@@ -18,18 +18,26 @@ export function computeCourseStats(lessons: Pick<Lesson, 'durationSec'>[]) {
   return { totalLessons, durationMin };
 }
 
+function byOrderAsc<T extends { order?: number }>(a: T, b: T) {
+  return (a.order ?? 0) - (b.order ?? 0);
+}
+
 export async function fetchCourseCurriculum(db: Firestore, courseId: string) {
   const [courseSnap, modulesSnap, lessonsSnap] = await Promise.all([
     db.collection(FS_COL.courses).doc(courseId).get(),
-    db.collection(FS_COL.modules).where('courseId', '==', courseId).orderBy('order', 'asc').get(),
-    db.collection(FS_COL.lessons).where('courseId', '==', courseId).orderBy('order', 'asc').get(),
+    db.collection(FS_COL.modules).where('courseId', '==', courseId).get(),
+    db.collection(FS_COL.lessons).where('courseId', '==', courseId).get(),
   ]);
 
   if (!courseSnap.exists) return null;
 
   const course = { id: courseSnap.id, ...(courseSnap.data() as Omit<Course, 'id'>) } as Course;
-  const modules = modulesSnap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as Omit<CourseModule, 'id'>) }));
-  const lessons = lessonsSnap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as Omit<Lesson, 'id'>) }));
+  const modules = modulesSnap.docs
+    .map((doc) => ({ id: doc.id, ...(doc.data() as Omit<CourseModule, 'id'>) }))
+    .sort(byOrderAsc);
+  const lessons = lessonsSnap.docs
+    .map((doc) => ({ id: doc.id, ...(doc.data() as Omit<Lesson, 'id'>) }))
+    .sort(byOrderAsc);
 
   return { course, modules, lessons };
 }
