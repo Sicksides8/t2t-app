@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "T2T Academy",
+    "slug": "t2t-academy",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "scheme": "t2tacademy",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#1D083A"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.t2tacademy.app"
+    },
+    "android": {
+      "package": "com.t2tacademy.app",
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "backgroundColor": "#1D083A"
+      },
+      "navigationBar": {
+        "backgroundColor": "#1D083A",
+        "barStyle": "light-content"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-notifications",
+      "expo-video",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "T2T Academy necesita acceso a tus fotos para actualizar tu perfil."
+        }
+      ],
+      "@react-native-google-signin/google-signin",
+      "expo-web-browser",
+      "./plugins/withGoogleServicesAndroid.js"
+    ]
+  }
+}

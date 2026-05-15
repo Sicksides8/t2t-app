@@ -1,0 +1,68 @@
+.page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.card {
+  width: min(440px, 100%);
+  display: grid;
+  gap: 16px;
+  padding: 32px;
+  border: 1px solid var(--divider);
+  border-radius: 32px;
+  background: rgba(42, 16, 82, 0.72);
+  backdrop-filter: blur(24px);
+}
+
+.logo {
+  width: 68px;
+  height: 68px;
+  display: grid;
+  place-items: center;
+  border-radius: 24px;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  font-weight: 900;
+}
+
+.card span {
+  color: var(--accent-secondary);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+.card h1 {
+  margin: 0 0 12px;
+}
+
+.card input {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 16px;
+  border: 1px solid var(--divider);
+  border-radius: 16px;
+  color: var(--text-primary);
+  background: var(--glass);
+}
+
+.card button {
+  min-height: 54px;
+  border: 0;
+  border-radius: 999px;
+  color: white;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.card p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.error {
+  color: var(--error);
+  font-weight: 600;
+}

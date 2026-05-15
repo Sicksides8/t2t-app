@@ -1,0 +1,20 @@
+{
+  "name": "t2t-academy",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/mobile",
+    "apps/web-crm"
+  ],
+  "scripts": {
+    "mobile": "npm --workspace apps/mobile run start",
+    "mobile:android": "npm --workspace apps/mobile run android",
+    "crm:dev": "npm --workspace apps/web-crm run dev",
+    "crm:build": "npm --workspace apps/web-crm run build",
+    "typecheck": "npm --workspace apps/mobile run typecheck && npm --workspace apps/web-crm run typecheck",
+    "seed:firestore": "node firebase/scripts/seed-t2t.mjs"
+  },
+  "devDependencies": {
+    "firebase-admin": "^13.7.0"
+  }
+}
