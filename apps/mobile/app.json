@@ -13,10 +13,16 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.t2tacademy.app"
+      "bundleIdentifier": "com.t2tacademy.app",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.t2tacademy.app",
+      "versionCode": 1,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#1D083A"
@@ -27,7 +33,8 @@
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -37,15 +44,28 @@
       "expo-font",
       "expo-notifications",
       "expo-video",
+      "expo-apple-authentication",
       [
         "expo-image-picker",
         {
           "photosPermission": "T2T Academy necesita acceso a tus fotos para actualizar tu perfil."
         }
       ],
-      "@react-native-google-signin/google-signin",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.34025167590-3lvtk9irp9pdrv33hm1lo771paalcavt"
+        }
+      ],
       "expo-web-browser",
-      "./plugins/withGoogleServicesAndroid.js"
-    ]
+      "./plugins/withGoogleServicesAndroid.js",
+      "./plugins/withAndroidReleaseSigning.js"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "202571bd-feab-43c3-9eb0-ef2a2ce0bc63"
+      }
+    },
+    "owner": "chillpenguin222"
   }
 }

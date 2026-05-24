@@ -16,7 +16,7 @@ interface AuthState {
   register: (email: string, password: string, displayName: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
   signInWithGoogleNative: () => Promise<void>;
-  /** Apple vía Firebase OAuth (sin expo-apple-authentication). */
+  /** Apple nativo en iOS; no disponible en Android. */
   signInWithAppleNative: () => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
@@ -105,6 +105,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const user = await authService.signInWithAppleOAuth();
       set({ user, isAuthenticated: true, isLoading: false });
     } catch (error: unknown) {
+      const code =
+        typeof error === 'object' && error !== null && 'code' in error
+          ? String((error as { code: unknown }).code)
+          : '';
+      if (code === 'ERR_REQUEST_CANCELED') {
+        set({ isLoading: false });
+        return;
+      }
       const message = mapAuthError(error);
       set({ error: message, isLoading: false });
       throw new Error(message);

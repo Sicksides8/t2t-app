@@ -21,6 +21,7 @@ export const FS_COL = {
   achievements: `${P}achievements`,
   weeklyChallenges: `${P}weekly_challenges`,
   config: `${P}config`,
+  waitlist: `${P}waitlist`,
   /** Progreso por usuario: t2t_progress/{uid}/… */
   progress: `${P}progress`,
   /** Subcolección (distinta de catálogo t2t_courses): t2t_progress/{uid}/t2t_user_courses/{courseId} */

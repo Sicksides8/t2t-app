@@ -21,6 +21,7 @@ export const FS_COL = {
   achievements: `${P}achievements`,
   weeklyChallenges: `${P}weekly_challenges`,
   config: `${P}config`,
+  waitlist: `${P}waitlist`,
   progress: `${P}progress`,
   progressCoursesSub: `${P}user_courses`,
 } as const;

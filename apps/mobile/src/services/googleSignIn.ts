@@ -4,6 +4,7 @@ import {
   isSuccessResponse,
   statusCodes,
 } from '@react-native-google-signin/google-signin';
+import { Platform } from 'react-native';
 
 /** Cliente OAuth Web (client_type 3 en google-services.json) del proyecto questly-flutter. */
 export const GOOGLE_WEB_CLIENT_ID_HINT =
@@ -53,7 +54,9 @@ export async function requestGoogleIdToken(): Promise<string | null> {
   if (!getGoogleWebClientId()) return null;
 
   try {
-    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    if (Platform.OS === 'android') {
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    }
     const response = await GoogleSignin.signIn();
     if (!isSuccessResponse(response)) {
       return null;

@@ -1,0 +1,25 @@
+{
+  "cli": {
+    "version": ">= 15.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "production": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "ios": {
+        "resourceClass": "m-medium",
+        "image": "latest"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascApiKeyPath": "./AuthKey_2CXNLLLCQJ.p8",
+        "ascApiKeyId": "2CXNLLLCQJ",
+        "ascApiKeyIssuerId": "bfbc17e8-bda7-4cc3-845d-a10fee0a95d0"
+      }
+    }
+  }
+}

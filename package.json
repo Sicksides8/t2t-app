@@ -4,14 +4,18 @@
   "private": true,
   "workspaces": [
     "apps/mobile",
-    "apps/web-crm"
+    "apps/web-crm",
+    "apps/waitlist-web"
   ],
   "scripts": {
     "mobile": "npm --workspace apps/mobile run start",
     "mobile:android": "npm --workspace apps/mobile run android",
+    "mobile:bundle": "npm --workspace apps/mobile run bundle:android",
     "crm:dev": "npm --workspace apps/web-crm run dev",
     "crm:build": "npm --workspace apps/web-crm run build",
-    "typecheck": "npm --workspace apps/mobile run typecheck && npm --workspace apps/web-crm run typecheck",
+    "waitlist:dev": "npm --workspace apps/waitlist-web run dev",
+    "waitlist:build": "npm --workspace apps/waitlist-web run build",
+    "typecheck": "npm --workspace apps/mobile run typecheck && npm --workspace apps/web-crm run typecheck && npm --workspace apps/waitlist-web run typecheck",
     "seed:firestore": "node firebase/scripts/seed-t2t.mjs"
   },
   "devDependencies": {

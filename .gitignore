@@ -9,6 +9,7 @@ build/
 Resources/
 *.apk
 *.aab
+*.ipa
 *.tsbuildinfo
 
 .env
@@ -18,6 +19,15 @@ Resources/
 
 android/
 ios/
+
+# Firma Android (producción) — nunca subir al repo
+apps/mobile/credentials/
+
+# App Store Connect API Key (nunca subir al repo)
+**/*.p8
+apps/mobile/AuthKey_*.p8
+*.keystore
+**/keystore.properties
 web-build/
 
 firebase-debug.log

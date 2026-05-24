@@ -102,6 +102,10 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /t2t_waitlist/{docId} {
+      allow read, write: if false;
+    }
+
     match /t2t_subscription_redemptions/{id} {
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;

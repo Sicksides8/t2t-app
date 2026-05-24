@@ -9,7 +9,7 @@ type Props = {
   loading?: boolean;
 };
 
-/** Botones sociales Penpot 32/33 (Apple vía Firebase OAuth, sin expo-apple-authentication). */
+/** Botones sociales Penpot 32/33 (Apple nativo solo en iOS cuando onApple esta definido). */
 export function AuthSocialButtons({ onGoogle, onApple, disabled, loading }: Props) {
   return (
     <View style={styles.wrap}>

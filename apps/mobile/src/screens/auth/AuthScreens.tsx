@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { isAppleSignInAvailable } from '../../services/appleSignIn';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthDivider, AuthPenpotShell, AuthSocialButtons, OtpInput } from '../../components/auth';
 import { Button, Input } from '../../components/ui';
@@ -22,10 +23,15 @@ export function SignUpScreen({ navigation }: NativeStackScreenProps<AuthStackPar
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [appleAvailable, setAppleAvailable] = useState(false);
 
   useEffect(() => {
     clearError();
   }, [clearError]);
+
+  useEffect(() => {
+    void isAppleSignInAvailable().then(setAppleAvailable);
+  }, []);
 
   const frame = PENPOT_FRAMES['32_SignUp'];
 
@@ -50,7 +56,9 @@ export function SignUpScreen({ navigation }: NativeStackScreenProps<AuthStackPar
       <AuthDivider />
       <AuthSocialButtons
         onGoogle={() => void signInWithGoogleNative().catch(() => {})}
-        onApple={() => void signInWithAppleNative().catch(() => {})}
+        onApple={
+          appleAvailable ? () => void signInWithAppleNative().catch(() => {}) : undefined
+        }
         disabled={isLoading}
         loading={isLoading}
       />
@@ -69,10 +77,15 @@ export function LoginScreen({ navigation }: NativeStackScreenProps<AuthStackPara
   const error = useAuthStore((state) => state.error);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [appleAvailable, setAppleAvailable] = useState(false);
 
   useEffect(() => {
     clearError();
   }, [clearError]);
+
+  useEffect(() => {
+    void isAppleSignInAvailable().then(setAppleAvailable);
+  }, []);
 
   const frame = PENPOT_FRAMES['33_Login'];
 
@@ -85,7 +98,9 @@ export function LoginScreen({ navigation }: NativeStackScreenProps<AuthStackPara
       <AuthDivider />
       <AuthSocialButtons
         onGoogle={() => void signInWithGoogleNative().catch(() => {})}
-        onApple={() => void signInWithAppleNative().catch(() => {})}
+        onApple={
+          appleAvailable ? () => void signInWithAppleNative().catch(() => {}) : undefined
+        }
         disabled={isLoading}
         loading={isLoading}
       />

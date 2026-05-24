@@ -51,4 +51,8 @@ const messages: Record<string, string> = {
   [statusCodes.PLAY_SERVICES_NOT_AVAILABLE]:
     'Google Play Services no esta disponible. Actualizalo en el dispositivo',
   [statusCodes.IN_PROGRESS]: 'Google Sign-In ya esta en curso, espera un momento',
+  ERR_REQUEST_CANCELED: 'Inicio cancelado',
+  'apple-not-available': 'Sign in with Apple no esta disponible en este dispositivo',
+  'apple-no-identity-token': 'No se pudo completar el inicio con Apple. Intenta de nuevo',
+  'apple-sign-in-cancelled': 'Inicio cancelado',
 };

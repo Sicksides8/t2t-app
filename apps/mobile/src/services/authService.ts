@@ -13,6 +13,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { Platform } from 'react-native';
 import { FS_COL } from '../constants/firestoreCollections';
 import { auth, db } from './firebase';
 import type { User } from '../types';
@@ -46,11 +47,16 @@ export async function loginWithApple(identityToken: string, nonce: string): Prom
   return getOrCreateUserProfile(result.user);
 }
 
-/** Apple Sign-In solo con Firebase Auth (OAuth popup/redirect). */
+/** Apple: nativo en iOS (expo-apple-authentication), OAuth web en web. */
 export async function signInWithAppleOAuth(): Promise<User> {
-  const { signInWithAppleFirebase } = await import('./appleSignIn');
-  const credential = await signInWithAppleFirebase();
-  return getOrCreateUserProfile(credential.user);
+  const { requestAppleSignIn } = await import('./appleSignIn');
+  const user = await requestAppleSignIn();
+  if (!user) {
+    const err = new Error('Inicio con Apple cancelado');
+    Object.assign(err, { code: 'ERR_REQUEST_CANCELED' });
+    throw err;
+  }
+  return user;
 }
 
 export async function resetPassword(email: string): Promise<void> {
@@ -72,6 +78,7 @@ export async function checkEmailVerified(): Promise<boolean> {
 
 export async function logout(): Promise<void> {
   await firebaseSignOut(auth);
+  if (Platform.OS !== 'android') return;
   try {
     if (await GoogleSignin.hasPlayServices()) {
       await GoogleSignin.signOut();
@@ -93,7 +100,7 @@ export async function getUserProfile(userId: string): Promise<User> {
   return fromFirestore(snapshot.id, snapshot.data());
 }
 
-async function getOrCreateUserProfile(firebaseUser: FirebaseUser): Promise<User> {
+export async function getOrCreateUserProfile(firebaseUser: FirebaseUser): Promise<User> {
   const snapshot = await getDoc(doc(db, FS_COL.users, firebaseUser.uid));
   if (snapshot.exists()) {
     return fromFirestore(snapshot.id, snapshot.data());

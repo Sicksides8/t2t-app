@@ -37,13 +37,33 @@ npm run typecheck       # Typecheck mobile + CRM
 npm run seed:firestore  # Seed Firestore (requiere credenciales admin locales)
 ```
 
-## APK Android (release)
+## Android producción (Google Play — AAB)
+
+Keystore de subida en `apps/mobile/credentials/` (no se sube a git). Tras `prebuild`, el script copia `keystore.properties` a `android/`.
 
 ```bash
 cd apps/mobile
-npm run prebuild:android   # si cambiaste dependencias nativas
-cd android
-./gradlew assembleRelease  # Windows: gradlew.bat assembleRelease
+npm run prebuild:android   # si cambiaste plugins nativos, app.json o google-services.json
+npm run bundle:android     # AAB firmado para Play Console
 ```
 
-APK: `apps/mobile/android/app/build/outputs/apk/release/app-release.apk`
+AAB: `apps/mobile/android/app/build/outputs/bundle/release/app-release.aab`
+
+SHA-1 del keystore de release: `npm run android:sha1:release` (desde `apps/mobile`).
+
+## iOS producción (App Store — EAS, sin Mac)
+
+Build en la nube de [Expo EAS](https://expo.dev). Sign in with Apple es **nativo en iOS**; Google Sign-In en iOS y Android. El botón Apple no se muestra en Android.
+
+Checklist de consolas (Firebase iOS, Apple Developer, secrets): [`apps/mobile/IOS_RELEASE_CHECKLIST.md`](apps/mobile/IOS_RELEASE_CHECKLIST.md).
+
+```bash
+cd apps/mobile
+npm run ios:google-config   # tras reemplazar GoogleService-Info.plist desde Firebase
+npx eas-cli login
+npx eas-cli init            # pega projectId en app.json → extra.eas.projectId
+npm run eas:build:ios       # .ipa en expo.dev
+npm run eas:submit:ios      # sube a App Store Connect
+```
+
+Iconos de tienda: `npm run generate:icons` (requiere `sharp` devDependency en mobile).

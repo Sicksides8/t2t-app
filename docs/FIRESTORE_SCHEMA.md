@@ -23,6 +23,7 @@ Constantes en código: `apps/mobile/src/constants/firestoreCollections.ts` y `ap
 - `t2t_weekly_challenges/{id}`: desafíos semanales.
 - `t2t_subscription_redemptions/{id}`: registro opcional de intentos de canje (cliente).
 - `t2t_config/{docId}`: configuración pública (ej. mantenimiento).
+- `t2t_waitlist/{docId}`: emails de lista de espera (`email`, `status`: `pending` | `invited`, `createdAt`, `invitedAt`, `source`). Escritura solo vía Admin SDK (`apps/waitlist-web`).
 
 ## Firebase Storage
 

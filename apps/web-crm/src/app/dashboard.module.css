@@ -147,6 +147,23 @@
   cursor: pointer;
 }
 
+.actionBtn {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  color: white;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.actionBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .back {
   margin: 0 0 12px;
 }

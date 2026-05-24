@@ -51,6 +51,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "34025167590-2evq706eg8uha2cmtfdf1flt11i4r8vs.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.t2tacademy.app",
+            "certificate_hash": "ef65d1cea21a78850cc04bd5d4ee11a64b6345e2"
+          }
+        },
+        {
           "client_id": "34025167590-pm3ace2f8fnq0iirdqimukeb3kq80u1k.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
