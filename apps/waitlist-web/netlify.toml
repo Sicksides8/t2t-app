@@ -12,6 +12,7 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  WAITLIST_SITE_URL = "https://t2tacademy.online"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"

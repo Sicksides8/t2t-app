@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://t2tacademy.online'),
   title: 'T2T Academy — Lista de espera',
   description: 'Sumate a la beta cerrada de T2T Academy y entrená las habilidades que transforman tu carrera.',
   openGraph: {
