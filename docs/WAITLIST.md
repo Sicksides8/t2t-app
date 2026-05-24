@@ -63,6 +63,10 @@ Colección `t2t_waitlist`. Reglas: solo Admin SDK.
 firebase deploy --only firestore:rules,firestore:indexes
 ```
 
+### Build falla por "secrets scanning" (AIza en google-services.json)
+
+El sitio waitlist comparte repo con `apps/mobile`. En `apps/waitlist-web/netlify.toml` está `SECRETS_SCAN_OMIT_PATHS` para excluir mobile/CRM del escáner. Si cambiás la config, no quites esa variable sin sanitizar esos archivos.
+
 Si el panel `/admin` pide un índice compuesto (`status` + `createdAt`), ejecutá el deploy de índices o usá el enlace que muestra la consola de Firebase. El código del panel evita ese índice para listas filtradas pequeñas; el índice sigue recomendado en producción.
 
 ## Deploy en Netlify (sitio separado del CRM)
