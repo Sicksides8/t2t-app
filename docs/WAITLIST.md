@@ -79,11 +79,12 @@ El **web-crm** y la **waitlist** son **dos sitios distintos** en Netlify, ambos 
 | Campo | Valor |
 |--------|--------|
 | **Site name** | ej. `t2t-waitlist` (distinto al del CRM) |
-| **Base directory** | `apps/waitlist-web` |
-| **Build command** | *(vacío si usás `apps/waitlist-web/netlify.toml`)* |
+| **Base directory** | *(vacío = raíz del repo)* |
+| **Package directory** | `apps/waitlist-web` |
+| **Build command** | *(vacío; usa `apps/waitlist-web/netlify.toml`)* |
 | **Publish directory** | *(vacío; lo gestiona el plugin de Next.js)* |
 
-El archivo `apps/waitlist-web/netlify.toml` corre `npm ci` en la raíz del monorepo y `npm run waitlist:build`.
+No pongas **Base directory** en `apps/waitlist-web` si el comando hace `cd ../..`: con **Package directory** el build ya corre desde la raíz. El `netlify.toml` ejecuta `npm ci && npm run waitlist:build` en el monorepo.
 
 ### Variables de entorno (solo en el sitio waitlist)
 
