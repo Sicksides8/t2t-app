@@ -9,6 +9,23 @@ function toOrigin(value: string | undefined): string | null {
   }
 }
 
+function normalizeHost(host: string): string {
+  return host.toLowerCase().replace(/^www\./, '');
+}
+
+function hostsMatch(a: string, b: string): boolean {
+  return normalizeHost(a) === normalizeHost(b);
+}
+
+/** Host público del request (Netlify/Next suelen usar host interno en request.url). */
+function getPublicHost(request: Request): string | null {
+  const forwarded = request.headers.get('x-forwarded-host');
+  if (forwarded) {
+    return forwarded.split(',')[0]?.trim() || null;
+  }
+  return request.headers.get('host');
+}
+
 function getAllowedOrigins(): string[] {
   const fromList = (process.env.WAITLIST_ALLOWED_ORIGINS || '')
     .split(',')
@@ -21,6 +38,7 @@ function getAllowedOrigins(): string[] {
     process.env.DEPLOY_PRIME_URL,
     process.env.NETLIFY_URL,
     process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.WAITLIST_SITE_URL,
   ]
     .map((v) => toOrigin(v))
     .filter((o): o is string => Boolean(o));
@@ -28,37 +46,36 @@ function getAllowedOrigins(): string[] {
   return [...new Set([...fromList, ...platformOrigins])];
 }
 
-function isSameHostAsRequest(request: Request, origin: string): boolean {
+function originMatchesPublicHost(request: Request, origin: string): boolean {
+  const publicHost = getPublicHost(request);
+  if (!publicHost) return false;
   try {
-    const requestHost = new URL(request.url).host;
-    const originHost = new URL(origin).host;
-    return requestHost === originHost;
+    return hostsMatch(new URL(origin).host, publicHost);
   } catch {
     return false;
   }
 }
 
 export function isAllowedOrigin(request: Request): boolean {
-  const allowed = getAllowedOrigins();
   const origin = request.headers.get('origin');
+  const allowed = getAllowedOrigins();
 
   if (origin) {
+    // Mismo sitio: t2tacademy.online, www., dominio Netlify, etc.
+    if (originMatchesPublicHost(request, origin)) return true;
     if (allowed.includes(origin)) return true;
-    if (isSameHostAsRequest(request, origin)) return true;
     return false;
   }
 
-  // Sin header Origin (algunos clientes): permitir si el host coincide con el deploy
-  const host = request.headers.get('host');
-  if (host) {
-    const hostOrigin = toOrigin(`https://${host}`);
-    if (hostOrigin && allowed.includes(hostOrigin)) return true;
+  const publicHost = getPublicHost(request);
+  if (publicHost) {
+    const httpsOrigin = toOrigin(`https://${publicHost}`);
+    const httpOrigin = toOrigin(`http://${publicHost}`);
+    if (httpsOrigin && allowed.includes(httpsOrigin)) return true;
+    if (httpOrigin && allowed.includes(httpOrigin)) return true;
     if (process.env.NODE_ENV !== 'production') return true;
-    try {
-      return host === new URL(request.url).host;
-    } catch {
-      return false;
-    }
+    // POST same-site sin header Origin
+    return true;
   }
 
   return process.env.NODE_ENV !== 'production';
