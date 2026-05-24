@@ -1,0 +1,13 @@
+# Segundo sitio Netlify (independiente del web-crm).
+# En Netlify UI: Base directory = apps/waitlist-web
+# Mismo repo y branch main que el CRM.
+
+[build]
+  # Monorepo npm workspaces: install desde la raíz del repo
+  command = "cd ../.. && npm ci && npm run waitlist:build"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

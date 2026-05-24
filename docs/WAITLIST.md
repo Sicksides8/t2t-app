@@ -64,3 +64,43 @@ firebase deploy --only firestore:rules,firestore:indexes
 ```
 
 Si el panel `/admin` pide un índice compuesto (`status` + `createdAt`), ejecutá el deploy de índices o usá el enlace que muestra la consola de Firebase. El código del panel evita ese índice para listas filtradas pequeñas; el índice sigue recomendado en producción.
+
+## Deploy en Netlify (sitio separado del CRM)
+
+El **web-crm** y la **waitlist** son **dos sitios distintos** en Netlify, ambos apuntan al mismo repo `t2t-app` y branch `main`.
+
+### Crear el segundo sitio
+
+1. Netlify → **Add new site** → **Import an existing project**.
+2. Mismo proveedor Git y repo **`t2t-app`** que el CRM.
+3. Branch: **`main`**.
+4. **No copies** la config del sitio del CRM; configurá la waitlist así:
+
+| Campo | Valor |
+|--------|--------|
+| **Site name** | ej. `t2t-waitlist` (distinto al del CRM) |
+| **Base directory** | `apps/waitlist-web` |
+| **Build command** | *(vacío si usás `apps/waitlist-web/netlify.toml`)* |
+| **Publish directory** | *(vacío; lo gestiona el plugin de Next.js)* |
+
+El archivo `apps/waitlist-web/netlify.toml` corre `npm ci` en la raíz del monorepo y `npm run waitlist:build`.
+
+### Variables de entorno (solo en el sitio waitlist)
+
+Configuralas en **Site configuration → Environment variables** del sitio nuevo (no en el del CRM):
+
+- `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
+- `RESEND_API_KEY`, `WAITLIST_FROM_EMAIL=onboarding@resend.dev`
+- `PLAY_STORE_URL`, `APP_STORE_URL` (opcional)
+- `MAILER_ADMIN_USER`, `MAILER_ADMIN_PASSWORD`
+- `WAITLIST_ALLOWED_ORIGINS` → opcional en producción: Netlify ya expone `URL` y se acepta automáticamente. En local usá `http://localhost:3001`. Si definís la variable, incluí también tu dominio custom.
+
+`FIREBASE_PRIVATE_KEY`: pegá la clave con `\n` literales o usá el editor multilínea de Netlify.
+
+### Resumen
+
+| | CRM | Waitlist |
+|---|-----|----------|
+| Carpeta | `apps/web-crm` | `apps/waitlist-web` |
+| Sitio Netlify | el que ya tenés | **uno nuevo** |
+| URL | dominio del CRM | dominio distinto (ej. waitlist.t2t.com) |
