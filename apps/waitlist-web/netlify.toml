@@ -16,3 +16,10 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# Canonical: sin www (como entrás hoy)
+[[redirects]]
+  from = "https://www.t2tacademy.online/*"
+  to = "https://t2tacademy.online/:splat"
+  status = 301
+  force = true
