@@ -7,12 +7,56 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:34025167590:android:087f81d3a8076c4ba87927",
+        "android_client_info": {
+          "package_name": "com.armat.seguridad"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "34025167590-8oqedbuneoseqo18i0jcegffl2dk03fg.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDQuwAZ-Bcao9TuQ7sFVLH4ucsY4juBDz4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "34025167590-8oqedbuneoseqo18i0jcegffl2dk03fg.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "34025167590-3lvtk9irp9pdrv33hm1lo771paalcavt.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.t2tacademy.app"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:34025167590:android:cd4dc22c46c2098fa87927",
         "android_client_info": {
           "package_name": "com.chillpenguin.lohagofacil"
         }
       },
       "oauth_client": [
+        {
+          "client_id": "34025167590-4v3b23j8lqicllpimmcnfufir0auk1f8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.chillpenguin.lohagofacil",
+            "certificate_hash": "a5c8293f6d7e719f83dff2ac6f314b60c2abe055"
+          }
+        },
         {
           "client_id": "34025167590-77ir70pnsgsn9a56ph3mhlv40taqf519.apps.googleusercontent.com",
           "client_type": 1,
@@ -37,6 +81,101 @@
             {
               "client_id": "34025167590-8oqedbuneoseqo18i0jcegffl2dk03fg.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "34025167590-3lvtk9irp9pdrv33hm1lo771paalcavt.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.t2tacademy.app"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:34025167590:android:37db14608e555b2aa87927",
+        "android_client_info": {
+          "package_name": "com.chillpenguin222.elevatelifeapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "34025167590-8oqedbuneoseqo18i0jcegffl2dk03fg.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDQuwAZ-Bcao9TuQ7sFVLH4ucsY4juBDz4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "34025167590-8oqedbuneoseqo18i0jcegffl2dk03fg.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "34025167590-3lvtk9irp9pdrv33hm1lo771paalcavt.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.t2tacademy.app"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:34025167590:android:67b87858859ec24ea87927",
+        "android_client_info": {
+          "package_name": "com.lohagofacil.mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "34025167590-q57ts769gog4en04bt91sb2blj2hqjlb.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.lohagofacil.mobile",
+            "certificate_hash": "a5c8293f6d7e719f83dff2ac6f314b60c2abe055"
+          }
+        },
+        {
+          "client_id": "34025167590-s5jl9s9rfsf54nfar5bjb2duqljl0c6b.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.lohagofacil.mobile",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "34025167590-8oqedbuneoseqo18i0jcegffl2dk03fg.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDQuwAZ-Bcao9TuQ7sFVLH4ucsY4juBDz4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "34025167590-8oqedbuneoseqo18i0jcegffl2dk03fg.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "34025167590-3lvtk9irp9pdrv33hm1lo771paalcavt.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.t2tacademy.app"
+              }
             }
           ]
         }
@@ -82,6 +221,73 @@
             {
               "client_id": "34025167590-8oqedbuneoseqo18i0jcegffl2dk03fg.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "34025167590-3lvtk9irp9pdrv33hm1lo771paalcavt.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.t2tacademy.app"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:34025167590:android:23765df5978f3362a87927",
+        "android_client_info": {
+          "package_name": "com.t2tacademy.mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "34025167590-2dgofcv272166nvkk76rue4pe1mmjrac.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.t2tacademy.mobile",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "34025167590-jv5gf0fs3c12jnvvp4mg5lvn77en1ugk.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.t2tacademy.mobile",
+            "certificate_hash": "ef65d1cea21a78850cc04bd5d4ee11a64b6345e2"
+          }
+        },
+        {
+          "client_id": "34025167590-uvsnfng305ml8cplhcrfs6k3g5tnrtq3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.t2tacademy.mobile",
+            "certificate_hash": "76682d6e26e64684e1a9eb9b9dbac3528950dfe6"
+          }
+        },
+        {
+          "client_id": "34025167590-8oqedbuneoseqo18i0jcegffl2dk03fg.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDQuwAZ-Bcao9TuQ7sFVLH4ucsY4juBDz4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "34025167590-8oqedbuneoseqo18i0jcegffl2dk03fg.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "34025167590-3lvtk9irp9pdrv33hm1lo771paalcavt.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.t2tacademy.app"
+              }
             }
           ]
         }

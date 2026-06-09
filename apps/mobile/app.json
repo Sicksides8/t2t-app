@@ -21,8 +21,8 @@
       }
     },
     "android": {
-      "package": "com.t2tacademy.app",
-      "versionCode": 1,
+      "package": "com.t2tacademy.mobile",
+      "versionCode": 2,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#1D083A"
