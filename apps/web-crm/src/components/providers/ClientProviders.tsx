@@ -2,11 +2,14 @@
 
 import { AuthProvider } from '../../contexts/AuthContext';
 import { AuthGuard } from '../AuthGuard';
+import { ToastProvider } from '../ui/Toast';
 
 export function ClientProviders({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <AuthGuard>{children}</AuthGuard>
+      <ToastProvider>
+        <AuthGuard>{children}</AuthGuard>
+      </ToastProvider>
     </AuthProvider>
   );
 }

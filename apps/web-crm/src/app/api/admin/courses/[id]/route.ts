@@ -3,6 +3,7 @@ import { requireAdmin } from '../../../../../lib/authHelper';
 import { fetchCourseCurriculum } from '../../../../../lib/courseAdminServer';
 import { adminDb } from '../../../../../lib/firebase-admin';
 import { FS_COL } from '../../../../../lib/firestoreCollections';
+import { deleteObject, isR2Configured, keyFromPublicUrl } from '../../../../../lib/r2';
 import { handleRouteError } from '../../../../../lib/routeError';
 import type { Course, PatchCourseBody } from '../../../../../types';
 
@@ -60,6 +61,71 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const next = await ref.get();
     const course = { id: next.id, ...(next.data() as Omit<Course, 'id'>) } as Course;
     return NextResponse.json({ success: true, data: course });
+  } catch (error) {
+    return handleRouteError(error);
+  }
+}
+
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    await requireAdmin(request);
+    const { id } = await params;
+    const courseRef = adminDb.collection(FS_COL.courses).doc(id);
+    const courseSnap = await courseRef.get();
+    if (!courseSnap.exists) {
+      return NextResponse.json(
+        { success: false, error: { message: 'Curso no encontrado' } },
+        { status: 404 },
+      );
+    }
+
+    const courseData = courseSnap.data() as Partial<Course>;
+    const [modulesSnap, lessonsSnap] = await Promise.all([
+      adminDb.collection(FS_COL.modules).where('courseId', '==', id).get(),
+      adminDb.collection(FS_COL.lessons).where('courseId', '==', id).get(),
+    ]);
+
+    const r2Keys = new Set<string>();
+    if (isR2Configured()) {
+      if (courseData.thumbnail) {
+        const k = keyFromPublicUrl(String(courseData.thumbnail));
+        if (k) r2Keys.add(k);
+      }
+      for (const doc of lessonsSnap.docs) {
+        const url = (doc.data() as { videoUrl?: string }).videoUrl;
+        if (url) {
+          const k = keyFromPublicUrl(url);
+          if (k) r2Keys.add(k);
+        }
+      }
+    }
+
+    const batch = adminDb.batch();
+    for (const doc of lessonsSnap.docs) batch.delete(doc.ref);
+    for (const doc of modulesSnap.docs) batch.delete(doc.ref);
+    batch.delete(courseRef);
+    await batch.commit();
+
+    let r2Deleted = 0;
+    let r2Failed = 0;
+    if (r2Keys.size > 0) {
+      const results = await Promise.allSettled(
+        Array.from(r2Keys).map((key) => deleteObject(key)),
+      );
+      r2Deleted = results.filter((r) => r.status === 'fulfilled').length;
+      r2Failed = results.length - r2Deleted;
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        id,
+        deletedLessons: lessonsSnap.size,
+        deletedModules: modulesSnap.size,
+        r2Deleted,
+        r2Failed,
+      },
+    });
   } catch (error) {
     return handleRouteError(error);
   }

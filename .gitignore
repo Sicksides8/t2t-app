@@ -35,3 +35,6 @@ firestore-debug.log
 ui-debug.log
 
 *.log
+
+# Carpeta local de QA/scratch (videos de prueba, etc.)
+tmp/
