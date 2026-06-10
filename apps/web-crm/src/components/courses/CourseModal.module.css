@@ -352,6 +352,63 @@
   color: white;
 }
 
+.chipGhost {
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background: transparent;
+  color: var(--text-tertiary, var(--text-secondary));
+  border-style: dashed;
+}
+
+.chipGhost:hover {
+  color: var(--text-primary);
+  border-style: solid;
+}
+
+.tierGrid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin-top: 8px;
+}
+
+.tierCard {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--divider);
+  background: var(--glass);
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.tierCard:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-primary);
+}
+
+.tierCardActive {
+  border-color: transparent;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(168, 85, 247, 0.18));
+  color: var(--text-primary);
+  box-shadow: 0 0 0 1px var(--accent-primary) inset;
+}
+
+.tierCardLabel {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.tierCardHint {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
 .toggleRow {
   display: grid;
   gap: 12px;
@@ -615,6 +672,25 @@
   width: 100%;
 }
 
+.lessonExpandedLabel {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.lessonExpandedLabel + * {
+  margin-top: -6px;
+}
+
+.dropzoneSmall {
+  padding: 18px;
+  min-height: 120px;
+  gap: 6px;
+}
+
 .bulkActions {
   display: flex;
   flex-wrap: wrap;
@@ -685,6 +761,34 @@
   object-fit: cover;
   border-radius: 10px;
   background: var(--glass);
+}
+
+.pdfPreview {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--divider);
+  color: var(--text-primary);
+}
+
+.pdfPreviewText {
+  display: grid;
+  gap: 2px;
+  font-size: 14px;
+}
+
+.pdfPreviewText strong {
+  word-break: break-all;
+}
+
+.pdfPreviewLink {
+  color: var(--accent-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-size: 13px;
 }
 
 .uploaderInfo {

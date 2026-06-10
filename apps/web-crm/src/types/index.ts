@@ -14,15 +14,20 @@ export interface User {
   updatedAt?: Date;
 }
 
+export type CourseLevel = 'beginner' | 'intermediate' | 'advanced' | 'master' | 'expert';
+export type CourseAccessTier = 'free' | 'lite' | 'premium';
+
 export interface Course {
   id: string;
   title: string;
   skillId: string;
   description: string;
   thumbnail?: string;
+  pdfUrl?: string;
   totalLessons: number;
   durationMin: number;
-  level: 'beginner' | 'intermediate' | 'advanced';
+  level: CourseLevel;
+  accessTier?: CourseAccessTier;
   isActive: boolean;
   isPremium?: boolean;
   order?: number;
@@ -42,6 +47,7 @@ export interface Lesson {
   moduleId: string;
   title: string;
   videoUrl: string;
+  pdfUrl?: string;
   durationSec: number;
   order: number;
   isFree: boolean;
@@ -63,7 +69,9 @@ export type CreateCourseBody = {
   skillId: string;
   description: string;
   thumbnail?: string;
-  level: Course['level'];
+  pdfUrl?: string;
+  level: CourseLevel;
+  accessTier?: CourseAccessTier;
   isActive?: boolean;
   isPremium?: boolean;
   order?: number;
@@ -71,13 +79,26 @@ export type CreateCourseBody = {
   lessons: Array<{
     title: string;
     videoUrl?: string;
+    pdfUrl?: string;
     durationSec: number;
     isFree?: boolean;
   }>;
 };
 
 export type PatchCourseBody = Partial<
-  Pick<Course, 'title' | 'skillId' | 'description' | 'thumbnail' | 'level' | 'isActive' | 'isPremium' | 'order'>
+  Pick<
+    Course,
+    | 'title'
+    | 'skillId'
+    | 'description'
+    | 'thumbnail'
+    | 'pdfUrl'
+    | 'level'
+    | 'accessTier'
+    | 'isActive'
+    | 'isPremium'
+    | 'order'
+  >
 >;
 
 export type SyncCurriculumBody = {
@@ -86,6 +107,7 @@ export type SyncCurriculumBody = {
     id?: string;
     title: string;
     videoUrl: string;
+    pdfUrl?: string;
     durationSec: number;
     order: number;
     isFree: boolean;

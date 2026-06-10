@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
   ChevronDown,
+  FileText,
   HelpCircle,
   ImageIcon,
   Info,
@@ -12,9 +13,15 @@ import {
   X,
 } from 'lucide-react';
 import { apiFetch } from '../../lib/api';
-import { LEVEL_OPTIONS, MOCK_VIDEO_URL, SKILL_OPTIONS } from '../../lib/courseConstants';
+import {
+  ACCESS_TIER_OPTIONS,
+  LEVEL_OPTIONS,
+  MOCK_VIDEO_URL,
+  SKILL_SUGGESTIONS,
+} from '../../lib/courseConstants';
 import type {
   Course,
+  CourseAccessTier,
   CourseDetailPayload,
   CreateCourseBody,
   LessonDraft,
@@ -45,17 +52,19 @@ type CourseFormModalProps = {
   nextOrder?: number;
 };
 
-type SectionId = 'course' | 'cover' | 'lessons' | 'publish';
+type SectionId = 'course' | 'cover' | 'material' | 'lessons' | 'publish';
 
 type SectionState = 'empty' | 'partial' | 'complete' | 'invalid';
 
 const DEMO_SNAPSHOT: CourseFormSnapshot = {
   title: 'Liderazgo humano para equipos modernos',
-  skillId: 'liderazgo',
+  skillId: 'Liderazgo',
   description:
     'Aprende a liderar con confianza, claridad y conversaciones difíciles bien llevadas. Ideal para coordinadores y mandos medios que quieren acompañar mejor a sus equipos.',
   thumbnail: '',
+  pdfUrl: '',
   level: 'beginner',
+  accessTier: 'free',
   isActive: true,
   isPremium: false,
   lessons: [
@@ -89,10 +98,12 @@ const DEMO_SNAPSHOT: CourseFormSnapshot = {
 function emptySnapshot(): CourseFormSnapshot {
   return {
     title: '',
-    skillId: 'liderazgo',
+    skillId: '',
     description: '',
     thumbnail: '',
+    pdfUrl: '',
     level: 'beginner',
+    accessTier: 'free',
     isActive: true,
     isPremium: false,
     lessons: [newLessonDraft(1), newLessonDraft(2)],
@@ -100,9 +111,13 @@ function emptySnapshot(): CourseFormSnapshot {
 }
 
 function computeCourseSection(snapshot: CourseFormSnapshot): SectionState {
-  const filled = [snapshot.title.trim(), snapshot.description.trim()].filter(Boolean).length;
+  const filled = [
+    snapshot.title.trim(),
+    snapshot.description.trim(),
+    snapshot.skillId.trim(),
+  ].filter(Boolean).length;
   if (filled === 0) return 'empty';
-  if (filled === 2) return 'complete';
+  if (filled === 3) return 'complete';
   return 'partial';
 }
 
@@ -132,7 +147,9 @@ function snapshotsEqual(a: CourseFormSnapshot, b: CourseFormSnapshot): boolean {
     a.skillId !== b.skillId ||
     a.description !== b.description ||
     a.thumbnail !== b.thumbnail ||
+    a.pdfUrl !== b.pdfUrl ||
     a.level !== b.level ||
+    a.accessTier !== b.accessTier ||
     a.isActive !== b.isActive ||
     a.isPremium !== b.isPremium ||
     a.lessons.length !== b.lessons.length
@@ -145,6 +162,7 @@ function snapshotsEqual(a: CourseFormSnapshot, b: CourseFormSnapshot): boolean {
     if (
       la.title !== lb.title ||
       la.videoUrl !== lb.videoUrl ||
+      (la.pdfUrl || '') !== (lb.pdfUrl || '') ||
       la.durationSec !== lb.durationSec ||
       la.isFree !== lb.isFree ||
       la.order !== lb.order
@@ -194,12 +212,19 @@ export function CourseFormModal({
       apiFetch<CourseDetailPayload>(`/api/admin/courses/${courseId}`)
         .then((data) => {
           if (loadSeqRef.current !== seq) return;
+          const fallbackTier: CourseAccessTier = data.course.accessTier
+            ? data.course.accessTier
+            : data.course.isPremium
+              ? 'lite'
+              : 'free';
           const initial: CourseFormSnapshot = {
             title: data.course.title || '',
-            skillId: data.course.skillId || 'liderazgo',
+            skillId: data.course.skillId || '',
             description: data.course.description || '',
             thumbnail: data.course.thumbnail || '',
+            pdfUrl: data.course.pdfUrl || '',
             level: data.course.level || 'beginner',
+            accessTier: fallbackTier,
             isActive: data.course.isActive !== false,
             isPremium: Boolean(data.course.isPremium),
             lessons: draftsFromLessons(data.lessons),
@@ -366,18 +391,22 @@ export function CourseFormModal({
   async function submitCreate() {
     setSaving(true);
     setError(null);
+    const isPremiumDerived = snapshot.accessTier !== 'free';
     const body: CreateCourseBody = {
       title: snapshot.title.trim(),
-      skillId: snapshot.skillId,
+      skillId: snapshot.skillId.trim(),
       description: snapshot.description.trim(),
       thumbnail: snapshot.thumbnail.trim() || undefined,
+      pdfUrl: snapshot.pdfUrl.trim() || undefined,
       level: snapshot.level,
+      accessTier: snapshot.accessTier,
       order: typeof nextOrder === 'number' ? nextOrder : undefined,
       isActive: snapshot.isActive,
-      isPremium: snapshot.isPremium,
+      isPremium: isPremiumDerived,
       lessons: snapshot.lessons.map((lesson) => ({
         title: lesson.title.trim(),
         videoUrl: lesson.videoUrl.trim() || MOCK_VIDEO_URL,
+        pdfUrl: lesson.pdfUrl?.trim() || undefined,
         durationSec: lesson.durationSec,
         isFree: lesson.isFree,
       })),
@@ -408,16 +437,19 @@ export function CourseFormModal({
     setSaving(true);
     setError(null);
     try {
+      const isPremiumDerived = snapshot.accessTier !== 'free';
       await apiFetch<Course>(`/api/admin/courses/${courseId}`, {
         method: 'PATCH',
         body: JSON.stringify({
           title: snapshot.title.trim(),
-          skillId: snapshot.skillId,
+          skillId: snapshot.skillId.trim(),
           description: snapshot.description.trim(),
           thumbnail: snapshot.thumbnail.trim() || null,
+          pdfUrl: snapshot.pdfUrl.trim() || null,
           level: snapshot.level,
+          accessTier: snapshot.accessTier,
           isActive: snapshot.isActive,
-          isPremium: snapshot.isPremium,
+          isPremium: isPremiumDerived,
         }),
       });
 
@@ -426,6 +458,7 @@ export function CourseFormModal({
           id: lesson.id,
           title: lesson.title.trim(),
           videoUrl: lesson.videoUrl.trim() || MOCK_VIDEO_URL,
+          pdfUrl: lesson.pdfUrl?.trim() || undefined,
           durationSec: lesson.durationSec,
           order: index + 1,
           isFree: lesson.isFree,
@@ -472,7 +505,7 @@ export function CourseFormModal({
               <h2 id="course-form-title">{mode === 'create' ? 'Nuevo curso' : 'Editar curso'}</h2>
               <p>
                 {mode === 'create'
-                  ? 'Completá la información del curso y sus lecciones. Se publica al guardar.'
+                  ? 'Completá la información del curso y sus módulos. Se publica al guardar.'
                   : snapshot.title || 'Cargando...'}
               </p>
             </div>
@@ -555,28 +588,41 @@ export function CourseFormModal({
                 <span className={styles.hint}>Lo que se ve grande en la card del catálogo (máx. 120).</span>
               </label>
 
-              <div>
-                <span style={{ fontSize: 14, fontWeight: 600 }}>
-                  Habilidad <span className={styles.required}>*</span>
+              <label className={styles.label}>
+                <span>
+                  Habilidad / Categoría <span className={styles.required}>*</span>
                 </span>
-                <p className={styles.hint} style={{ marginBottom: 8 }}>
-                  La categoría con la que se clasifica el curso en la app.
-                </p>
-                <div className={styles.chips}>
-                  {SKILL_OPTIONS.map((opt) => (
+                <input
+                  className={`${styles.input} ${
+                    courseState !== 'empty' && !snapshot.skillId.trim() ? styles.inputInvalid : ''
+                  }`}
+                  value={snapshot.skillId}
+                  onChange={(e) => update('skillId', e.target.value)}
+                  placeholder="Ej: Liderazgo, Comunicación, Productividad..."
+                  maxLength={60}
+                  list="skill-suggestions"
+                />
+                <datalist id="skill-suggestions">
+                  {SKILL_SUGGESTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.label} />
+                  ))}
+                </datalist>
+                <span className={styles.hint}>
+                  Texto libre. Aparece como categoría en la app móvil.
+                </span>
+                <div className={styles.chips} style={{ marginTop: 8 }}>
+                  {SKILL_SUGGESTIONS.map((opt) => (
                     <button
                       key={opt.value}
                       type="button"
-                      className={`${styles.chip} ${
-                        snapshot.skillId === opt.value ? styles.chipActive : ''
-                      }`}
-                      onClick={() => update('skillId', opt.value)}
+                      className={`${styles.chip} ${styles.chipGhost}`}
+                      onClick={() => update('skillId', opt.label)}
                     >
                       {opt.label}
                     </button>
                   ))}
                 </div>
-              </div>
+              </label>
 
               <div>
                 <span style={{ fontSize: 14, fontWeight: 600 }}>
@@ -640,13 +686,34 @@ export function CourseFormModal({
           </Section>
 
           <Section
+            id="material"
+            icon={<FileText size={18} />}
+            title="Material PDF del curso"
+            subtitle="Opcional, ej. resumen general o syllabus"
+            state={snapshot.pdfUrl ? 'complete' : 'partial'}
+            open={openSections.has('material')}
+            onToggle={() => toggleSection('material')}
+          >
+            <MediaUploader
+              kind="pdf"
+              value={snapshot.pdfUrl || undefined}
+              scope={scope}
+              onPrevReplaced={trackOrphan}
+              onChange={(url) => update('pdfUrl', url || '')}
+            />
+            <p className={styles.hint}>
+              También podés subir un PDF distinto en cada módulo (ej. ejercicios o material complementario).
+            </p>
+          </Section>
+
+          <Section
             id="lessons"
             icon={<ListChecks size={18} />}
-            title={`Lecciones (${snapshot.lessons.length})`}
+            title={`Módulos (${snapshot.lessons.length})`}
             subtitle={
               snapshot.lessons.length > 0
                 ? `Duración total estimada: ${totalDurationMin(snapshot.lessons)} min`
-                : 'Agregá al menos una lección para publicar'
+                : 'Agregá al menos un módulo para publicar'
             }
             state={lessonsState}
             open={openSections.has('lessons')}
@@ -665,7 +732,7 @@ export function CourseFormModal({
           <Section
             id="publish"
             icon={<Check size={18} />}
-            title="Publicación"
+            title="Publicación y acceso"
             subtitle="Quién puede verlo en la app"
             state={publishState}
             open={openSections.has('publish')}
@@ -682,17 +749,30 @@ export function CourseFormModal({
                 checked={snapshot.isActive}
                 onChange={(value) => update('isActive', value)}
               />
-              <ToggleCard
-                title="Premium"
-                description={
-                  snapshot.isPremium
-                    ? 'Solo accesible con suscripción activa'
-                    : 'Disponible para todos los alumnos'
-                }
-                checked={snapshot.isPremium}
-                onChange={(value) => update('isPremium', value)}
-                tooltip="Si activás Premium, las lecciones que no marques como Gratis quedan bloqueadas para usuarios sin suscripción."
-              />
+            </div>
+
+            <div style={{ marginTop: 14 }}>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>
+                Tipo de acceso <span className={styles.required}>*</span>
+              </span>
+              <p className={styles.hint} style={{ marginTop: 4 }}>
+                Define qué suscripción necesita el alumno para ver este curso.
+              </p>
+              <div className={styles.tierGrid}>
+                {ACCESS_TIER_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={`${styles.tierCard} ${
+                      snapshot.accessTier === opt.value ? styles.tierCardActive : ''
+                    }`}
+                    onClick={() => update('accessTier', opt.value)}
+                  >
+                    <span className={styles.tierCardLabel}>{opt.label}</span>
+                    <span className={styles.tierCardHint}>{opt.hint}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </Section>
 

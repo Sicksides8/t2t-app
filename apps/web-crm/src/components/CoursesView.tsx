@@ -8,25 +8,30 @@ import { CourseFormModal } from './courses/CourseFormModal';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 import { useToast } from './ui/Toast';
 import { apiFetch } from '../lib/api';
-import { LEVEL_OPTIONS, SKILL_OPTIONS } from '../lib/courseConstants';
-import type { Course } from '../types';
+import {
+  ACCESS_TIER_LABEL,
+  ACCESS_TIER_OPTIONS,
+  LEGACY_LEVEL_LABEL,
+  LEVEL_OPTIONS,
+} from '../lib/courseConstants';
+import type { Course, CourseAccessTier } from '../types';
 import styles from '../app/dashboard.module.css';
 import filterStyles from './CoursesFilters.module.css';
 import modalStyles from './courses/CourseModal.module.css';
 
 type DurationFilter = 'all' | 'short' | 'medium' | 'long';
 type StatusFilter = 'all' | 'active' | 'inactive';
+type TierFilter = 'all' | CourseAccessTier;
 
-const LEVEL_LABEL: Record<Course['level'], string> = {
-  beginner: 'Principiante',
-  intermediate: 'Intermedio',
-  advanced: 'Avanzado',
-};
+function tierFromCourse(course: Course): CourseAccessTier {
+  if (course.accessTier) return course.accessTier;
+  return course.isPremium ? 'lite' : 'free';
+}
 
-const SKILL_LABEL: Record<string, string> = SKILL_OPTIONS.reduce(
-  (acc, opt) => ({ ...acc, [opt.value]: opt.label }),
-  {} as Record<string, string>,
-);
+function skillLabel(skillId: string): string {
+  if (!skillId) return '—';
+  return skillId.charAt(0).toUpperCase() + skillId.slice(1);
+}
 
 export function CoursesView() {
   const toast = useToast();
@@ -45,6 +50,7 @@ export function CoursesView() {
   const [search, setSearch] = useState('');
   const [skillFilter, setSkillFilter] = useState<string>('all');
   const [levelFilter, setLevelFilter] = useState<string>('all');
+  const [tierFilter, setTierFilter] = useState<TierFilter>('all');
   const [durationFilter, setDurationFilter] = useState<DurationFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
@@ -100,8 +106,8 @@ export function CoursesView() {
       );
       const detail =
         result.r2Deleted > 0
-          ? ` (${result.deletedLessons} lecciones, ${result.r2Deleted} archivos en R2)`
-          : ` (${result.deletedLessons} lecciones)`;
+          ? ` (${result.deletedLessons} módulos, ${result.r2Deleted} archivos en R2)`
+          : ` (${result.deletedLessons} módulos)`;
       toast.show({
         tone: 'success',
         title: 'Curso eliminado',
@@ -199,12 +205,23 @@ export function CoursesView() {
     }
   }
 
+  const skillOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const row of rows) {
+      const id = (row.skillId || '').trim();
+      if (id) set.add(id);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [rows]);
+
   const filteredRows = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return rows.filter((row) => {
       if (needle && !row.title.toLowerCase().includes(needle)) return false;
-      if (skillFilter !== 'all' && row.skillId !== skillFilter) return false;
+      if (skillFilter !== 'all' && (row.skillId || '').toLowerCase() !== skillFilter.toLowerCase())
+        return false;
       if (levelFilter !== 'all' && row.level !== levelFilter) return false;
+      if (tierFilter !== 'all' && tierFromCourse(row) !== tierFilter) return false;
       if (statusFilter === 'active' && !row.isActive) return false;
       if (statusFilter === 'inactive' && row.isActive) return false;
       const duration = Number(row.durationMin || 0);
@@ -213,12 +230,13 @@ export function CoursesView() {
       if (durationFilter === 'long' && duration <= 30) return false;
       return true;
     });
-  }, [rows, search, skillFilter, levelFilter, durationFilter, statusFilter]);
+  }, [rows, search, skillFilter, levelFilter, tierFilter, durationFilter, statusFilter]);
 
   const filtersActive =
     Boolean(search.trim()) ||
     skillFilter !== 'all' ||
     levelFilter !== 'all' ||
+    tierFilter !== 'all' ||
     durationFilter !== 'all' ||
     statusFilter !== 'all';
 
@@ -237,17 +255,29 @@ export function CoursesView() {
     {
       key: 'skillId',
       label: 'Habilidad',
-      render: (row) => SKILL_LABEL[row.skillId] || row.skillId,
+      render: (row) => skillLabel(row.skillId),
     },
     {
       key: 'level',
       label: 'Nivel',
-      render: (row) => LEVEL_LABEL[row.level] || row.level,
+      render: (row) => LEGACY_LEVEL_LABEL[row.level] || row.level,
+    },
+    {
+      key: 'accessTier',
+      label: 'Acceso',
+      render: (row) => {
+        const tier = tierFromCourse(row);
+        return (
+          <span className={`${filterStyles.tierPill} ${filterStyles[`tierPill_${tier}`]}`}>
+            {ACCESS_TIER_LABEL[tier]}
+          </span>
+        );
+      },
     },
     {
       key: 'durationMin',
       label: 'Duracion',
-      render: (row) => `${row.durationMin} min · ${row.totalLessons} lecc.`,
+      render: (row) => `${row.durationMin} min · ${row.totalLessons} mod.`,
     },
     {
       key: 'isActive',
@@ -313,9 +343,9 @@ export function CoursesView() {
         aria-label="Filtrar por habilidad"
       >
         <option value="all">Todas las habilidades</option>
-        {SKILL_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
+        {skillOptions.map((opt) => (
+          <option key={opt} value={opt}>
+            {skillLabel(opt)}
           </option>
         ))}
       </select>
@@ -327,6 +357,19 @@ export function CoursesView() {
       >
         <option value="all">Todos los niveles</option>
         {LEVEL_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+      <select
+        className={filterStyles.select}
+        value={tierFilter}
+        onChange={(e) => setTierFilter(e.target.value as TierFilter)}
+        aria-label="Filtrar por tipo de acceso"
+      >
+        <option value="all">Cualquier acceso</option>
+        {ACCESS_TIER_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}
           </option>
@@ -361,6 +404,7 @@ export function CoursesView() {
             setSearch('');
             setSkillFilter('all');
             setLevelFilter('all');
+            setTierFilter('all');
             setDurationFilter('all');
             setStatusFilter('all');
           }}
@@ -469,7 +513,7 @@ export function CoursesView() {
         title="¿Eliminar este curso?"
         message={
           deleteTarget
-            ? `Vas a borrar "${deleteTarget.title}" y sus ${deleteTarget.totalLessons} lecciones, junto con los videos en R2. Esta acción no se puede deshacer.`
+            ? `Vas a borrar "${deleteTarget.title}" y sus ${deleteTarget.totalLessons} módulos, junto con los videos y PDFs en R2. Esta acción no se puede deshacer.`
             : ''
         }
         confirmLabel="Sí, eliminar"
@@ -490,7 +534,7 @@ export function CoursesView() {
         }
         message={
           bulkAction === 'delete'
-            ? `Vas a borrar definitivamente ${selectedCount} cursos y todas sus lecciones, junto con los videos en R2. Esta acción no se puede deshacer.`
+            ? `Vas a borrar definitivamente ${selectedCount} cursos y todos sus módulos, junto con los videos y PDFs en R2. Esta acción no se puede deshacer.`
             : bulkAction === 'activate'
               ? `Los ${selectedCount} cursos seleccionados se publicarán en la app y serán visibles para los alumnos.`
               : `Los ${selectedCount} cursos seleccionados quedarán ocultos en la app. Podés reactivarlos cuando quieras.`

@@ -1,11 +1,13 @@
-import type { Course, LessonDraft } from '../../types';
+import type { CourseAccessTier, CourseLevel, LessonDraft } from '../../types';
 
 export type CourseFormSnapshot = {
   title: string;
   skillId: string;
   description: string;
   thumbnail: string;
-  level: Course['level'];
+  pdfUrl: string;
+  level: CourseLevel;
+  accessTier: CourseAccessTier;
   isActive: boolean;
   isPremium: boolean;
   lessons: LessonDraft[];

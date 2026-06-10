@@ -118,7 +118,7 @@ export function LessonListEditor({
   return (
     <div className={styles.lessonList}>
       {lessons.length === 0 ? (
-        <p className={styles.hint}>Aún no hay lecciones. Agregá la primera para empezar.</p>
+        <p className={styles.hint}>Aún no hay módulos. Agregá el primero para empezar.</p>
       ) : null}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={ids} strategy={verticalListSortingStrategy} disabled={disabled}>
@@ -145,7 +145,7 @@ export function LessonListEditor({
 
       <div className={styles.bulkActions}>
         <button type="button" className={styles.secondaryBtn} onClick={add} disabled={disabled}>
-          <Plus size={16} /> Añadir lección
+          <Plus size={16} /> Añadir módulo
         </button>
         <button type="button" className={styles.iconBtn} onClick={() => setBulkOpen(true)} disabled={disabled}>
           <ListPlus size={14} /> Pegar lista de títulos
@@ -219,7 +219,7 @@ function SortableLessonRow({
         <button
           type="button"
           className={styles.lessonHandle}
-          aria-label="Mover lección"
+          aria-label="Mover módulo"
           {...sortable.attributes}
           {...sortable.listeners}
         >
@@ -230,7 +230,7 @@ function SortableLessonRow({
           className={styles.lessonTitleInput}
           value={lesson.title}
           onChange={(e) => onUpdate({ title: e.target.value })}
-          placeholder={`Título de la lección ${index + 1}`}
+          placeholder={`Título del módulo ${index + 1}`}
           disabled={disabled}
         />
         <div className={styles.lessonBadges}>
@@ -288,6 +288,7 @@ function SortableLessonRow({
       </div>
       {expanded ? (
         <div className={styles.lessonExpanded}>
+          <div className={styles.lessonExpandedLabel}>Video del módulo</div>
           <MediaUploader
             kind="video"
             value={lesson.videoUrl || undefined}
@@ -301,6 +302,16 @@ function SortableLessonRow({
               }
               onUpdate(patch);
             }}
+          />
+          <div className={styles.lessonExpandedLabel}>Material PDF del módulo (opcional)</div>
+          <MediaUploader
+            kind="pdf"
+            compact
+            value={lesson.pdfUrl || undefined}
+            scope={scope}
+            disabled={disabled}
+            onPrevReplaced={(url) => onAssetReplaced?.(url)}
+            onChange={(url) => onUpdate({ pdfUrl: url || '' })}
           />
           <div className={styles.fieldGridTwo}>
             <DurationField
@@ -369,7 +380,7 @@ function FreeToggle({ isFree, onChange }: { isFree: boolean; onChange: (value: b
         style={{ textAlign: 'left', cursor: 'pointer' }}
       >
         <div className={styles.toggleCardText}>
-          <strong>Lección gratis</strong>
+          <strong>Módulo gratis</strong>
           <span>{isFree ? 'Visible sin suscripción' : 'Solo para suscriptores'}</span>
         </div>
         <span className={`${styles.switch} ${isFree ? styles.switchOn : ''}`}>
@@ -403,14 +414,14 @@ function BulkPasteModal({
       >
         <h3 style={{ margin: 0, fontSize: 18 }}>Pegar lista de títulos</h3>
         <p className={styles.hint}>
-          Una lección por línea. Te creamos {titles.length || 'N'} lecciones nuevas con título y un video por
+          Un módulo por línea. Te creamos {titles.length || 'N'} módulos nuevos con título y un video por
           defecto que podrás reemplazar después.
         </p>
         <textarea
           className={styles.textarea}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder={'Lección 1: introducción\nLección 2: práctica\nLección 3: cierre'}
+          placeholder={'Módulo 1: introducción\nMódulo 2: práctica\nMódulo 3: cierre'}
         />
         <div className={styles.rowActions} style={{ justifyContent: 'flex-end' }}>
           <button type="button" className={styles.secondaryBtn} onClick={onCancel}>
@@ -422,7 +433,7 @@ function BulkPasteModal({
             onClick={() => onConfirm(titles)}
             disabled={titles.length === 0}
           >
-            Crear {titles.length} lecciones
+            Crear {titles.length} módulos
           </button>
         </div>
       </div>

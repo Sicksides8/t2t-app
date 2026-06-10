@@ -31,6 +31,7 @@ export function draftsFromLessons(lessons: Lesson[]): LessonDraft[] {
       id: lesson.id,
       title: lesson.title,
       videoUrl: lesson.videoUrl,
+      pdfUrl: lesson.pdfUrl,
       durationSec: lesson.durationSec,
       order: lesson.order,
       isFree: lesson.isFree,

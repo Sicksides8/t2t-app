@@ -17,18 +17,22 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const body = (await request.json()) as SyncCurriculumBody;
-    const lessons = (body.lessons || []).map((lesson, index) => ({
-      id: lesson.id,
-      title: String(lesson.title || '').trim(),
-      videoUrl: String(lesson.videoUrl || '').trim(),
-      durationSec: Math.max(30, Number(lesson.durationSec) || 420),
-      order: typeof lesson.order === 'number' ? lesson.order : index + 1,
-      isFree: Boolean(lesson.isFree),
-    }));
+    const lessons = (body.lessons || []).map((lesson, index) => {
+      const pdfUrl = lesson.pdfUrl ? String(lesson.pdfUrl).trim() : '';
+      return {
+        id: lesson.id,
+        title: String(lesson.title || '').trim(),
+        videoUrl: String(lesson.videoUrl || '').trim(),
+        ...(pdfUrl ? { pdfUrl } : {}),
+        durationSec: Math.max(30, Number(lesson.durationSec) || 420),
+        order: typeof lesson.order === 'number' ? lesson.order : index + 1,
+        isFree: Boolean(lesson.isFree),
+      };
+    });
 
     if (lessons.some((l) => !l.title || !l.videoUrl)) {
       return NextResponse.json(
-        { success: false, error: { message: 'Cada leccion requiere titulo y URL de video' } },
+        { success: false, error: { message: 'Cada modulo requiere titulo y URL de video' } },
         { status: 400 },
       );
     }

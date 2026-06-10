@@ -41,13 +41,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const lessonsInput = (body.lessons || []).map((lesson, index) => ({
-      title: String(lesson.title || `Leccion ${index + 1}`).trim(),
-      videoUrl: String(lesson.videoUrl || MOCK_VIDEO_URL).trim(),
-      durationSec: Math.max(30, Number(lesson.durationSec) || 420),
-      order: index + 1,
-      isFree: Boolean(lesson.isFree ?? index === 0),
-    }));
+    const lessonsInput = (body.lessons || []).map((lesson, index) => {
+      const pdfUrl = lesson.pdfUrl ? String(lesson.pdfUrl).trim() : '';
+      return {
+        title: String(lesson.title || `Modulo ${index + 1}`).trim(),
+        videoUrl: String(lesson.videoUrl || MOCK_VIDEO_URL).trim(),
+        ...(pdfUrl ? { pdfUrl } : {}),
+        durationSec: Math.max(30, Number(lesson.durationSec) || 420),
+        order: index + 1,
+        isFree: Boolean(lesson.isFree ?? index === 0),
+      };
+    });
 
     const stats = computeCourseStats(lessonsInput);
     const now = new Date();
@@ -62,14 +66,21 @@ export async function POST(request: NextRequest) {
     const courseRef = adminDb.collection(FS_COL.courses).doc();
     const courseId = courseRef.id;
     const thumb = body.thumbnail?.trim();
+    const pdfUrl = body.pdfUrl?.trim();
+    const accessTier =
+      body.accessTier && ['free', 'lite', 'premium'].includes(body.accessTier) ? body.accessTier : undefined;
+    const isPremium =
+      typeof body.isPremium === 'boolean' ? body.isPremium : accessTier ? accessTier !== 'free' : false;
     const courseData = withoutUndefined({
       title,
       skillId,
       description,
       ...(thumb ? { thumbnail: thumb } : {}),
+      ...(pdfUrl ? { pdfUrl } : {}),
       level: body.level || 'beginner',
+      ...(accessTier ? { accessTier } : {}),
       isActive: body.isActive !== false,
-      isPremium: Boolean(body.isPremium),
+      isPremium,
       order,
       totalLessons: stats.totalLessons,
       durationMin: stats.durationMin,

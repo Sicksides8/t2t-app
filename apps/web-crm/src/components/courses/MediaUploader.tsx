@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ImagePlus, Trash2, UploadCloud, Video } from 'lucide-react';
+import { FileText, ImagePlus, Trash2, UploadCloud, Video } from 'lucide-react';
 import { apiFetch, getAuthToken } from '../../lib/api';
 import styles from './CourseModal.module.css';
 
-type MediaKind = 'video' | 'thumbnail';
+type MediaKind = 'video' | 'thumbnail' | 'pdf';
 
 type MediaUploaderProps = {
   kind: MediaKind;
@@ -13,6 +13,7 @@ type MediaUploaderProps = {
   onChange: (url: string | undefined, meta?: { durationSec?: number; key?: string }) => void;
   scope?: string;
   disabled?: boolean;
+  compact?: boolean;
   /** Llamado cuando ya hay value y el usuario lo reemplaza/quita. Útil para limpiar el orphan de R2. */
   onPrevReplaced?: (prevUrl: string) => void;
 };
@@ -25,8 +26,44 @@ type PresignResponse = {
 
 const VIDEO_ACCEPT = 'video/mp4,video/webm,video/quicktime';
 const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp';
+const PDF_ACCEPT = 'application/pdf';
 const VIDEO_MAX_MB = 500;
 const IMAGE_MAX_MB = 5;
+const PDF_MAX_MB = 25;
+
+function acceptFor(kind: MediaKind): string {
+  if (kind === 'video') return VIDEO_ACCEPT;
+  if (kind === 'pdf') return PDF_ACCEPT;
+  return IMAGE_ACCEPT;
+}
+
+function maxMbFor(kind: MediaKind): number {
+  if (kind === 'video') return VIDEO_MAX_MB;
+  if (kind === 'pdf') return PDF_MAX_MB;
+  return IMAGE_MAX_MB;
+}
+
+function dropzoneTitle(kind: MediaKind): string {
+  if (kind === 'video') return 'Arrastrá tu video o hacé clic';
+  if (kind === 'pdf') return 'Arrastrá un PDF o hacé clic';
+  return 'Arrastrá una imagen o hacé clic';
+}
+
+function dropzoneHint(kind: MediaKind): string {
+  if (kind === 'video') return `mp4, webm o mov · hasta ${VIDEO_MAX_MB} MB`;
+  if (kind === 'pdf') return `pdf · hasta ${PDF_MAX_MB} MB`;
+  return `jpg, png o webp · hasta ${IMAGE_MAX_MB} MB`;
+}
+
+function fileBasenameFromUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const last = decodeURIComponent(parsed.pathname.split('/').pop() || '');
+    return last || 'archivo.pdf';
+  } catch {
+    return url.split('/').pop() || 'archivo.pdf';
+  }
+}
 
 function readVideoDurationSec(file: File): Promise<number | null> {
   return new Promise((resolve) => {
@@ -82,6 +119,7 @@ export function MediaUploader({
   onChange,
   scope = 'new',
   disabled,
+  compact = false,
   onPrevReplaced,
 }: MediaUploaderProps) {
   const [busy, setBusy] = useState(false);
@@ -114,6 +152,15 @@ export function MediaUploader({
         setError(`Video demasiado grande. Máximo ${VIDEO_MAX_MB} MB.`);
         return;
       }
+    } else if (kind === 'pdf') {
+      if (file.type !== 'application/pdf') {
+        setError('Formato no soportado. Solo se acepta PDF.');
+        return;
+      }
+      if (file.size > PDF_MAX_MB * 1024 * 1024) {
+        setError(`PDF demasiado grande. Máximo ${PDF_MAX_MB} MB.`);
+        return;
+      }
     } else {
       if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
         setError('Formato no soportado. Usá jpg, png o webp.');
@@ -132,7 +179,7 @@ export function MediaUploader({
     }
 
     if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
-    const previewUrl = URL.createObjectURL(file);
+    const previewUrl = kind === 'pdf' ? null : URL.createObjectURL(file);
     setLocalPreviewUrl(previewUrl);
     setFilename(file.name);
     setBusy(true);
@@ -197,17 +244,19 @@ export function MediaUploader({
     }
   }
 
-  const accept = kind === 'video' ? VIDEO_ACCEPT : IMAGE_ACCEPT;
-  const maxMB = kind === 'video' ? VIDEO_MAX_MB : IMAGE_MAX_MB;
+  const accept = acceptFor(kind);
   const previewSrc = localPreviewUrl || value;
-  const hasPreview = Boolean(previewSrc);
-  const Icon = kind === 'video' ? Video : ImagePlus;
+  const hasValue = kind === 'pdf' ? Boolean(value || filename) : Boolean(previewSrc);
+  const Icon = kind === 'video' ? Video : kind === 'pdf' ? FileText : ImagePlus;
+  const dropzoneClass = `${styles.dropzone} ${compact ? styles.dropzoneSmall : ''} ${
+    dragOver ? styles.dropzoneActive : ''
+  }`;
 
   return (
     <div className={styles.uploader}>
-      {!hasPreview ? (
+      {!hasValue ? (
         <label
-          className={`${styles.dropzone} ${dragOver ? styles.dropzoneActive : ''}`}
+          className={dropzoneClass}
           onDragOver={(e) => {
             e.preventDefault();
             if (!disabled && !busy) setDragOver(true);
@@ -215,15 +264,9 @@ export function MediaUploader({
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
         >
-          <UploadCloud size={28} aria-hidden />
-          <span className={styles.dropzoneTitle}>
-            {kind === 'video' ? 'Arrastrá tu video o hacé clic' : 'Arrastrá una imagen o hacé clic'}
-          </span>
-          <span className={styles.dropzoneHint}>
-            {kind === 'video'
-              ? `mp4, webm o mov · hasta ${maxMB} MB`
-              : `jpg, png o webp · hasta ${maxMB} MB`}
-          </span>
+          <UploadCloud size={compact ? 22 : 28} aria-hidden />
+          <span className={styles.dropzoneTitle}>{dropzoneTitle(kind)}</span>
+          <span className={styles.dropzoneHint}>{dropzoneHint(kind)}</span>
           <input
             ref={inputRef}
             type="file"
@@ -235,14 +278,37 @@ export function MediaUploader({
         </label>
       ) : (
         <div className={styles.uploaderPreview}>
-          {kind === 'video' ? (
+          {kind === 'video' && previewSrc ? (
             <video className={styles.previewVideo} src={previewSrc} controls preload="metadata" />
-          ) : (
+          ) : null}
+          {kind === 'thumbnail' && previewSrc ? (
             <img className={styles.previewImage} src={previewSrc} alt="Portada" />
-          )}
+          ) : null}
+          {kind === 'pdf' ? (
+            <div className={styles.pdfPreview}>
+              <FileText size={28} aria-hidden />
+              <div className={styles.pdfPreviewText}>
+                <strong>{filename || (value ? fileBasenameFromUrl(value) : 'Documento PDF')}</strong>
+                {value ? (
+                  <a href={value} target="_blank" rel="noreferrer" className={styles.pdfPreviewLink}>
+                    Abrir en una pestaña nueva
+                  </a>
+                ) : (
+                  <span>Listo para subir.</span>
+                )}
+              </div>
+            </div>
+          ) : null}
           <div className={styles.uploaderInfo}>
             <span>
-              <Icon size={14} aria-hidden /> {filename || (kind === 'video' ? 'Video subido' : 'Imagen subida')}
+              <Icon size={14} aria-hidden /> {filename ||
+                (kind === 'video'
+                  ? 'Video subido'
+                  : kind === 'pdf'
+                    ? value
+                      ? fileBasenameFromUrl(value)
+                      : 'PDF subido'
+                    : 'Imagen subida')}
             </span>
             {busy ? <span>{progress}%</span> : null}
           </div>

@@ -1,4 +1,5 @@
 import type { Firestore } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import { FS_COL } from './firestoreCollections';
 import { DEFAULT_MODULE_TITLE } from './courseConstants';
 import type { Course, CourseModule, Lesson } from '../types';
@@ -7,6 +8,7 @@ export type LessonInput = {
   id?: string;
   title: string;
   videoUrl: string;
+  pdfUrl?: string;
   durationSec: number;
   order: number;
   isFree: boolean;
@@ -68,12 +70,14 @@ export async function syncCourseCurriculum(
     .map((item, index) => {
       const order = index + 1;
       const id = item.id || `${modId}_l${order}`;
+      const pdfUrl = item.pdfUrl ? String(item.pdfUrl).trim() : '';
       return {
         id,
         courseId,
         moduleId: modId,
         title: item.title.trim(),
         videoUrl: item.videoUrl.trim(),
+        ...(pdfUrl ? { pdfUrl } : {}),
         durationSec: Math.max(30, item.durationSec),
         order,
         isFree: Boolean(item.isFree),
@@ -95,11 +99,11 @@ export async function syncCourseCurriculum(
   );
 
   for (const lesson of normalizedLessons) {
-    batch.set(
-      db.collection(FS_COL.lessons).doc(lesson.id),
-      { ...lesson, updatedAt: now, createdAt: now },
-      { merge: true },
-    );
+    const docPayload: Record<string, unknown> = { ...lesson, updatedAt: now, createdAt: now };
+    if (!lesson.pdfUrl) {
+      docPayload.pdfUrl = FieldValue.delete();
+    }
+    batch.set(db.collection(FS_COL.lessons).doc(lesson.id), docPayload, { merge: true });
   }
 
   const stats = computeCourseStats(normalizedLessons);

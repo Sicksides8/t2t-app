@@ -3,29 +3,30 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Trash2 } from 'lucide-react';
+import { ExternalLink, FileText, Trash2 } from 'lucide-react';
 import { AppShell } from './layout/AppShell';
 import { CourseFormModal } from './courses/CourseFormModal';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 import { useToast } from './ui/Toast';
 import { apiFetch } from '../lib/api';
-import { LEVEL_OPTIONS, SKILL_OPTIONS } from '../lib/courseConstants';
-import type { Course, CourseDetailPayload } from '../types';
+import {
+  ACCESS_TIER_LABEL,
+  LEGACY_LEVEL_LABEL,
+} from '../lib/courseConstants';
+import type { Course, CourseAccessTier, CourseDetailPayload } from '../types';
 import styles from '../app/dashboard.module.css';
 import filterStyles from './CoursesFilters.module.css';
 import modalStyles from './courses/CourseModal.module.css';
 
-const LEVEL_LABEL: Record<Course['level'], string> = {
-  beginner: 'Principiante',
-  intermediate: 'Intermedio',
-  advanced: 'Avanzado',
-};
-const SKILL_LABEL: Record<string, string> = SKILL_OPTIONS.reduce(
-  (acc, opt) => ({ ...acc, [opt.value]: opt.label }),
-  {} as Record<string, string>,
-);
+function tierFromCourse(course: Course): CourseAccessTier {
+  if (course.accessTier) return course.accessTier;
+  return course.isPremium ? 'lite' : 'free';
+}
 
-void LEVEL_OPTIONS;
+function skillLabel(skillId: string): string {
+  if (!skillId) return '—';
+  return skillId.charAt(0).toUpperCase() + skillId.slice(1);
+}
 
 export function CourseDetailView({ courseId }: { courseId: string }) {
   const router = useRouter();
@@ -94,7 +95,7 @@ export function CourseDetailView({ courseId }: { courseId: string }) {
       toast.show({
         tone: 'success',
         title: 'Curso eliminado',
-        message: `Se borraron ${result.deletedLessons} lecciones y ${result.r2Deleted} archivos en R2.`,
+        message: `Se borraron ${result.deletedLessons} módulos y ${result.r2Deleted} archivos en R2.`,
       });
       router.push('/courses');
     } catch (err) {
@@ -121,7 +122,7 @@ export function CourseDetailView({ courseId }: { courseId: string }) {
         <>
           <div className={modalStyles.rowActions} style={{ marginBottom: 16, alignItems: 'center' }}>
             <button type="button" className={modalStyles.primaryBtn} onClick={() => setEditOpen(true)}>
-              Editar curso y lecciones
+              Editar curso y módulos
             </button>
             <button
               type="button"
@@ -152,14 +153,26 @@ export function CourseDetailView({ courseId }: { courseId: string }) {
               </div>
               <div>
                 <dt>Habilidad</dt>
-                <dd>{SKILL_LABEL[course.skillId] || course.skillId}</dd>
+                <dd>{skillLabel(course.skillId)}</dd>
               </div>
               <div>
                 <dt>Nivel</dt>
-                <dd>{LEVEL_LABEL[course.level] || course.level}</dd>
+                <dd>{LEGACY_LEVEL_LABEL[course.level] || course.level}</dd>
               </div>
               <div>
-                <dt>Lecciones</dt>
+                <dt>Tipo de acceso</dt>
+                <dd>
+                  <span
+                    className={`${filterStyles.tierPill} ${
+                      filterStyles[`tierPill_${tierFromCourse(course)}`]
+                    }`}
+                  >
+                    {ACCESS_TIER_LABEL[tierFromCourse(course)]}
+                  </span>
+                </dd>
+              </div>
+              <div>
+                <dt>Módulos</dt>
                 <dd>{course.totalLessons}</dd>
               </div>
               <div>
@@ -176,12 +189,33 @@ export function CourseDetailView({ courseId }: { courseId: string }) {
                 <dt>Descripcion</dt>
                 <dd>{course.description}</dd>
               </div>
+              {course.pdfUrl ? (
+                <div>
+                  <dt>Material PDF</dt>
+                  <dd>
+                    <a
+                      href={course.pdfUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        color: 'var(--accent-primary)',
+                        textDecoration: 'underline',
+                      }}
+                    >
+                      <FileText size={14} /> Abrir PDF <ExternalLink size={12} />
+                    </a>
+                  </dd>
+                </div>
+              ) : null}
             </dl>
           </section>
           <section className={styles.panel}>
-            <h2 style={{ marginTop: 0 }}>Lecciones ({lessons.length})</h2>
+            <h2 style={{ marginTop: 0 }}>Módulos ({lessons.length})</h2>
             {lessons.length === 0 ? (
-              <p className={styles.muted}>Sin lecciones. Usa Editar para anadir contenido.</p>
+              <p className={styles.muted}>Sin módulos. Usá Editar para añadir contenido.</p>
             ) : (
               <table className={styles.table}>
                 <thead>
@@ -189,6 +223,7 @@ export function CourseDetailView({ courseId }: { courseId: string }) {
                     <th>#</th>
                     <th>Titulo</th>
                     <th>Duracion</th>
+                    <th>PDF</th>
                     <th>Gratis</th>
                   </tr>
                 </thead>
@@ -201,6 +236,25 @@ export function CourseDetailView({ courseId }: { courseId: string }) {
                         <td>{lesson.order}</td>
                         <td>{lesson.title}</td>
                         <td>{Math.round(lesson.durationSec / 60)} min</td>
+                        <td>
+                          {lesson.pdfUrl ? (
+                            <a
+                              href={lesson.pdfUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                color: 'var(--accent-primary)',
+                              }}
+                            >
+                              <FileText size={14} /> Ver
+                            </a>
+                          ) : (
+                            <span className={styles.muted}>—</span>
+                          )}
+                        </td>
                         <td>{lesson.isFree ? 'Si' : 'No'}</td>
                       </tr>
                     ))}
@@ -222,7 +276,7 @@ export function CourseDetailView({ courseId }: { courseId: string }) {
         title="¿Eliminar este curso?"
         message={
           course
-            ? `Vas a borrar "${course.title}" y sus ${course.totalLessons} lecciones, junto con los videos en R2. Esta acción no se puede deshacer.`
+            ? `Vas a borrar "${course.title}" y sus ${course.totalLessons} módulos, junto con los videos y PDFs en R2. Esta acción no se puede deshacer.`
             : ''
         }
         confirmLabel="Sí, eliminar"

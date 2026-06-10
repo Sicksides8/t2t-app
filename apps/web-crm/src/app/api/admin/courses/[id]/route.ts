@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { FieldValue } from 'firebase-admin/firestore';
 import { requireAdmin } from '../../../../../lib/authHelper';
 import { fetchCourseCurriculum } from '../../../../../lib/courseAdminServer';
 import { adminDb } from '../../../../../lib/firebase-admin';
@@ -12,7 +13,9 @@ const PATCHABLE_KEYS: (keyof PatchCourseBody)[] = [
   'skillId',
   'description',
   'thumbnail',
+  'pdfUrl',
   'level',
+  'accessTier',
   'isActive',
   'isPremium',
   'order',
@@ -51,10 +54,30 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     if (typeof update.title === 'string') update.title = update.title.trim();
+    if (typeof update.skillId === 'string') update.skillId = update.skillId.trim();
     if (typeof update.description === 'string') update.description = update.description.trim();
     if (typeof update.thumbnail === 'string') {
       const thumb = update.thumbnail.trim();
-      update.thumbnail = thumb || null;
+      update.thumbnail = thumb || FieldValue.delete();
+    } else if (update.thumbnail === null) {
+      update.thumbnail = FieldValue.delete();
+    }
+    if (typeof update.pdfUrl === 'string') {
+      const pdf = update.pdfUrl.trim();
+      update.pdfUrl = pdf || FieldValue.delete();
+    } else if (update.pdfUrl === null) {
+      update.pdfUrl = FieldValue.delete();
+    }
+    if (typeof update.accessTier === 'string') {
+      const tier = update.accessTier.trim();
+      if (!['free', 'lite', 'premium'].includes(tier)) {
+        delete update.accessTier;
+      } else {
+        update.accessTier = tier;
+        if (typeof update.isPremium !== 'boolean') {
+          update.isPremium = tier !== 'free';
+        }
+      }
     }
 
     await ref.update(update);
@@ -91,10 +114,18 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         const k = keyFromPublicUrl(String(courseData.thumbnail));
         if (k) r2Keys.add(k);
       }
+      if (courseData.pdfUrl) {
+        const k = keyFromPublicUrl(String(courseData.pdfUrl));
+        if (k) r2Keys.add(k);
+      }
       for (const doc of lessonsSnap.docs) {
-        const url = (doc.data() as { videoUrl?: string }).videoUrl;
-        if (url) {
-          const k = keyFromPublicUrl(url);
+        const data = doc.data() as { videoUrl?: string; pdfUrl?: string };
+        if (data.videoUrl) {
+          const k = keyFromPublicUrl(data.videoUrl);
+          if (k) r2Keys.add(k);
+        }
+        if (data.pdfUrl) {
+          const k = keyFromPublicUrl(data.pdfUrl);
           if (k) r2Keys.add(k);
         }
       }
