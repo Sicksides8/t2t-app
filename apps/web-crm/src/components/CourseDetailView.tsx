@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ExternalLink, FileText, Trash2 } from 'lucide-react';
+import { ExternalLink, FileText, Link2, Trash2 } from 'lucide-react';
 import { AppShell } from './layout/AppShell';
 import { CourseFormModal } from './courses/CourseFormModal';
 import { ConfirmDialog } from './ui/ConfirmDialog';
@@ -224,6 +224,7 @@ export function CourseDetailView({ courseId }: { courseId: string }) {
                     <th>Titulo</th>
                     <th>Duracion</th>
                     <th>PDF</th>
+                    <th>Enlaces</th>
                     <th>Gratis</th>
                   </tr>
                 </thead>
@@ -234,7 +235,41 @@ export function CourseDetailView({ courseId }: { courseId: string }) {
                     .map((lesson) => (
                       <tr key={lesson.id}>
                         <td>{lesson.order}</td>
-                        <td>{lesson.title}</td>
+                        <td>
+                          <div>{lesson.title}</div>
+                          {lesson.links && lesson.links.length > 0 ? (
+                            <ul
+                              style={{
+                                listStyle: 'none',
+                                margin: '6px 0 0',
+                                padding: 0,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 4,
+                              }}
+                            >
+                              {lesson.links.map((link, i) => (
+                                <li key={i}>
+                                  <a
+                                    href={link.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 6,
+                                      color: 'var(--accent-primary)',
+                                      fontSize: 13,
+                                    }}
+                                  >
+                                    <Link2 size={12} />
+                                    {link.label || link.url}
+                                  </a>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </td>
                         <td>{Math.round(lesson.durationSec / 60)} min</td>
                         <td>
                           {lesson.pdfUrl ? (
@@ -255,6 +290,7 @@ export function CourseDetailView({ courseId }: { courseId: string }) {
                             <span className={styles.muted}>—</span>
                           )}
                         </td>
+                        <td>{lesson.links?.length || 0}</td>
                         <td>{lesson.isFree ? 'Si' : 'No'}</td>
                       </tr>
                     ))}

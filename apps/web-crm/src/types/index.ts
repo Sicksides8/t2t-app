@@ -41,6 +41,11 @@ export interface CourseModule {
   totalLessons: number;
 }
 
+export interface ModuleLink {
+  label?: string;
+  url: string;
+}
+
 export interface Lesson {
   id: string;
   courseId: string;
@@ -48,6 +53,7 @@ export interface Lesson {
   title: string;
   videoUrl: string;
   pdfUrl?: string;
+  links?: ModuleLink[];
   durationSec: number;
   order: number;
   isFree: boolean;
@@ -80,6 +86,7 @@ export type CreateCourseBody = {
     title: string;
     videoUrl?: string;
     pdfUrl?: string;
+    links?: ModuleLink[];
     durationSec: number;
     isFree?: boolean;
   }>;
@@ -108,6 +115,7 @@ export type SyncCurriculumBody = {
     title: string;
     videoUrl: string;
     pdfUrl?: string;
+    links?: ModuleLink[];
     durationSec: number;
     order: number;
     isFree: boolean;

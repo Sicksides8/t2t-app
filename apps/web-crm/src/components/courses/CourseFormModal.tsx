@@ -25,6 +25,7 @@ import type {
   CourseDetailPayload,
   CreateCourseBody,
   LessonDraft,
+  ModuleLink,
   SyncCurriculumBody,
 } from '../../types';
 import { useToast } from '../ui/Toast';
@@ -165,10 +166,22 @@ function snapshotsEqual(a: CourseFormSnapshot, b: CourseFormSnapshot): boolean {
       (la.pdfUrl || '') !== (lb.pdfUrl || '') ||
       la.durationSec !== lb.durationSec ||
       la.isFree !== lb.isFree ||
-      la.order !== lb.order
+      la.order !== lb.order ||
+      !linksEqual(la.links, lb.links)
     ) {
       return false;
     }
+  }
+  return true;
+}
+
+function linksEqual(a?: ModuleLink[], b?: ModuleLink[]): boolean {
+  const aa = a || [];
+  const bb = b || [];
+  if (aa.length !== bb.length) return false;
+  for (let i = 0; i < aa.length; i += 1) {
+    if ((aa[i].url || '') !== (bb[i].url || '')) return false;
+    if ((aa[i].label || '') !== (bb[i].label || '')) return false;
   }
   return true;
 }
@@ -407,6 +420,7 @@ export function CourseFormModal({
         title: lesson.title.trim(),
         videoUrl: lesson.videoUrl.trim() || MOCK_VIDEO_URL,
         pdfUrl: lesson.pdfUrl?.trim() || undefined,
+        links: lesson.links && lesson.links.length > 0 ? lesson.links : undefined,
         durationSec: lesson.durationSec,
         isFree: lesson.isFree,
       })),
@@ -459,6 +473,7 @@ export function CourseFormModal({
           title: lesson.title.trim(),
           videoUrl: lesson.videoUrl.trim() || MOCK_VIDEO_URL,
           pdfUrl: lesson.pdfUrl?.trim() || undefined,
+          links: lesson.links && lesson.links.length > 0 ? lesson.links : undefined,
           durationSec: lesson.durationSec,
           order: index + 1,
           isFree: lesson.isFree,

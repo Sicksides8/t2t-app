@@ -8,9 +8,11 @@ import {
   ChevronRight,
   Copy,
   GripVertical,
+  Link2,
   ListPlus,
   Plus,
   Trash2,
+  X,
 } from 'lucide-react';
 import {
   closestCenter,
@@ -29,7 +31,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { LessonDraft } from '../../types';
+import type { LessonDraft, ModuleLink } from '../../types';
 import { MediaUploader } from './MediaUploader';
 import {
   draftsFromTitles,
@@ -313,6 +315,12 @@ function SortableLessonRow({
             onPrevReplaced={(url) => onAssetReplaced?.(url)}
             onChange={(url) => onUpdate({ pdfUrl: url || '' })}
           />
+          <div className={styles.lessonExpandedLabel}>Enlaces externos del módulo (opcional)</div>
+          <LinksEditor
+            links={lesson.links || []}
+            disabled={disabled}
+            onChange={(next) => onUpdate({ links: next.length > 0 ? next : undefined })}
+          />
           <div className={styles.fieldGridTwo}>
             <DurationField
               valueSec={lesson.durationSec}
@@ -324,6 +332,97 @@ function SortableLessonRow({
       ) : null}
     </div>
   );
+}
+
+function LinksEditor({
+  links,
+  disabled,
+  onChange,
+}: {
+  links: ModuleLink[];
+  disabled?: boolean;
+  onChange: (next: ModuleLink[]) => void;
+}) {
+  function update(index: number, patch: Partial<ModuleLink>) {
+    const next = links.map((item, i) => (i === index ? { ...item, ...patch } : item));
+    onChange(next);
+  }
+
+  function remove(index: number) {
+    onChange(links.filter((_, i) => i !== index));
+  }
+
+  function add() {
+    onChange([...links, { label: '', url: '' }]);
+  }
+
+  return (
+    <div className={styles.linksEditor}>
+      {links.length === 0 ? (
+        <p className={styles.linksHint}>
+          Sumá enlaces a recursos externos (Google Docs, artículos, planillas...). Cada módulo
+          puede tener los que necesite.
+        </p>
+      ) : (
+        <ul className={styles.linksList} role="list">
+          {links.map((link, index) => {
+            const url = (link.url || '').trim();
+            const invalid = url.length > 0 && !isLikelyValidUrl(url);
+            return (
+              <li key={index} className={styles.linkRow}>
+                <span className={styles.linkIcon} aria-hidden>
+                  <Link2 size={14} />
+                </span>
+                <div className={styles.linkFields}>
+                  <input
+                    type="text"
+                    className={styles.linkLabelInput}
+                    value={link.label || ''}
+                    onChange={(e) => update(index, { label: e.target.value })}
+                    placeholder="Nombre (opcional, ej: Plantilla Google Docs)"
+                    maxLength={80}
+                    disabled={disabled}
+                    aria-label={`Nombre del enlace ${index + 1}`}
+                  />
+                  <input
+                    type="url"
+                    inputMode="url"
+                    className={`${styles.linkUrlInput} ${invalid ? styles.inputInvalid : ''}`}
+                    value={link.url}
+                    onChange={(e) => update(index, { url: e.target.value })}
+                    placeholder="https://..."
+                    disabled={disabled}
+                    aria-label={`URL del enlace ${index + 1}`}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className={styles.linkRemoveBtn}
+                  aria-label={`Eliminar enlace ${index + 1}`}
+                  onClick={() => remove(index)}
+                  disabled={disabled}
+                >
+                  <X size={14} />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <button type="button" className={styles.linkAddBtn} onClick={add} disabled={disabled}>
+        <Plus size={14} /> Añadir enlace
+      </button>
+    </div>
+  );
+}
+
+function isLikelyValidUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return Boolean(url.protocol && url.host);
+  } catch {
+    return false;
+  }
 }
 
 function DurationField({

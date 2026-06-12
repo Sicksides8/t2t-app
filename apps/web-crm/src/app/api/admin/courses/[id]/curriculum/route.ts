@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '../../../../../../lib/authHelper';
-import { fetchCourseCurriculum, syncCourseCurriculum } from '../../../../../../lib/courseAdminServer';
+import {
+  fetchCourseCurriculum,
+  sanitizeModuleLinks,
+  syncCourseCurriculum,
+} from '../../../../../../lib/courseAdminServer';
 import { adminDb } from '../../../../../../lib/firebase-admin';
 import { FS_COL } from '../../../../../../lib/firestoreCollections';
 import { handleRouteError } from '../../../../../../lib/routeError';
@@ -19,11 +23,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const body = (await request.json()) as SyncCurriculumBody;
     const lessons = (body.lessons || []).map((lesson, index) => {
       const pdfUrl = lesson.pdfUrl ? String(lesson.pdfUrl).trim() : '';
+      const links = sanitizeModuleLinks(lesson.links);
       return {
         id: lesson.id,
         title: String(lesson.title || '').trim(),
         videoUrl: String(lesson.videoUrl || '').trim(),
         ...(pdfUrl ? { pdfUrl } : {}),
+        ...(links.length > 0 ? { links } : {}),
         durationSec: Math.max(30, Number(lesson.durationSec) || 420),
         order: typeof lesson.order === 'number' ? lesson.order : index + 1,
         isFree: Boolean(lesson.isFree),

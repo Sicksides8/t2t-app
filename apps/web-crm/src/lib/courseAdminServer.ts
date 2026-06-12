@@ -2,17 +2,35 @@ import type { Firestore } from 'firebase-admin/firestore';
 import { FieldValue } from 'firebase-admin/firestore';
 import { FS_COL } from './firestoreCollections';
 import { DEFAULT_MODULE_TITLE } from './courseConstants';
-import type { Course, CourseModule, Lesson } from '../types';
+import type { Course, CourseModule, Lesson, ModuleLink } from '../types';
 
 export type LessonInput = {
   id?: string;
   title: string;
   videoUrl: string;
   pdfUrl?: string;
+  links?: ModuleLink[];
   durationSec: number;
   order: number;
   isFree: boolean;
 };
+
+export function sanitizeModuleLinks(input: unknown): ModuleLink[] {
+  if (!Array.isArray(input)) return [];
+  const cleaned: ModuleLink[] = [];
+  for (const raw of input) {
+    if (!raw || typeof raw !== 'object') continue;
+    const url = String((raw as { url?: unknown }).url || '').trim();
+    if (!url) continue;
+    if (!/^https?:\/\//i.test(url)) continue;
+    if (url.length > 500) continue;
+    const labelRaw = (raw as { label?: unknown }).label;
+    const label = typeof labelRaw === 'string' ? labelRaw.trim().slice(0, 80) : '';
+    cleaned.push(label ? { label, url } : { url });
+    if (cleaned.length >= 25) break;
+  }
+  return cleaned;
+}
 
 export function computeCourseStats(lessons: Pick<Lesson, 'durationSec'>[]) {
   const totalLessons = lessons.length;
@@ -71,6 +89,7 @@ export async function syncCourseCurriculum(
       const order = index + 1;
       const id = item.id || `${modId}_l${order}`;
       const pdfUrl = item.pdfUrl ? String(item.pdfUrl).trim() : '';
+      const links = sanitizeModuleLinks(item.links);
       return {
         id,
         courseId,
@@ -78,6 +97,7 @@ export async function syncCourseCurriculum(
         title: item.title.trim(),
         videoUrl: item.videoUrl.trim(),
         ...(pdfUrl ? { pdfUrl } : {}),
+        ...(links.length > 0 ? { links } : {}),
         durationSec: Math.max(30, item.durationSec),
         order,
         isFree: Boolean(item.isFree),
@@ -102,6 +122,9 @@ export async function syncCourseCurriculum(
     const docPayload: Record<string, unknown> = { ...lesson, updatedAt: now, createdAt: now };
     if (!lesson.pdfUrl) {
       docPayload.pdfUrl = FieldValue.delete();
+    }
+    if (!lesson.links || lesson.links.length === 0) {
+      docPayload.links = FieldValue.delete();
     }
     batch.set(db.collection(FS_COL.lessons).doc(lesson.id), docPayload, { merge: true });
   }
