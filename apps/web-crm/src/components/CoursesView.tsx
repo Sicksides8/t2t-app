@@ -467,7 +467,7 @@ export function CoursesView() {
     <>
       <AdminPage
         title="Cursos"
-        description={`Gestión completa: crear, editar, activar/ocultar y eliminar cursos en Firestore (t2t_courses). ${rows.length} cursos · mostrando ${filteredRows.length}.`}
+        description="Gestión completa: crear, editar, activar/ocultar y eliminar cursos"
         columns={columns}
         rows={filteredRows}
         rowKey={(row) => row.id}

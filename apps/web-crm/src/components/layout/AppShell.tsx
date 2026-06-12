@@ -64,7 +64,6 @@ export function AppShell({ children, title = 'T2T Academy CRM' }: { children: Re
       <section className={styles.content}>
         <header className={styles.header}>
           <div>
-            <span className={styles.kicker}>Firestore + API routes</span>
             <h1>{title}</h1>
           </div>
           <div className={styles.headerActions}>
