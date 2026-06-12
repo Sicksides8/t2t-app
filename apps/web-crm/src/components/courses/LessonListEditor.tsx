@@ -315,7 +315,7 @@ function SortableLessonRow({
             onPrevReplaced={(url) => onAssetReplaced?.(url)}
             onChange={(url) => onUpdate({ pdfUrl: url || '' })}
           />
-          <div className={styles.lessonExpandedLabel}>Enlaces externos del módulo (opcional)</div>
+          <div className={styles.lessonExpandedLabel}>Enlaces externos</div>
           <LinksEditor
             links={lesson.links || []}
             disabled={disabled}
@@ -410,7 +410,7 @@ function LinksEditor({
         </ul>
       )}
       <button type="button" className={styles.linkAddBtn} onClick={add} disabled={disabled}>
-        <Plus size={14} /> Añadir enlace
+        <Plus size={16} /> Añadir enlace
       </button>
     </div>
   );
