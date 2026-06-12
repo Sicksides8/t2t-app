@@ -6,9 +6,14 @@ import { handleRouteError } from '../../../../../lib/routeError';
 const VIDEO_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime']);
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const PDF_TYPES = new Set(['application/pdf']);
-const MAX_VIDEO_BYTES = 500 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 2 * 1024 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const MAX_PDF_BYTES = 25 * 1024 * 1024;
+const MAX_PDF_BYTES = 100 * 1024 * 1024;
+/** TTL del presigned URL: el creador necesita tiempo para subir
+ *  archivos grandes (2 GB de video pueden tardar >30 min según conexión). */
+const PRESIGN_TTL_VIDEO = 60 * 60; // 1 h
+const PRESIGN_TTL_PDF = 30 * 60; // 30 min
+const PRESIGN_TTL_DEFAULT = 10 * 60; // 10 min
 
 type UploadKind = 'video' | 'thumbnail' | 'pdf';
 
@@ -106,15 +111,21 @@ export async function POST(request: NextRequest) {
 
     const maxBytes = maxBytesFor(kind);
     if (size > maxBytes) {
-      const mb = Math.round(maxBytes / 1024 / 1024);
+      const gb = maxBytes / (1024 * 1024 * 1024);
+      const sizeLabel =
+        gb >= 1
+          ? `${Number.isInteger(gb) ? gb : gb.toFixed(1)} GB`
+          : `${Math.round(maxBytes / 1024 / 1024)} MB`;
       return NextResponse.json(
-        { success: false, error: { message: `Archivo demasiado grande. Máximo ${mb} MB.` } },
+        { success: false, error: { message: `Archivo demasiado grande. Máximo ${sizeLabel}.` } },
         { status: 400 },
       );
     }
 
     const key = buildKey(kind, scope, filename, contentType);
-    const presigned = await presignPutUrl({ key, contentType });
+    const expiresInSeconds =
+      kind === 'video' ? PRESIGN_TTL_VIDEO : kind === 'pdf' ? PRESIGN_TTL_PDF : PRESIGN_TTL_DEFAULT;
+    const presigned = await presignPutUrl({ key, contentType, expiresInSeconds });
 
     return NextResponse.json({ success: true, data: presigned });
   } catch (error) {

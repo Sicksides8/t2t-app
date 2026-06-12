@@ -27,9 +27,17 @@ type PresignResponse = {
 const VIDEO_ACCEPT = 'video/mp4,video/webm,video/quicktime';
 const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp';
 const PDF_ACCEPT = 'application/pdf';
-const VIDEO_MAX_MB = 500;
+const VIDEO_MAX_MB = 2048;
 const IMAGE_MAX_MB = 5;
-const PDF_MAX_MB = 25;
+const PDF_MAX_MB = 100;
+
+function formatSizeLabel(mb: number): string {
+  if (mb >= 1024) {
+    const gb = mb / 1024;
+    return `${Number.isInteger(gb) ? gb : gb.toFixed(1)} GB`;
+  }
+  return `${mb} MB`;
+}
 
 function acceptFor(kind: MediaKind): string {
   if (kind === 'video') return VIDEO_ACCEPT;
@@ -50,9 +58,9 @@ function dropzoneTitle(kind: MediaKind): string {
 }
 
 function dropzoneHint(kind: MediaKind): string {
-  if (kind === 'video') return `mp4, webm o mov · hasta ${VIDEO_MAX_MB} MB`;
-  if (kind === 'pdf') return `pdf · hasta ${PDF_MAX_MB} MB`;
-  return `jpg, png o webp · hasta ${IMAGE_MAX_MB} MB`;
+  if (kind === 'video') return `mp4, webm o mov · hasta ${formatSizeLabel(VIDEO_MAX_MB)}`;
+  if (kind === 'pdf') return `pdf · hasta ${formatSizeLabel(PDF_MAX_MB)}`;
+  return `jpg, png o webp · hasta ${formatSizeLabel(IMAGE_MAX_MB)}`;
 }
 
 function fileBasenameFromUrl(url: string): string {
@@ -149,7 +157,7 @@ export function MediaUploader({
         return;
       }
       if (file.size > VIDEO_MAX_MB * 1024 * 1024) {
-        setError(`Video demasiado grande. Máximo ${VIDEO_MAX_MB} MB.`);
+        setError(`Video demasiado grande. Máximo ${formatSizeLabel(VIDEO_MAX_MB)}.`);
         return;
       }
     } else if (kind === 'pdf') {
@@ -158,7 +166,7 @@ export function MediaUploader({
         return;
       }
       if (file.size > PDF_MAX_MB * 1024 * 1024) {
-        setError(`PDF demasiado grande. Máximo ${PDF_MAX_MB} MB.`);
+        setError(`PDF demasiado grande. Máximo ${formatSizeLabel(PDF_MAX_MB)}.`);
         return;
       }
     } else {
