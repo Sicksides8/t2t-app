@@ -12,6 +12,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   LogOut,
+  PlayCircle,
   Settings,
   Tags,
   TrendingUp,
@@ -31,6 +32,7 @@ const items = [
   { href: '/retencion', label: 'Retencion', icon: TrendingUp },
   { href: '/codes', label: 'Codigos', icon: Gift },
   { href: '/notifications', label: 'Notificaciones', icon: Bell },
+  { href: '/welcome-video', label: 'Video de bienvenida', icon: PlayCircle },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

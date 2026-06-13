@@ -1,12 +1,12 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '../../../../../lib/authHelper';
-import { adminDb } from '../../../../../lib/firebase-admin';
-import { deleteObject, isR2Configured, keyFromPublicUrl } from '../../../../../lib/r2';
-import { handleRouteError } from '../../../../../lib/routeError';
+import { requireAdmin } from '../../../../lib/authHelper';
+import { adminDb } from '../../../../lib/firebase-admin';
+import { deleteObject, isR2Configured, keyFromPublicUrl } from '../../../../lib/r2';
+import { handleRouteError } from '../../../../lib/routeError';
 
 /**
- * Settings → Video de bienvenida.
+ * Video de bienvenida del onboarding (admin panel top-level).
  *
  * Persistencia: t2t_config/app  →  campo `welcomeVideoUrl` (string | null).
  * Lectura desde mobile: directa por Firestore client (rules permiten read
@@ -69,7 +69,7 @@ export async function PUT(request: NextRequest) {
         try {
           await deleteObject(key);
         } catch (cleanupErr) {
-          console.warn('[settings-welcome-video] R2 cleanup fallo', cleanupErr);
+          console.warn('[welcome-video] R2 cleanup fallo', cleanupErr);
         }
       }
     }

@@ -1,5 +1,10 @@
-import { redirect } from 'next/navigation';
+import { PlaceholderSection } from '../../components/PlaceholderSection';
 
-export default function SettingsIndexPage(): never {
-  redirect('/settings/welcome-video');
+export default function SettingsPage() {
+  return (
+    <PlaceholderSection
+      title="Settings"
+      description="Configuracion general, modo mantenimiento, flags y parametros de negocio."
+    />
+  );
 }
