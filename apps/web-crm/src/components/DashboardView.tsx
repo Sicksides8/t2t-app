@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { AppShell } from './layout/AppShell';
 import { apiFetch } from '../lib/api';
@@ -8,9 +8,27 @@ import { formatNumber } from '../lib/format';
 import type { AdminStats, Course } from '../types';
 import styles from '../app/dashboard.module.css';
 
+type CourseWithMeta = Course & {
+  createdAt?: string | { _seconds?: number } | Date;
+  updatedAt?: string | { _seconds?: number } | Date;
+};
+
+function toMillis(value: CourseWithMeta['createdAt']): number {
+  if (!value) return 0;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  if (typeof value === 'object' && '_seconds' in value && typeof value._seconds === 'number') {
+    return value._seconds * 1000;
+  }
+  return 0;
+}
+
 export function DashboardView() {
   const [stats, setStats] = useState<AdminStats | null>(null);
-  const [courses, setCourses] = useState<Course[]>([]);
+  const [courses, setCourses] = useState<CourseWithMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,7 +41,7 @@ export function DashboardView() {
       try {
         const [statsData, coursesData] = await Promise.all([
           apiFetch<AdminStats>('/api/admin/stats'),
-          apiFetch<Course[]>('/api/courses'),
+          apiFetch<CourseWithMeta[]>('/api/admin/courses?includeInactive=1'),
         ]);
         if (!cancelled) {
           setStats(statsData);
@@ -44,6 +62,18 @@ export function DashboardView() {
     };
   }, []);
 
+  const recentCourses = useMemo(() => {
+    return courses
+      .slice()
+      .sort((a, b) => {
+        const am = toMillis(a.createdAt) || toMillis(a.updatedAt);
+        const bm = toMillis(b.createdAt) || toMillis(b.updatedAt);
+        if (bm !== am) return bm - am;
+        return (a.order ?? 0) - (b.order ?? 0);
+      })
+      .slice(0, 12);
+  }, [courses]);
+
   return (
     <AppShell title="Dashboard">
       {loading ? <p className={styles.status}>Cargando metricas...</p> : null}
@@ -53,30 +83,31 @@ export function DashboardView() {
         <Metric label="Alumnos registrados" value={stats ? formatNumber(stats.totalUsers) : '—'} />
         <Metric label="Cursos en catalogo" value={stats ? formatNumber(stats.totalCourses) : '—'} />
         <Metric label="Suscripciones activas" value={stats ? formatNumber(stats.activeSubscriptions) : '—'} />
-        <Metric label="Cursos visibles (API)" value={formatNumber(courses.length)} />
+        <Metric label="Cursos en el panel" value={formatNumber(courses.length)} />
       </section>
 
       <section className={styles.panel}>
-        <h2>Cursos destacados</h2>
+        <h2>Últimos cursos</h2>
         {!loading && !error ? (
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Curso</th>
-                <th>Habilidad</th>
-                <th>Duracion</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {courses.length === 0 ? (
+          recentCourses.length === 0 ? (
+            <div className={styles.empty} style={{ padding: 24, textAlign: 'center' }}>
+              <p style={{ marginTop: 0 }}>Todavía no hay cursos en el catálogo.</p>
+              <Link href="/courses" className={styles.rowLink}>
+                + Crear el primer curso
+              </Link>
+            </div>
+          ) : (
+            <table className={styles.table}>
+              <thead>
                 <tr>
-                  <td colSpan={4} className={styles.empty}>
-                    No hay cursos. Ejecuta el seed de Firestore o crea uno desde Cursos.
-                  </td>
+                  <th>Curso</th>
+                  <th>Habilidad</th>
+                  <th>Duracion</th>
+                  <th>Estado</th>
                 </tr>
-              ) : (
-                courses.slice(0, 12).map((course) => (
+              </thead>
+              <tbody>
+                {recentCourses.map((course) => (
                   <tr key={course.id}>
                     <td>
                       <Link href={`/courses/${course.id}`} className={styles.rowLink}>
@@ -89,10 +120,10 @@ export function DashboardView() {
                       <span className={styles.badge}>{course.isActive ? 'Activo' : 'Oculto'}</span>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          )
         ) : null}
       </section>
     </AppShell>
