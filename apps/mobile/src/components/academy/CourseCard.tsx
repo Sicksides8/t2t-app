@@ -1,10 +1,9 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ProgressBar } from '../ui';
-import { SkillChip } from './SkillChip';
-import { skills } from '../../data/academy';
-import { Colors, Radius, Spacing, Typography } from '../../theme';
+import { Colors, Spacing, Typography } from '../../theme';
 import type { Course } from '../../types';
 
 type Props = {
@@ -14,23 +13,35 @@ type Props = {
   compact?: boolean;
 };
 
+const MAGENTA_GRADIENT = ['#6E1AAE', '#C040EE'] as const;
+const TEAL_GRADIENT = ['#0E5A52', '#34D6C2'] as const;
+
 export function CourseCard({ course, onPress, progressPercent, compact }: Props) {
-  const skill = skills.find((s) => s.id === course.skillId);
-  const levelLabel =
-    course.level === 'beginner' ? 'Principiante' : course.level === 'intermediate' ? 'Intermedio' : 'Avanzado';
+  const tileGradient: readonly [string, string] = course.isPremium
+    ? TEAL_GRADIENT
+    : MAGENTA_GRADIENT;
 
   return (
-    <Pressable onPress={onPress} style={[styles.card, compact && styles.cardCompact]}>
-      <View style={[styles.icon, skill && { backgroundColor: skill.color }]}>
-        <Ionicons name={course.isPremium ? 'lock-closed' : 'play'} color={Colors.textPrimary} size={22} />
-      </View>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.card, compact && styles.cardCompact, pressed && styles.pressed]}
+    >
+      {course.thumbnail ? (
+        <Image source={{ uri: course.thumbnail }} style={styles.tile} resizeMode="cover" />
+      ) : (
+        <LinearGradient
+          colors={tileGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.tile}
+        />
+      )}
       <View style={styles.body}>
-        {skill ? <SkillChip label={skill.name} color={skill.color} small /> : null}
         <Text style={styles.title} numberOfLines={2}>
           {course.title}
         </Text>
         <Text style={styles.meta}>
-          {course.durationMin} min · {course.totalLessons} lecciones · {levelLabel}
+          {course.totalLessons} módulos · {course.durationMin} min
         </Text>
         {progressPercent != null && progressPercent > 0 ? (
           <View style={styles.progressWrap}>
@@ -39,7 +50,11 @@ export function CourseCard({ course, onPress, progressPercent, compact }: Props)
           </View>
         ) : null}
       </View>
-      <Ionicons name="chevron-forward" color={Colors.textTertiary} size={18} />
+      {course.isPremium ? (
+        <View style={styles.lockChip}>
+          <Ionicons name="lock-closed" size={14} color={Colors.textPrimary} />
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -48,45 +63,57 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
-    padding: Spacing.lg,
-    borderRadius: Radius.card,
-    backgroundColor: Colors.bgSurface,
+    gap: 14,
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: '#2A1052',
     borderWidth: 1,
-    borderColor: Colors.divider,
+    borderColor: '#FFFFFF14',
     marginBottom: Spacing.md,
   },
   cardCompact: {
     padding: Spacing.md,
   },
-  icon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.accentPrimary,
+  pressed: {
+    opacity: 0.92,
+  },
+  tile: {
+    width: 64,
+    height: 64,
+    borderRadius: 14,
   },
   body: {
     flex: 1,
-    gap: Spacing.xs,
+    gap: 4,
   },
   title: {
     ...Typography.bodyMedium,
     color: Colors.textPrimary,
     fontWeight: '800',
+    fontSize: 16,
   },
   meta: {
     ...Typography.caption,
-    color: Colors.textSecondary,
+    color: Colors.textTertiary,
+    fontSize: 13,
   },
   progressWrap: {
-    marginTop: Spacing.xs,
+    marginTop: 4,
     gap: 4,
   },
   progressLabel: {
     ...Typography.caption,
     color: Colors.textTertiary,
     fontSize: 10,
+  },
+  lockChip: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF14',
+    borderWidth: 1,
+    borderColor: '#FFFFFF1F',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
