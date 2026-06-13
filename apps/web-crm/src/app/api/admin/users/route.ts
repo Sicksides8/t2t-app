@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
         totalSpent: agg ? Math.round(agg.total * 100) / 100 : 0,
         lastPaymentAt: agg?.lastPaidAt ?? null,
         createdAt: toIso(data.createdAt),
+        disabled: Boolean(data.disabled),
       };
     });
 

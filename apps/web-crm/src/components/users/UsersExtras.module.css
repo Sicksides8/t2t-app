@@ -1,0 +1,322 @@
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 160px;
+}
+
+.identityName {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.identityEmail {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  word-break: break-all;
+}
+
+.pillRow {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--divider);
+  background: var(--glass);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.pillFree {
+  border-color: rgba(148, 163, 184, 0.45);
+  color: rgb(203, 213, 225);
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.pillPro {
+  border-color: rgba(99, 102, 241, 0.55);
+  color: rgb(165, 180, 252);
+  background: rgba(99, 102, 241, 0.14);
+}
+
+.pillElite {
+  border-color: rgba(245, 158, 11, 0.6);
+  color: rgb(252, 211, 77);
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.statusActive {
+  border-color: rgba(34, 197, 94, 0.55);
+  color: rgb(74, 222, 128);
+  background: rgba(34, 197, 94, 0.14);
+}
+
+.statusTrial {
+  border-color: rgba(59, 130, 246, 0.55);
+  color: rgb(147, 197, 253);
+  background: rgba(59, 130, 246, 0.14);
+}
+
+.statusCancelled {
+  border-color: rgba(244, 114, 182, 0.55);
+  color: rgb(249, 168, 212);
+  background: rgba(244, 114, 182, 0.14);
+}
+
+.statusNone {
+  opacity: 0.7;
+}
+
+.suspended {
+  border-color: rgba(239, 68, 68, 0.65);
+  color: rgb(252, 165, 165);
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.roleAdmin {
+  border-color: rgba(168, 85, 247, 0.6);
+  color: rgb(216, 180, 254);
+  background: rgba(168, 85, 247, 0.18);
+}
+
+.roleStudent {
+  border-color: rgba(148, 163, 184, 0.35);
+  color: var(--text-tertiary);
+}
+
+.kebabWrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.kebabBtn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--divider);
+  background: var(--glass);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-grid;
+  place-items: center;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.kebabBtn:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.kebabBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.kebabBtnOpen {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 220px;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--divider);
+  background: var(--bg-elevated, #16161e);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.menuItem:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.menuItem:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.menuItemDanger {
+  color: rgb(252, 165, 165);
+}
+
+.menuItemDanger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.14);
+  color: rgb(254, 202, 202);
+}
+
+.menuDivider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--divider);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formField span {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.formField input,
+.formField select,
+.formField textarea {
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--divider);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.formField textarea {
+  min-height: 72px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.fullWidth {
+  grid-column: 1 / -1;
+}
+
+.presetRow {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.presetChip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--divider);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.presetChip:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.presetChipActive {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: rgba(183, 60, 239, 0.12);
+}
+
+.helperText {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.summary {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--divider);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.summary strong {
+  color: var(--text-primary);
+}
+
+.primaryBtn,
+.secondaryBtn,
+.dangerBtn {
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 0;
+}
+
+.primaryBtn {
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  color: white;
+}
+
+.primaryBtn:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.secondaryBtn {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--divider);
+}
+
+.secondaryBtn:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dangerBtn {
+  background: var(--error, #ef4444);
+  color: white;
+}
+
+.dangerBtn:hover:not(:disabled) {
+  filter: brightness(1.07);
+}
+
+.primaryBtn:disabled,
+.secondaryBtn:disabled,
+.dangerBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

@@ -136,12 +136,6 @@ export function IngresosView() {
   return (
     <AppShell title="Ingresos">
       <section className={styles.panel}>
-        <p className={styles.description}>
-          Lectura en vivo de la coleccion <code>t2t_payments</code> (la app movil escribe aqui
-          desde el flujo de checkout). El MRR se calcula desde <code>t2t_subscriptions</code>{' '}
-          activas o en trial.
-        </p>
-
         <form
           className={styles.form}
           onSubmit={(e) => {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '../../../../../lib/firebase-admin';
+import { adminAuth, adminDb } from '../../../../../lib/firebase-admin';
 import { requireAdmin } from '../../../../../lib/authHelper';
 import { FS_COL } from '../../../../../lib/firestoreCollections';
 import { handleRouteError } from '../../../../../lib/routeError';
@@ -69,6 +69,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       onboardingCompleted: Boolean(userData.onboardingCompleted),
       coins: typeof userData.coins === 'number' ? userData.coins : 0,
       createdAt: toIso(userData.createdAt),
+      disabled: Boolean(userData.disabled),
     };
 
     let subscription: SubscriptionSummary | null = null;
@@ -118,6 +119,49 @@ export async function GET(request: NextRequest, context: RouteContext) {
     };
 
     return NextResponse.json({ success: true, data: detail });
+  } catch (error) {
+    return handleRouteError(error);
+  }
+}
+
+/**
+ * DELETE /api/admin/users/[uid]
+ * Borra el doc en t2t_users y t2t_subscriptions, y la cuenta en Firebase Auth.
+ * Conserva pagos y movimientos de coins historicos para reportes.
+ */
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  try {
+    const admin = await requireAdmin(request);
+    const { uid } = await context.params;
+    if (!uid) {
+      return NextResponse.json(
+        { success: false, error: { message: 'uid requerido' } },
+        { status: 400 },
+      );
+    }
+    if (uid === admin.uid) {
+      return NextResponse.json(
+        { success: false, error: { message: 'No podes eliminar tu propia cuenta' } },
+        { status: 400 },
+      );
+    }
+
+    const userRef = adminDb.collection(FS_COL.users).doc(uid);
+    const subRef = adminDb.collection(FS_COL.subscriptions).doc(uid);
+
+    await Promise.all([
+      userRef.delete().catch(() => null),
+      subRef.delete().catch(() => null),
+    ]);
+
+    try {
+      await adminAuth.deleteUser(uid);
+    } catch (err) {
+      const code = (err as { code?: string })?.code;
+      if (code !== 'auth/user-not-found') throw err;
+    }
+
+    return NextResponse.json({ success: true, data: { uid } });
   } catch (error) {
     return handleRouteError(error);
   }

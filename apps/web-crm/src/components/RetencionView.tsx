@@ -10,7 +10,6 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Info } from 'lucide-react';
 import { AppShell } from './layout/AppShell';
 import { MetricCard } from './ui/MetricCard';
 import { apiFetch } from '../lib/api';
@@ -75,12 +74,6 @@ export function RetencionView() {
   return (
     <AppShell title="Retencion">
       <section className={styles.panel}>
-        <p className={styles.description}>
-          <Info size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />
-          Las cohortes usan <code>t2t_coins_transactions</code> como senal de actividad (cada
-          leccion completada genera una tx). Churn calculado sobre{' '}
-          <code>t2t_subscriptions</code> usando <code>startDate</code> y <code>cancelledAt</code>.
-        </p>
         <div className={styles.form}>
           <label>
             <span className={styles.muted}>Granularidad</span>{' '}

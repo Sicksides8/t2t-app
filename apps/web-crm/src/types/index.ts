@@ -164,17 +164,62 @@ export interface AdminUserRow {
   totalSpent?: number;
   lastPaymentAt?: string | null;
   createdAt: string | null;
+  /** True si el usuario fue suspendido en Firebase Auth (no puede iniciar sesion). */
+  disabled?: boolean;
 }
+
+export type UpdateRoleBody = {
+  role: 'admin' | 'student';
+};
+
+export type SuspendUserBody = {
+  disabled: boolean;
+};
+
+export type CancelSubscriptionBody = {
+  reason?: string;
+};
+
+export type GrantPlanBody = {
+  planId: 'pro' | 'elite';
+  cycle: 'monthly' | 'yearly';
+  durationDays: number;
+  reason: string;
+};
+
+/** Restringe a que planes aplica un codigo/cupon de descuento. */
+export type CodeAppliesTo = 'pro' | 'elite' | 'any_paid';
 
 export interface SubscriptionCodeRow {
   id: string;
+  /** Titulo legible del cupon (ej: "Promo lanzamiento Junio"). */
+  title?: string;
+  /** Plan especifico al que aplica, o 'any_paid' (pro y elite). */
   planId: string;
+  appliesTo?: CodeAppliesTo;
+  /** % de descuento 1-100. 100 => acceso gratis. */
+  discountPercent?: number;
   durationDays: number;
+  /** ISO-8601, null si no expira. */
+  expiresAt?: string | null;
   used: boolean;
   usedBy?: string;
   usedAt: string | null;
   createdAt: string | null;
+  createdBy?: string;
 }
+
+export type CreateCodeBody = {
+  /** Codigo opcional; si no se pasa se autogenera (mayusculas, alfanumerico). */
+  code?: string;
+  title: string;
+  discountPercent: number;
+  appliesTo: CodeAppliesTo;
+  /** ISO-8601 o null para sin expiracion. */
+  expiresAt: string | null;
+  /** Dias de cobertura cuando se canjea (obligatorio si discountPercent === 100). */
+  durationDays?: number;
+};
 
 // ============================================================================
 // Pagos / Ingresos
