@@ -35,7 +35,7 @@ export function CreateCodeModal({ open, onClose, onSubmit }: Props) {
   const toast = useToast();
   const [code, setCode] = useState('');
   const [title, setTitle] = useState('');
-  const [discountPercent, setDiscountPercent] = useState<number>(20);
+  const [discountInput, setDiscountInput] = useState<string>('20');
   const [appliesTo, setAppliesTo] = useState<CodeAppliesTo>('any_paid');
   const [durationDays, setDurationDays] = useState<number>(DEFAULT_DURATION);
   const [hasExpiration, setHasExpiration] = useState<boolean>(false);
@@ -46,7 +46,7 @@ export function CreateCodeModal({ open, onClose, onSubmit }: Props) {
     if (open) {
       setCode('');
       setTitle('');
-      setDiscountPercent(20);
+      setDiscountInput('20');
       setAppliesTo('any_paid');
       setDurationDays(DEFAULT_DURATION);
       setHasExpiration(false);
@@ -55,7 +55,27 @@ export function CreateCodeModal({ open, onClose, onSubmit }: Props) {
     }
   }, [open]);
 
-  const isFree = discountPercent === 100;
+  const discountPercent = Number(discountInput);
+  const discountIsValid =
+    discountInput !== '' &&
+    Number.isInteger(discountPercent) &&
+    discountPercent >= 1 &&
+    discountPercent <= 100;
+  const isFree = discountIsValid && discountPercent === 100;
+
+  function handleDiscountChange(raw: string) {
+    const cleaned = raw.replace(/[^\d]/g, '').slice(0, 3);
+    if (cleaned === '') {
+      setDiscountInput('');
+      return;
+    }
+    const n = Number(cleaned);
+    if (n > 100) {
+      setDiscountInput('100');
+      return;
+    }
+    setDiscountInput(String(n));
+  }
 
   const appliesLabel = useMemo(() => {
     const opt = APPLIES_OPTIONS.find((o) => o.value === appliesTo);
@@ -68,7 +88,7 @@ export function CreateCodeModal({ open, onClose, onSubmit }: Props) {
       toast.show({ tone: 'error', message: 'El titulo es obligatorio' });
       return;
     }
-    if (!Number.isInteger(discountPercent) || discountPercent < 1 || discountPercent > 100) {
+    if (!discountIsValid) {
       toast.show({ tone: 'error', message: 'El descuento debe ser un entero entre 1 y 100' });
       return;
     }
@@ -193,12 +213,17 @@ export function CreateCodeModal({ open, onClose, onSubmit }: Props) {
         <label className={styles.field}>
           <span>Descuento (%)</span>
           <input
-            type="number"
-            min={1}
-            max={100}
-            value={discountPercent}
-            onChange={(e) => setDiscountPercent(Math.max(1, Math.min(100, Number(e.target.value) || 0)))}
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={3}
+            placeholder="1 a 100"
+            value={discountInput}
+            onChange={(e) => handleDiscountChange(e.target.value)}
           />
+          <p className={styles.helperText}>
+            Entero entre 1 y 100. Con 100 el codigo entrega acceso GRATIS.
+          </p>
         </label>
 
         <label className={styles.field}>
@@ -268,7 +293,9 @@ export function CreateCodeModal({ open, onClose, onSubmit }: Props) {
       </div>
 
       <div className={`${styles.summary} ${isFree ? styles.summaryFree : ''}`}>
-        {isFree ? (
+        {!discountIsValid ? (
+          <>Ingresa un descuento entre 1 y 100 para ver el resumen.</>
+        ) : isFree ? (
           <>
             <strong>Acceso GRATIS</strong> — al canjear este codigo, el alumno obtiene{' '}
             <strong>{appliesLabel}</strong> sin pagar durante <strong>{durationDays} dias</strong>.
