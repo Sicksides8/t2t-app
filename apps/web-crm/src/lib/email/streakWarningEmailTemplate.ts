@@ -1,11 +1,4 @@
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+import { escapeHtml } from './htmlUtils';
 
 export function buildStreakWarningHtml(params: { displayName: string; currentStreak: number }): string {
   const name = escapeHtml(params.displayName);

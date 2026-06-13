@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   DiagnosticBrainMapScreen,
@@ -24,6 +25,7 @@ import {
   progressLoaderFrames,
   reflectionFrames,
 } from '../../data/onboardingFlow';
+import { sendDiagnosticResultEmail } from '../../services/diagnosticEmailService';
 import { saveDiagnosticResult } from '../../services/diagnosticService';
 import { useAcademyStore, useAuthStore } from '../../stores';
 import type { RootStackParamList } from '../../types';
@@ -263,8 +265,14 @@ export function OnboardingFlow({ navigation }: Partial<NativeStackScreenProps<Ro
       return (
         <EmailDeliveryScreen
           onBack={() => setResultView('radar')}
-          onSubmit={async () => {
-            /* TODO: integrar envío real cuando exista el endpoint. */
+          onSubmit={async (email) => {
+            try {
+              await sendDiagnosticResultEmail({ email, diagnostic });
+              Alert.alert('Listo', 'Te enviamos tu diagnóstico al email.');
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : 'No pudimos enviar el email.';
+              Alert.alert('No pudimos enviarlo', msg);
+            }
           }}
         />
       );
