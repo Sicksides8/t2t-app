@@ -10,6 +10,7 @@ import { adminDb } from '../../../../lib/firebase-admin';
 import { FS_COL } from '../../../../lib/firestoreCollections';
 import { withoutUndefined } from '../../../../lib/firestoreDoc';
 import { handleRouteError } from '../../../../lib/routeError';
+import { slugifySkill } from '../../../../lib/skillId';
 import type { Course, CreateCourseBody } from '../../../../types';
 
 export async function GET(request: NextRequest) {
@@ -36,7 +37,8 @@ export async function POST(request: NextRequest) {
     await requireAdmin(request);
     const body = (await request.json()) as CreateCourseBody;
     const title = String(body.title || '').trim();
-    const skillId = String(body.skillId || '').trim();
+    const rawSkillId = String(body.skillId || '').trim();
+    const skillId = slugifySkill(rawSkillId);
     const description = String(body.description || '').trim();
     if (!title || !skillId || !description) {
       return NextResponse.json(

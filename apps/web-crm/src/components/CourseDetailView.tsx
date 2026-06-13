@@ -13,6 +13,7 @@ import {
   ACCESS_TIER_LABEL,
   LEGACY_LEVEL_LABEL,
 } from '../lib/courseConstants';
+import { humanizeSkillId } from '../lib/skillId';
 import type { Course, CourseAccessTier, CourseDetailPayload } from '../types';
 import styles from '../app/dashboard.module.css';
 import filterStyles from './CoursesFilters.module.css';
@@ -25,7 +26,7 @@ function tierFromCourse(course: Course): CourseAccessTier {
 
 function skillLabel(skillId: string): string {
   if (!skillId) return '—';
-  return skillId.charAt(0).toUpperCase() + skillId.slice(1);
+  return humanizeSkillId(skillId) || skillId;
 }
 
 export function CourseDetailView({ courseId }: { courseId: string }) {

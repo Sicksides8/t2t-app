@@ -6,6 +6,7 @@ import { adminDb } from '../../../../../lib/firebase-admin';
 import { FS_COL } from '../../../../../lib/firestoreCollections';
 import { deleteObject, isR2Configured, keyFromPublicUrl } from '../../../../../lib/r2';
 import { handleRouteError } from '../../../../../lib/routeError';
+import { slugifySkill } from '../../../../../lib/skillId';
 import type { Course, PatchCourseBody } from '../../../../../types';
 
 const PATCHABLE_KEYS: (keyof PatchCourseBody)[] = [
@@ -54,7 +55,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     if (typeof update.title === 'string') update.title = update.title.trim();
-    if (typeof update.skillId === 'string') update.skillId = update.skillId.trim();
+    if (typeof update.skillId === 'string') {
+      const slug = slugifySkill(update.skillId);
+      if (!slug) {
+        delete update.skillId;
+      } else {
+        update.skillId = slug;
+      }
+    }
     if (typeof update.description === 'string') update.description = update.description.trim();
     if (typeof update.thumbnail === 'string') {
       const thumb = update.thumbnail.trim();
