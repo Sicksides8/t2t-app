@@ -14,7 +14,8 @@ import { ScreenWrapper, TAB_SCREEN_EDGES } from '../../components/ui';
 import { CourseListSkeleton } from '../../components/ui/Skeleton';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { skills as seedSkills } from '../../data/academy';
-import { getCourses, getRecommendedCourses, getSkills } from '../../services/academyService';
+import { getRecommendedCourses, getSkills } from '../../services/academyService';
+import { fetchCourses } from '../../services/courseService';
 import type { Skill } from '../../types';
 import { useAcademyStore, useAuthStore, useCourseStore } from '../../stores';
 import { humanizeSkillId, normalizeSkillId, sameSkillId } from '../../utils/skillId';
@@ -49,7 +50,10 @@ export function ExploreScreen() {
 
   useEffect(() => {
     void (async () => {
-      const [remoteSkills, remoteCourses] = await Promise.all([getSkills(), getCourses()]);
+      // Usamos fetchCourses (que va por /api/courses con fallback al SDK)
+      // en vez de getCourses directo. Así dependemos del endpoint público
+      // del CRM y no del orderBy del Web SDK que requiere índice compuesto.
+      const [remoteSkills, remoteCourses] = await Promise.all([getSkills(), fetchCourses()]);
       const baseSkills = remoteSkills.length ? remoteSkills : seedSkills;
 
       // Sumamos al catálogo cualquier skill que aparezca en los cursos cargados
