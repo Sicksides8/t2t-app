@@ -9,14 +9,15 @@ import {
   ExploreCourseTile,
   type CourseFilters,
 } from '../../components/academy';
-import { ExploreChip, ExploreOrbs } from '../../components/explore';
+import { ExploreChip } from '../../components/explore';
 import { ScreenWrapper, TAB_SCREEN_EDGES } from '../../components/ui';
 import { CourseListSkeleton } from '../../components/ui/Skeleton';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { courses as seedCourses, skills as seedSkills } from '../../data/academy';
+import { skills as seedSkills } from '../../data/academy';
 import { getCourses, getRecommendedCourses, getSkills } from '../../services/academyService';
 import type { Skill } from '../../types';
 import { useAcademyStore, useAuthStore, useCourseStore } from '../../stores';
+import { humanizeSkillId, normalizeSkillId, sameSkillId } from '../../utils/skillId';
 import { Colors, Spacing, Typography } from '../../theme';
 import type { Course, RootStackParamList } from '../../types';
 
@@ -35,9 +36,7 @@ export function ExploreScreen() {
   const user = useAuthStore((state) => state.user);
   const diagnostic = useAcademyStore((state) => state.diagnostic);
   const loadCourses = useCourseStore((state) => state.load);
-  const storeCourses = useCourseStore((state) => state.courses);
   const loading = useCourseStore((state) => state.loading);
-  const progressMap = useAcademyStore((state) => state.progress);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeChip, setActiveChip] = useState<string>(ALL_SKILL_ID);
@@ -51,14 +50,34 @@ export function ExploreScreen() {
   useEffect(() => {
     void (async () => {
       const [remoteSkills, remoteCourses] = await Promise.all([getSkills(), getCourses()]);
-      const skillsList = remoteSkills.length ? remoteSkills : seedSkills;
-      const coursesList = remoteCourses.length ? remoteCourses : seedCourses;
+      const baseSkills = remoteSkills.length ? remoteSkills : seedSkills;
+
+      // Sumamos al catálogo cualquier skill que aparezca en los cursos cargados
+      // pero que no esté en el catálogo estático/remoto. Así un curso creado
+      // desde el CRM con habilidad nueva (ej. "marketing") muestra su chip y
+      // su categoría aunque la skill no esté declarada.
+      const knownIds = new Set(baseSkills.map((s) => normalizeSkillId(s.id)));
+      const extras: Skill[] = [];
+      for (const course of remoteCourses) {
+        const normalized = normalizeSkillId(course.skillId);
+        if (!normalized || knownIds.has(normalized)) continue;
+        knownIds.add(normalized);
+        extras.push({
+          id: normalized,
+          name: humanizeSkillId(normalized) || normalized,
+          description: 'Habilidad disponible en el catálogo',
+          icon: 'sparkles',
+          color: '#7C7CFF',
+          order: baseSkills.length + extras.length + 1,
+        });
+      }
+      const skillsList = [...baseSkills, ...extras];
       setCatalogSkills(skillsList);
-      setAllCourses(coursesList);
+      setAllCourses(remoteCourses);
 
       const next: Record<string, number> = {};
       for (const skill of skillsList) {
-        next[skill.id] = coursesList.filter((c) => c.skillId === skill.id).length;
+        next[skill.id] = remoteCourses.filter((c) => sameSkillId(c.skillId, skill.id)).length;
       }
       setCounts(next);
     })();
@@ -71,13 +90,13 @@ export function ExploreScreen() {
 
   useEffect(() => {
     if (!user?.id) {
-      setRecommended(storeCourses.length ? storeCourses.slice(0, 8) : seedCourses.slice(0, 8));
+      setRecommended([]);
       return;
     }
     void getRecommendedCourses(user.id, diagnostic.topSkills).then((list) => {
-      setRecommended(list.length ? list : seedCourses.slice(0, 8));
+      setRecommended(list);
     });
-  }, [user?.id, diagnostic.topSkills, storeCourses]);
+  }, [user?.id, diagnostic.topSkills]);
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
@@ -101,17 +120,17 @@ export function ExploreScreen() {
 
   const categoryRows = useMemo(() => chunkSkills(visibleSkills, 2), [visibleSkills]);
 
+  const skillNameById = useMemo(
+    () => Object.fromEntries(catalogSkills.map((s) => [s.id, s.name])) as Record<string, string>,
+    [catalogSkills],
+  );
+
+  const isForYou = activeChip === ALL_SKILL_ID;
+
   const forYouCourses = useMemo(() => {
-    let base =
-      activeChip !== ALL_SKILL_ID
-        ? allCourses.filter((c) => c.skillId === activeChip)
-        : recommended.length
-          ? recommended
-          : allCourses.length
-            ? allCourses
-            : storeCourses.length
-              ? storeCourses
-              : seedCourses;
+    let base = isForYou
+      ? recommended
+      : allCourses.filter((c) => sameSkillId(c.skillId, activeChip));
 
     if (normalizedQuery) {
       base = base.filter(
@@ -121,26 +140,40 @@ export function ExploreScreen() {
       );
     }
 
-    if (filters.level) base = base.filter((c) => c.level === filters.level);
     if (filters.maxDurationMin) base = base.filter((c) => c.durationMin <= filters.maxDurationMin!);
-    if (filters.onlyNotStarted) {
-      base = base.filter((c) => !(progressMap[c.id]?.percentComplete > 0));
+    if (filters.plan) {
+      base = base.filter((c) => {
+        const isPremium = c.isPremium === true;
+        if (filters.plan === 'FREE') return !isPremium;
+        if (filters.plan === 'PRO') return isPremium; // PRO -> incluye premium
+        return isPremium; // MASTER -> incluye premium también (futura granularidad)
+      });
     }
 
     return base.slice(0, 12);
-  }, [activeChip, allCourses, filters, normalizedQuery, progressMap, recommended, storeCourses]);
+  }, [activeChip, allCourses, filters, isForYou, normalizedQuery, recommended]);
+
+  const hasDiagnostic = diagnostic.topSkills.length > 0;
+
+  const forYouSubtitle = useMemo(() => {
+    if (!isForYou || !hasDiagnostic) return null;
+    const names = diagnostic.topSkills
+      .slice(0, 2)
+      .map((id) => skillNameById[id])
+      .filter(Boolean) as string[];
+    if (!names.length) return null;
+    return `Basado en ${names.join(' · ')}`;
+  }, [diagnostic.topSkills, hasDiagnostic, isForYou, skillNameById]);
 
   const openCatalog = (skillId: string, skillName: string) => {
     setActiveChip(skillId);
     navigation.navigate('SkillCatalog', { skillId, skillName });
   };
 
-  const hasActiveFilters = Boolean(filters.level || filters.maxDurationMin || filters.onlyNotStarted);
+  const hasActiveFilters = Boolean(filters.maxDurationMin || filters.plan);
 
   return (
     <ScreenWrapper scroll edges={TAB_SCREEN_EDGES} contentStyle={styles.screen}>
-      <ExploreOrbs />
-
       <Text style={styles.title}>Explorar</Text>
 
       <View style={styles.searchBar}>
@@ -212,16 +245,15 @@ export function ExploreScreen() {
         ) : null}
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Para vos</Text>
-        {loading && !forYouCourses.length ? <CourseListSkeleton /> : null}
-        {!loading && !forYouCourses.length ? (
-          <EmptyState
-            title="Nada para mostrar"
-            message="Ajustá los filtros o explorá otra categoría."
-            icon="book-outline"
-          />
-        ) : (
+      {loading && !forYouCourses.length ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Para ti</Text>
+          <CourseListSkeleton />
+        </View>
+      ) : forYouCourses.length > 0 ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Para ti</Text>
+          {forYouSubtitle ? <Text style={styles.sectionSubtitle}>{forYouSubtitle}</Text> : null}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -231,17 +263,21 @@ export function ExploreScreen() {
               <ExploreCourseTile
                 key={course.id}
                 course={course}
-                width={170}
+                width={180}
+                matchSkillName={
+                  isForYou && hasDiagnostic ? skillNameById[course.skillId] : undefined
+                }
                 onPress={() => navigation.navigate('CourseDetail', { courseId: course.id })}
               />
             ))}
           </ScrollView>
-        )}
-      </View>
+        </View>
+      ) : null}
 
       <CourseFiltersSheet
         visible={filterOpen}
         filters={filters}
+        resultCount={forYouCourses.length}
         onApply={setFilters}
         onClose={() => setFilterOpen(false)}
       />
@@ -255,10 +291,10 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: -0.4,
+    fontWeight: '800',
+    letterSpacing: -0.5,
     color: Colors.textPrimary,
-    marginBottom: 14,
+    marginBottom: 12,
   },
   searchBar: {
     flexDirection: 'row',
@@ -267,8 +303,10 @@ const styles = StyleSheet.create({
     height: 48,
     paddingHorizontal: 16,
     borderRadius: 16,
-    backgroundColor: Colors.bgSurface,
-    marginBottom: 14,
+    backgroundColor: '#1F0A40',
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    marginBottom: 10,
   },
   searchInput: {
     flex: 1,
@@ -278,8 +316,9 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   chipsScroll: {
+    flexGrow: 0,
     marginHorizontal: -Spacing.xl,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   chipsRow: {
     paddingHorizontal: Spacing.xl,
@@ -287,13 +326,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   section: {
-    gap: 10,
+    gap: 12,
     marginBottom: 14,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
     color: Colors.textPrimary,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: Colors.textTertiary,
+    marginTop: -4,
   },
   catRow: {
     flexDirection: 'row',

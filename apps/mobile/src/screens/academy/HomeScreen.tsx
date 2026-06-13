@@ -9,19 +9,19 @@ import { SectionHeader } from '../../components/academy';
 import {
   ContinueCourseCard,
   HomeHeader,
-  HomeOrbs,
   HomeSkillChip,
   HomeStreakCard,
   HomeTodayHero,
 } from '../../components/home';
-import { ScreenWrapper, TAB_SCREEN_EDGES } from '../../components/ui';
+import { EmptyState, ScreenWrapper, TAB_SCREEN_EDGES } from '../../components/ui';
 import { CourseListSkeleton } from '../../components/ui/Skeleton';
-import { courses as seedCourses, lessons as seedLessons, skills } from '../../data/academy';
+import { skills } from '../../data/academy';
 import { getLessons, getRecommendedCourses } from '../../services/academyService';
 import { useAcademyStore, useAuthStore, useCourseStore, useNotificationStore } from '../../stores';
 import { Spacing } from '../../theme';
 import { computeProfileStats } from '../../utils/profileStats';
 import { formatHeroMeta, pickHeroCourse, pickNextLesson } from '../../utils/homeRoutine';
+import { sameSkillId } from '../../utils/skillId';
 import type { Course, Lesson, MainTabParamList, RootStackParamList } from '../../types';
 
 type HomeNav = CompositeNavigationProp<
@@ -39,7 +39,7 @@ export function HomeScreen() {
   const diagnostic = useAcademyStore((state) => state.diagnostic);
   const notifications = useNotificationStore((state) => state.items);
   const [recommended, setRecommended] = useState<Course[]>([]);
-  const [heroLessons, setHeroLessons] = useState<Lesson[]>(seedLessons);
+  const [heroLessons, setHeroLessons] = useState<Lesson[]>([]);
 
   useEffect(() => {
     void loadCourses();
@@ -52,7 +52,7 @@ export function HomeScreen() {
 
   const displayCourses = useMemo(() => {
     if (recommended.length) return recommended;
-    return storeCourses.length ? storeCourses : seedCourses;
+    return storeCourses;
   }, [recommended, storeCourses]);
 
   const continueCourses = useMemo(() => {
@@ -85,7 +85,7 @@ export function HomeScreen() {
   const firstName = user?.displayName?.split(' ')[0] || 'alumno';
   const hasUnread = notifications.some((n) => !n.read);
 
-  const heroSkill = heroCourse ? skills.find((s) => s.id === heroCourse.skillId) : undefined;
+  const heroSkill = heroCourse ? skills.find((s) => sameSkillId(s.id, heroCourse.skillId)) : undefined;
   const heroTitle = heroLesson?.title ?? heroCourse?.title ?? 'Tu próximo entrenamiento';
   const heroDurationMin = heroLesson
     ? Math.max(1, Math.round(heroLesson.durationSec / 60))
@@ -112,8 +112,6 @@ export function HomeScreen() {
 
   return (
     <ScreenWrapper scroll edges={TAB_SCREEN_EDGES} contentStyle={styles.screen}>
-      <HomeOrbs />
-
       <HomeHeader
         firstName={firstName}
         displayName={user?.displayName || 'Alumno T2T'}
@@ -136,33 +134,45 @@ export function HomeScreen() {
         />
       ) : null}
 
-      <View style={[styles.section, !heroCourse && styles.sectionSpaced]}>
-        <SectionHeader
-          isFirst
-          title="Continuá viendo"
-          actionLabel="Ver todo"
-          onAction={() => navigateToExploreTab(navigation)}
-        />
+      {!loading && displayCourses.length === 0 ? (
+        <View style={styles.sectionSpaced}>
+          <EmptyState
+            title="Aún no hay cursos disponibles"
+            message="Estamos preparando el primer catálogo. En breve vas a poder empezar a entrenar."
+            icon="library-outline"
+            actionLabel="Explorar habilidades"
+            onAction={() => navigateToExploreTab(navigation)}
+          />
+        </View>
+      ) : (
+        <View style={[styles.section, !heroCourse && styles.sectionSpaced]}>
+          <SectionHeader
+            isFirst
+            title="Continuá viendo"
+            actionLabel="Ver todo"
+            onAction={() => navigateToExploreTab(navigation)}
+          />
 
-        {loading && !continueCourses.length ? <CourseListSkeleton /> : null}
+          {loading && !continueCourses.length ? <CourseListSkeleton /> : null}
 
-        {continueCourses.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.carousel}
-          >
-            {continueCourses.map((course) => (
-              <ContinueCourseCard
-                key={course.id}
-                course={course}
-                progressPercent={progressMap[course.id]?.percentComplete ?? 0}
-                onPress={() => navigation.navigate('CourseDetail', { courseId: course.id })}
-              />
-            ))}
-          </ScrollView>
-        ) : null}
-      </View>
+          {continueCourses.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.carousel}
+            >
+              {continueCourses.map((course) => (
+                <ContinueCourseCard
+                  key={course.id}
+                  course={course}
+                  progressPercent={progressMap[course.id]?.percentComplete ?? 0}
+                  onPress={() => navigation.navigate('CourseDetail', { courseId: course.id })}
+                />
+              ))}
+            </ScrollView>
+          ) : null}
+        </View>
+      )}
 
       <View style={[styles.section, styles.sectionSpaced]}>
         <SectionHeader isFirst title="Habilidades" />
