@@ -7,12 +7,15 @@
   padding: 20px;
   background: rgba(10, 4, 22, 0.72);
   backdrop-filter: blur(6px);
+  overflow-y: auto;
 }
 
 .dialog {
   width: 100%;
   max-width: 480px;
+  max-height: calc(100vh - 40px);
   display: grid;
+  grid-template-rows: auto 1fr auto;
   gap: 16px;
   padding: 22px;
   border: 1px solid var(--divider);
@@ -20,6 +23,21 @@
   background: var(--bg-elevated);
   box-shadow: 0 24px 80px #00000066;
   text-align: left;
+  overflow: hidden;
+}
+
+@media (max-width: 560px) {
+  .overlay {
+    padding: 12px;
+    place-items: start center;
+  }
+
+  .dialog {
+    max-height: calc(100vh - 24px);
+    padding: 18px;
+    border-radius: 18px;
+    gap: 12px;
+  }
 }
 
 .header {
@@ -71,6 +89,22 @@
   color: var(--text-primary);
   font-size: 14px;
   line-height: 1.5;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
+}
+
+.body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+
+.body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .footer {
