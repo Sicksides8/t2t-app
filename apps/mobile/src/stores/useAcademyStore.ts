@@ -1,11 +1,8 @@
 import { create } from 'zustand';
-import type { Course, CourseProgress, DiagnosticResult, Plan } from '../types';
-import { courses, plans } from '../data/academy';
+import type { CourseProgress, DiagnosticResult } from '../types';
 import { computeDiagnosticScores } from '../data/diagnostic';
 
 interface AcademyState {
-  courses: Course[];
-  plans: Plan[];
   selectedCourseId?: string;
   diagnostic: DiagnosticResult;
   progress: Record<string, CourseProgress>;
@@ -13,11 +10,10 @@ interface AcademyState {
   completeDiagnostic: () => DiagnosticResult;
   selectCourse: (courseId: string) => void;
   markLessonComplete: (courseId: string, lessonId: string, totalLessons?: number) => void;
+  markCourseStarted: (courseId: string, currentLessonId: string) => void;
 }
 
 export const useAcademyStore = create<AcademyState>((set, get) => ({
-  courses,
-  plans,
   selectedCourseId: undefined,
   diagnostic: {
     answers: {},
@@ -37,10 +33,13 @@ export const useAcademyStore = create<AcademyState>((set, get) => ({
 
   completeDiagnostic: () => {
     const answers = get().diagnostic.answers;
-    const { scores, topSkills, weakSkills } = computeDiagnosticScores(answers);
+    const { scores, baseScores, focusAreas, topSkills, weakSkills } =
+      computeDiagnosticScores(answers);
     const diagnostic: DiagnosticResult = {
       answers,
       scores,
+      baseScores,
+      focusAreas,
       topSkills,
       weakSkills,
       completedAt: new Date(),
@@ -50,6 +49,33 @@ export const useAcademyStore = create<AcademyState>((set, get) => ({
   },
 
   selectCourse: (courseId) => set({ selectedCourseId: courseId }),
+
+  markCourseStarted: (courseId, currentLessonId) =>
+    set((state) => {
+      const current = state.progress[courseId];
+      if (current && current.percentComplete > 0) {
+        // Ya estaba iniciado: solo refrescamos la lección actual.
+        if (current.currentLessonId === currentLessonId) return state;
+        return {
+          progress: {
+            ...state.progress,
+            [courseId]: { ...current, currentLessonId, updatedAt: new Date() },
+          },
+        };
+      }
+      return {
+        progress: {
+          ...state.progress,
+          [courseId]: {
+            courseId,
+            lessonsCompleted: current?.lessonsCompleted ?? [],
+            currentLessonId,
+            percentComplete: Math.max(current?.percentComplete ?? 0, 1),
+            updatedAt: new Date(),
+          },
+        },
+      };
+    }),
 
   markLessonComplete: (courseId, lessonId, totalLessons = 5) =>
     set((state) => {
