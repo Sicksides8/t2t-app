@@ -13,7 +13,7 @@ import {
 } from '../screens/academy/AcademyScreen';
 import { flushPendingDiagnosticIfAuthenticated } from '../services/diagnosticService';
 import { getUserProfile, onAuthChange } from '../services/authService';
-import { useAuthStore, useNotificationStore } from '../stores';
+import { useAcademyStore, useAuthStore, useNotificationStore } from '../stores';
 import { Colors, Spacing, Typography } from '../theme';
 import type { RootStackParamList } from '../types';
 import AuthStack from './AuthStack';
@@ -49,6 +49,7 @@ export default function RootNavigator() {
       unsub = onAuthChange(async (firebaseUser) => {
         if (!firebaseUser) {
           setUser(null);
+          useAcademyStore.getState().clearProgress();
           setInitialized();
           return;
         }
@@ -70,6 +71,9 @@ export default function RootNavigator() {
             updatedAt: new Date(),
           });
         }
+        // Hidratar progreso desde Firestore antes de marcar inicializado
+        // para que pantallas como Mis cursos arranquen con datos correctos.
+        await useAcademyStore.getState().loadUserProgress(firebaseUser.uid);
         setInitialized();
       });
     }

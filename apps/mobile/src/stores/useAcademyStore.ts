@@ -1,4 +1,7 @@
 import { create } from 'zustand';
+import { collection, getDocs } from 'firebase/firestore';
+import { FS_COL } from '../constants/firestoreCollections';
+import { db } from '../services/firebase';
 import type { CourseProgress, DiagnosticResult } from '../types';
 import { computeDiagnosticScores } from '../data/diagnostic';
 
@@ -11,6 +14,8 @@ interface AcademyState {
   selectCourse: (courseId: string) => void;
   markLessonComplete: (courseId: string, lessonId: string, totalLessons?: number) => void;
   markCourseStarted: (courseId: string, currentLessonId: string) => void;
+  loadUserProgress: (userId: string) => Promise<void>;
+  clearProgress: () => void;
 }
 
 export const useAcademyStore = create<AcademyState>((set, get) => ({
@@ -105,4 +110,41 @@ export const useAcademyStore = create<AcademyState>((set, get) => ({
         },
       };
     }),
+
+  loadUserProgress: async (userId) => {
+    if (!userId) return;
+    try {
+      const snap = await getDocs(
+        collection(db, FS_COL.progress, userId, FS_COL.progressCoursesSub),
+      );
+      const next: Record<string, CourseProgress> = {};
+      snap.forEach((docSnap) => {
+        const data = docSnap.data() as Partial<CourseProgress>;
+        const courseId = data.courseId || docSnap.id;
+        next[courseId] = {
+          courseId,
+          lessonsCompleted: Array.isArray(data.lessonsCompleted) ? data.lessonsCompleted : [],
+          currentLessonId: data.currentLessonId,
+          percentComplete: typeof data.percentComplete === 'number' ? data.percentComplete : 0,
+          updatedAt: data.updatedAt ? new Date(data.updatedAt as unknown as string) : new Date(),
+        };
+      });
+      // Merge: si ya había progreso local más fresco (caso edge: usuario sin
+      // red abriendo y completando), no lo pisamos.
+      set((state) => {
+        const merged = { ...next };
+        for (const [cid, local] of Object.entries(state.progress)) {
+          const remote = merged[cid];
+          if (!remote || (local.percentComplete ?? 0) > (remote.percentComplete ?? 0)) {
+            merged[cid] = local;
+          }
+        }
+        return { progress: merged };
+      });
+    } catch {
+      /* sin red o sin permisos: dejamos progreso vacío en memoria */
+    }
+  },
+
+  clearProgress: () => set({ progress: {} }),
 }));
