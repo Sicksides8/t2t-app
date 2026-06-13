@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, StyleSheet, Text, View } from 'react-native';
 import { PenpotFlowShell, PenpotTopBar } from '../../components/penpot';
 import { Button } from '../../components/ui';
 import {
@@ -21,6 +21,7 @@ import {
   HookWelcomeVideoIntro,
 } from '../../components/hooks';
 import {
+  buildPersonalizedPlanForHorizon,
   countedSteps,
   findStepIndexById,
   hookStepRequiresSelection,
@@ -29,14 +30,33 @@ import {
   type HookStep,
 } from '../../data/hooksFlow';
 import * as authService from '../../services/authService';
+import { getAppConfig } from '../../services/appConfigService';
 import { getBillingProvider } from '../../services/subscriptionService';
-import { applyCouponToUser } from '../../services/couponService';
+import { applyCodeToUser } from '../../services/couponService';
 import { useAuthStore } from '../../stores';
 import { Colors, Spacing } from '../../theme';
-import type { SubscriptionSource } from '../../types';
+import type { PlanHorizonDays, SubscriptionPlanId, SubscriptionSource } from '../../types';
+
+const HORIZON_STEP_ID = '46b_Hook_Horizonte';
+
+function parseHorizonDays(id: string | undefined): PlanHorizonDays | null {
+  if (id === '30') return 30;
+  if (id === '60') return 60;
+  if (id === '90') return 90;
+  return null;
+}
 
 const PROGRESS_TICK_MS = 900;
 const SOCIAL_PROOF_AUTO_MS = 3200;
+
+/**
+ * Pasarela de pago a usar al activar el trial desde "Confirmar plan".
+ * iOS → Apple IAP, resto → Google Play. Es la única forma de elegir
+ * el provider sin exponer dos botones distintos al usuario.
+ *
+ * `Platform.OS` es estable en el bundle, por eso vive a nivel módulo.
+ */
+const platformSource: SubscriptionSource = Platform.OS === 'ios' ? 'apple' : 'google';
 
 type BranchState =
   | { kind: 'main' }
@@ -56,6 +76,22 @@ export function HooksFlowScreen() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [hooksAnswers, setHooksAnswers] = useState<Record<string, string[]>>({});
   const [selectedPlanId, setSelectedPlanId] = useState<HookPricingPlan['id'] | null>(null);
+  /**
+   * Resultado del canje de código (cuando aplica), usado para personalizar
+   * el paso `55_Codigo_Aplicado` con plan y duración reales en vez del
+   * texto seed hardcoded.
+   */
+  const [appliedCodeResult, setAppliedCodeResult] = useState<{
+    targetPlan: SubscriptionPlanId;
+    durationDays: number;
+    discountPercent: number;
+  } | null>(null);
+  /**
+   * URL del video de bienvenida traída desde t2t_config/app (subido por
+   * el admin desde el CRM en /settings/welcome-video). Si llega null o
+   * todavía no resolvió, el componente cae al fallback demo.
+   */
+  const [remoteWelcomeUrl, setRemoteWelcomeUrl] = useState<string | null>(null);
   const user = useAuthStore((state) => state.user);
   const setOnboardingCompleted = useAuthStore((state) => state.setOnboardingCompleted);
   const refreshUserProfile = useAuthStore((state) => state.refreshUserProfile);
@@ -71,13 +107,45 @@ export function HooksFlowScreen() {
       return s;
     }
     if (branch.kind === 'codeApplied') {
-      return steps[findStepIndexById('55_Codigo_Aplicado', steps)];
+      const base = steps[findStepIndexById('55_Codigo_Aplicado', steps)];
+      // Si el canje fue exitoso, override el seed con los datos reales
+      // (plan / duración / tipo de descuento) para que el copy refleje el
+      // beneficio real del código y no el texto hardcoded del seed.
+      if (base.kind === 'codeApplied' && appliedCodeResult) {
+        const { targetPlan, durationDays, discountPercent } = appliedCodeResult;
+        const planName = targetPlan.toUpperCase();
+        const ribbon = discountPercent === 100
+          ? 'Código aplicado · gratis'
+          : `Código aplicado · ${discountPercent}% off`;
+        const headline = discountPercent === 100
+          ? `Tu plan ${planName} está activo`
+          : `Tu plan ${planName} con descuento`;
+        const caption = discountPercent === 100
+          ? `Por ${durationDays} días sin cargo`
+          : `${discountPercent}% off por ${durationDays} días`;
+        return {
+          ...base,
+          content: {
+            ...base.content,
+            headline,
+            caption,
+            ribbonLabel: ribbon,
+          },
+        };
+      }
+      return base;
     }
     if (branch.kind === 'final') {
-      return steps[findStepIndexById('53_Plan_Personalizado', steps)];
+      const baseFinal = steps[findStepIndexById('53_Plan_Personalizado', steps)];
+      // Override dinámico: si el user eligió un horizonte (30/60/90) en el step
+      // 46b_Hook_Horizonte, escalamos título, ruta de hitos y packs del frame.
+      if (baseFinal.kind === 'personalizedPlan') {
+        return buildPersonalizedPlanForHorizon(user?.planHorizonDays, baseFinal);
+      }
+      return baseFinal;
     }
     return steps[step];
-  }, [branch, step, steps]);
+  }, [branch, step, steps, appliedCodeResult, user?.planHorizonDays]);
 
   // Counter visible in top bar
   const counterIndex = current.counted
@@ -123,6 +191,18 @@ export function HooksFlowScreen() {
     if (user?.displayName) setName(user.displayName);
   }, [user?.id, user?.displayName, user?.hookSelections]);
 
+  // Carga el welcome video URL custom (configurado por el admin desde el CRM).
+  // Fire-and-forget: si falla o tarda, el render cae al demo hasta que llegue.
+  useEffect(() => {
+    let cancelled = false;
+    void getAppConfig().then((cfg) => {
+      if (!cancelled) setRemoteWelcomeUrl(cfg.welcomeVideoUrl);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const persistSelection = useCallback(
     async (labels: string[]) => {
       if (labels.length === 0) return;
@@ -130,15 +210,37 @@ export function HooksFlowScreen() {
       setHooksAnswers(merged);
       const uid = useAuthStore.getState().user?.id;
       if (!uid) return;
+      // Si el step actual es el de Horizonte (30/60/90 días), además de
+      // guardar el label en hookSelections persistimos el campo dedicado
+      // `planHorizonDays` que consume `buildPersonalizedPlanForHorizon`.
+      const horizonId =
+        current.id === HORIZON_STEP_ID && current.kind === 'iconSelect'
+          ? Array.from(selectedIds)[0]
+          : undefined;
+      const horizonDays = parseHorizonDays(horizonId);
+      const planStartedAt = horizonDays ? new Date() : undefined;
       try {
-        await authService.updateUserFields(uid, { hookSelections: merged });
+        await authService.updateUserFields(uid, {
+          hookSelections: merged,
+          ...(horizonDays ? { planHorizonDays: horizonDays } : {}),
+          ...(planStartedAt ? { planStartedAt } : {}),
+        });
         const u = useAuthStore.getState().user;
-        if (u) useAuthStore.setState({ user: { ...u, hookSelections: merged } });
+        if (u) {
+          useAuthStore.setState({
+            user: {
+              ...u,
+              hookSelections: merged,
+              ...(horizonDays ? { planHorizonDays: horizonDays } : {}),
+              ...(planStartedAt ? { planStartedAt } : {}),
+            },
+          });
+        }
       } catch {
         /* offline */
       }
     },
-    [current.id, hooksAnswers],
+    [current.id, current.kind, hooksAnswers, selectedIds],
   );
 
   const resolveSelectionLabels = useCallback((): string[] => {
@@ -252,17 +354,31 @@ export function HooksFlowScreen() {
         return;
       }
 
-      // Redeem branch -> aplica el cupón vía couponService (provider-aware)
+      // Redeem branch -> aplica el código vía couponService (provider-aware).
+      // Si falla, mostramos Alert y NO avanzamos a codeApplied (para que el
+      // usuario pueda corregir el código o volver atrás).
       if (current.kind === 'redeemCode') {
         const uid = useAuthStore.getState().user?.id;
-        if (promoCode.trim() && uid) {
-          const result = await applyCouponToUser(uid, promoCode.trim());
-          if (result.ok) {
-            await refreshUserProfile();
-          }
-          // TODO MERCADOPAGO: mostrar `result.message` en un toast/alert al
-          // user (ej. "Cupón no válido", "Trial extendido 30 días").
+        if (!uid) {
+          setBranch({ kind: 'codeApplied' });
+          return;
         }
+        const trimmed = promoCode.trim();
+        if (!trimmed) {
+          Alert.alert('Código vacío', 'Ingresá un código para canjear.');
+          return;
+        }
+        const result = await applyCodeToUser(uid, trimmed);
+        if (!result.ok) {
+          Alert.alert('No se pudo canjear', result.message);
+          return;
+        }
+        setAppliedCodeResult({
+          targetPlan: result.targetPlan,
+          durationDays: result.durationDays,
+          discountPercent: result.discountPercent,
+        });
+        await refreshUserProfile();
         setBranch({ kind: 'codeApplied' });
         return;
       }
@@ -410,11 +526,9 @@ export function HooksFlowScreen() {
       case 'confirmPlan':
         return (
           <HookConfirmPlanFooter
-            appleCtaLabel={current.appleCtaLabel}
-            googleCtaLabel={current.googleCtaLabel}
+            ctaLabel={current.ctaLabel}
             footnote={current.footnote}
-            onApple={() => void startTrialAndFinish('apple')}
-            onGoogle={() => void startTrialAndFinish('google')}
+            onStartTrial={() => void startTrialAndFinish(platformSource)}
           />
         );
       default:
@@ -456,9 +570,8 @@ export function HooksFlowScreen() {
         selectedPlanId,
         setSelectedPlanId,
         onRedeemTap: () => setBranch({ kind: 'redeem' }),
-        onApple: () => void startTrialAndFinish('apple'),
-        onGoogle: () => void startTrialAndFinish('google'),
         onWelcomeSkip: () => void finishHooks(),
+        remoteWelcomeUrl,
       })}
 
       {/* Special Offer modal */}
@@ -500,9 +613,8 @@ type RenderCtx = {
   selectedPlanId: HookPricingPlan['id'] | null;
   setSelectedPlanId: (v: HookPricingPlan['id']) => void;
   onRedeemTap: () => void;
-  onApple: () => void;
-  onGoogle: () => void;
   onWelcomeSkip: () => void;
+  remoteWelcomeUrl: string | null;
 };
 
 function renderStepBody(ctx: RenderCtx) {
@@ -657,7 +769,7 @@ function renderStepBody(ctx: RenderCtx) {
           headline={step.headline}
           authorName={step.authorName}
           authorRole={step.authorRole}
-          videoUrl={step.videoUrl}
+          videoUrl={ctx.remoteWelcomeUrl ?? step.videoUrl}
           skipLabel={step.skipLabel}
           onSkip={ctx.onWelcomeSkip}
         />

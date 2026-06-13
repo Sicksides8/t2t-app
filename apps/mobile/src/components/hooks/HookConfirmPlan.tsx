@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Typography } from '../../theme';
@@ -52,30 +52,32 @@ export function HookConfirmPlan({
 }
 
 type ConfirmPlanFooterProps = {
-  appleCtaLabel: string;
-  googleCtaLabel: string;
+  ctaLabel: string;
   footnote: string;
-  onApple: () => void;
-  onGoogle: () => void;
+  onStartTrial: () => void;
 };
 
-/** Footer fijo con los CTAs de pago para "Confirmar plan". */
+/**
+ * Footer fijo con el CTA de pago para "Confirmar plan".
+ *
+ * Un único botón "Empezar prueba gratis" que delega en `onStartTrial`. La
+ * pasarela (Apple Pay en iOS, Google Play en Android, mock en otros) se
+ * resuelve en el caller con `Platform.OS`. El icono se adapta a la
+ * plataforma para sugerir cuál pasarela se va a abrir.
+ */
 export function HookConfirmPlanFooter({
-  appleCtaLabel,
-  googleCtaLabel,
+  ctaLabel,
   footnote,
-  onApple,
-  onGoogle,
+  onStartTrial,
 }: ConfirmPlanFooterProps) {
+  const iconName: keyof typeof Ionicons.glyphMap =
+    Platform.OS === 'ios' ? 'logo-apple' : 'card-outline';
+
   return (
     <View style={styles.footer}>
-      <Pressable onPress={onApple} style={styles.appleBtn} accessibilityRole="button">
-        <Ionicons name="logo-apple" size={18} color={Colors.textPrimary} />
-        <Text style={styles.appleText}>{appleCtaLabel}</Text>
-      </Pressable>
-      <Pressable onPress={onGoogle} style={styles.googleBtn} accessibilityRole="button">
-        <Ionicons name="globe-outline" size={18} color={Colors.textPrimary} />
-        <Text style={styles.googleText}>{googleCtaLabel}</Text>
+      <Pressable onPress={onStartTrial} style={styles.ctaBtn} accessibilityRole="button">
+        <Ionicons name={iconName} size={18} color={Colors.textPrimary} />
+        <Text style={styles.ctaText}>{ctaLabel}</Text>
       </Pressable>
       <Text style={styles.footnote}>{footnote}</Text>
     </View>
@@ -159,7 +161,7 @@ const styles = StyleSheet.create({
   footer: {
     gap: 10,
   },
-  appleBtn: {
+  ctaBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -168,23 +170,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: Colors.accentPrimary,
   },
-  appleText: {
-    color: Colors.textPrimary,
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  googleBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    paddingVertical: 16,
-    borderRadius: 999,
-    backgroundColor: '#FFFFFF12',
-    borderWidth: 1,
-    borderColor: '#FFFFFF1F',
-  },
-  googleText: {
+  ctaText: {
     color: Colors.textPrimary,
     fontWeight: '700',
     fontSize: 15,

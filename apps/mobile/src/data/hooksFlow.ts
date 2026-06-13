@@ -1,5 +1,6 @@
 import type { ComponentProps } from 'react';
 import type { Ionicons } from '@expo/vector-icons';
+import type { PlanHorizonDays } from '../types';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -147,8 +148,7 @@ export type HookStep =
       trialCaption: string;
       afterPricing: string;
       redeemCtaLabel: string;
-      appleCtaLabel: string;
-      googleCtaLabel: string;
+      ctaLabel: string;
       footnote: string;
     })
   | (StepBase & NotCounted & {
@@ -357,6 +357,46 @@ export const hooksFlowSteps: HookStep[] = [
     },
   },
 
+  // STEP 6.5 — HorizonteObjetivo (counted) — activa el "plan de entrenamiento"
+  // (30/60/90 días). El valor seleccionado se persiste en `user.planHorizonDays`
+  // y se consume en el frame final `53_Plan_Personalizado` para escalar título,
+  // ruta de hitos y packs sugeridos.
+  {
+    id: '46b_Hook_Horizonte',
+    penId: '46b',
+    kind: 'iconSelect',
+    counted: true,
+    title: '¿En cuánto tiempo querés ver resultados?',
+    subtitle: 'Elegí el horizonte de tu plan de entrenamiento',
+    multiSelect: false,
+    options: [
+      {
+        id: '30',
+        label: '30 días',
+        subtitle: 'Sprint corto · resultados rápidos',
+        icon: 'flash-outline',
+        tileColor: '#FF5C7A',
+        iconColor: '#FFFFFF',
+      },
+      {
+        id: '60',
+        label: '60 días',
+        subtitle: 'Recomendado · cambios sostenibles',
+        icon: 'rocket-outline',
+        tileColor: '#B73CEF',
+        iconColor: '#FFFFFF',
+      },
+      {
+        id: '90',
+        label: '90 días',
+        subtitle: 'Plan profundo · transformación completa',
+        icon: 'trophy-outline',
+        tileColor: '#34D6C2',
+        iconColor: '#1A0030',
+      },
+    ],
+  },
+
   // Transition — Plan Listo (NOT counted)
   {
     id: '47_Plan_Listo',
@@ -455,8 +495,7 @@ export const hooksFlowSteps: HookStep[] = [
     trialCaption: 'gratis · sin cargo',
     afterPricing: 'Después: USD 9.90 / mes. Cancelás cuando quieras.',
     redeemCtaLabel: '¿Tenés un código? Canjéalo',
-    appleCtaLabel: 'Continuar con Apple',
-    googleCtaLabel: 'Continuar con Google',
+    ctaLabel: 'Empezar prueba gratis',
     footnote: 'No se te cobrará durante el trial.',
   },
 
@@ -617,3 +656,88 @@ export function isOptionalStep(step: HookStep): boolean {
 export function findStepIndexById(id: string, steps: HookStep[] = hooksFlowSteps): number {
   return steps.findIndex((s) => s.id === id);
 }
+
+/** Step base del plan personalizado, usado como template por `buildPersonalizedPlanForHorizon`. */
+type PersonalizedPlanStep = Extract<HookStep, { kind: 'personalizedPlan' }>;
+
+/**
+ * Construye una versión del frame `53_Plan_Personalizado` adaptada al horizonte
+ * elegido (30/60/90 días). Escala:
+ *  - `title` y `bodyLine` (label de duración).
+ *  - `route` (hitos con días absolutos: arranque, mid-1, mid-2, checkpoint final).
+ *  - `packs` (los `daysLabel` se ajustan a fracciones del horizonte).
+ *
+ * No reordena ni cambia el coach/avatar — sólo escala los timestamps. Si no se
+ * pasa horizonte se devuelve el seed (60 días) para mantener compat hacia atrás.
+ */
+export function buildPersonalizedPlanForHorizon(
+  horizon: PlanHorizonDays | undefined,
+  base: PersonalizedPlanStep = hooksFlowSteps.find(
+    (s) => s.id === '53_Plan_Personalizado',
+  ) as PersonalizedPlanStep,
+): PersonalizedPlanStep {
+  if (!horizon) return base;
+
+  const milestoneIcons = base.route.map((r) => r.icon);
+  const milestoneTitles = base.route.map((r) => r.title);
+  const milestoneCaptions = base.route.map((r) => r.caption);
+
+  // Cuatro hitos: día 1 (arranque), 1/3, 2/3 y checkpoint final.
+  const checkpointDay = horizon;
+  const mid1 = Math.max(2, Math.round(horizon / 3));
+  const mid2 = Math.max(mid1 + 1, Math.round((horizon * 2) / 3));
+
+  const route: PersonalizedPlanStep['route'] = [
+    {
+      id: 'r1',
+      day: 1,
+      title: milestoneTitles[0] ?? 'Tu radar de hoy · Liderazgo',
+      caption: milestoneCaptions[0] ?? '10 min · módulo introductorio',
+      variant: 'green',
+      icon: milestoneIcons[0] ?? 'play',
+      solid: true,
+    },
+    {
+      id: 'r-mid1',
+      day: mid1,
+      title: milestoneTitles[1] ?? 'Comunicación efectiva',
+      caption: milestoneCaptions[1] ?? '15 min · 2 módulos',
+      variant: 'teal',
+      icon: milestoneIcons[1] ?? 'chatbubble-outline',
+    },
+    {
+      id: 'r-mid2',
+      day: mid2,
+      title: milestoneTitles[2] ?? 'Resolución de problemas',
+      caption: milestoneCaptions[2] ?? '20 min · 3 módulos',
+      variant: 'teal',
+      icon: milestoneIcons[2] ?? 'bulb-outline',
+    },
+    {
+      id: 'r-final',
+      day: checkpointDay,
+      title: 'Checkpoint · Repite tu radar',
+      caption: '5 min · ver tu progreso',
+      variant: 'magenta',
+      icon: 'refresh',
+    },
+  ];
+
+  // Escalado de packs: el seed tiene `30 días` y `28 días`. Ajustamos a
+  // ~50% y ~45% del horizonte para que los packs siempre queden dentro
+  // de la duración del plan (y sean coherentes con un sprint corto).
+  const packs: PersonalizedPlanStep['packs'] = base.packs.map((pack, idx) => {
+    const ratio = idx === 0 ? 0.5 : 0.45;
+    const days = Math.max(7, Math.round(horizon * ratio));
+    return { ...pack, daysLabel: `${days} días` };
+  });
+
+  return {
+    ...base,
+    title: `Tu plan · ${horizon} días`,
+    bodyLine: `${horizon} días con ${base.coachName}`,
+    route,
+    packs,
+  };
+}
+
