@@ -258,6 +258,14 @@
           }
         },
         {
+          "client_id": "34025167590-qbsjs4cbpvgbagtabks3ree2n6h4nprn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.t2tacademy.mobile",
+            "certificate_hash": "aa3f78c53292523055c3e44dd85f1eb0d27aa003"
+          }
+        },
+        {
           "client_id": "34025167590-uvsnfng305ml8cplhcrfs6k3g5tnrtq3.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

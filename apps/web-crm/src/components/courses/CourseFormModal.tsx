@@ -26,6 +26,7 @@ import type {
   CreateCourseBody,
   LessonDraft,
   ModuleLink,
+  SubtitleTrack,
   SyncCurriculumBody,
 } from '../../types';
 import { useToast } from '../ui/Toast';
@@ -167,7 +168,8 @@ function snapshotsEqual(a: CourseFormSnapshot, b: CourseFormSnapshot): boolean {
       la.durationSec !== lb.durationSec ||
       la.isFree !== lb.isFree ||
       la.order !== lb.order ||
-      !linksEqual(la.links, lb.links)
+      !linksEqual(la.links, lb.links) ||
+      !subtitlesEqual(la.subtitles, lb.subtitles)
     ) {
       return false;
     }
@@ -184,6 +186,34 @@ function linksEqual(a?: ModuleLink[], b?: ModuleLink[]): boolean {
     if ((aa[i].label || '') !== (bb[i].label || '')) return false;
   }
   return true;
+}
+
+function subtitlesEqual(a?: SubtitleTrack[], b?: SubtitleTrack[]): boolean {
+  const aa = a || [];
+  const bb = b || [];
+  if (aa.length !== bb.length) return false;
+  for (let i = 0; i < aa.length; i += 1) {
+    if ((aa[i].lang || '') !== (bb[i].lang || '')) return false;
+    if ((aa[i].label || '') !== (bb[i].label || '')) return false;
+    if ((aa[i].url || '') !== (bb[i].url || '')) return false;
+  }
+  return true;
+}
+
+/**
+ * Filtra subtítulos a enviar al backend: descarta entradas a medio cargar
+ * (sin url o sin lang) y normaliza los strings.
+ */
+function cleanSubtitlesPayload(input?: SubtitleTrack[]): SubtitleTrack[] | undefined {
+  if (!Array.isArray(input) || input.length === 0) return undefined;
+  const cleaned = input
+    .map((track) => ({
+      lang: (track.lang || '').trim().toLowerCase(),
+      label: (track.label || '').trim(),
+      url: (track.url || '').trim(),
+    }))
+    .filter((track) => track.lang && track.url);
+  return cleaned.length > 0 ? cleaned : undefined;
 }
 
 export function CourseFormModal({
@@ -421,6 +451,7 @@ export function CourseFormModal({
         videoUrl: lesson.videoUrl.trim() || MOCK_VIDEO_URL,
         pdfUrl: lesson.pdfUrl?.trim() || undefined,
         links: lesson.links && lesson.links.length > 0 ? lesson.links : undefined,
+        subtitles: cleanSubtitlesPayload(lesson.subtitles),
         durationSec: lesson.durationSec,
         isFree: lesson.isFree,
       })),
@@ -474,6 +505,7 @@ export function CourseFormModal({
           videoUrl: lesson.videoUrl.trim() || MOCK_VIDEO_URL,
           pdfUrl: lesson.pdfUrl?.trim() || undefined,
           links: lesson.links && lesson.links.length > 0 ? lesson.links : undefined,
+          subtitles: cleanSubtitlesPayload(lesson.subtitles),
           durationSec: lesson.durationSec,
           order: index + 1,
           isFree: lesson.isFree,

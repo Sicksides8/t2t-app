@@ -1,7 +1,7 @@
 import type { CourseModule, Lesson } from '../types';
 import type { CourseProgress } from '../types';
 
-/** True si al completar `lessonId` se terminó el módulo (todas las lecciones del módulo). */
+/** True si al completar `lessonId` se terminó el módulo (todos los items del módulo). */
 export function isModuleJustCompleted(
   modules: CourseModule[],
   lessons: Lesson[],

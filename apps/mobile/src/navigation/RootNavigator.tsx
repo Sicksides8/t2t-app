@@ -13,6 +13,8 @@ import {
 } from '../screens/academy/AcademyScreen';
 import { flushPendingDiagnosticIfAuthenticated } from '../services/diagnosticService';
 import { getUserProfile, onAuthChange } from '../services/authService';
+import { recordActivity } from '../services/streakService';
+import { scheduleStreakReminder } from '../services/streakReminder';
 import { useAcademyStore, useAuthStore, useNotificationStore } from '../stores';
 import { Colors, Spacing, Typography } from '../theme';
 import type { RootStackParamList } from '../types';
@@ -33,6 +35,16 @@ export default function RootNavigator() {
   useEffect(() => {
     if (!user?.id) return undefined;
     flushPendingDiagnosticIfAuthenticated().catch(() => undefined);
+    // Engagement diario: abrir la app autenticado cuenta como actividad
+    // (alimenta la racha y reprograma el recordatorio local).
+    void (async () => {
+      try {
+        await recordActivity();
+        await scheduleStreakReminder();
+      } catch {
+        /* offline: silencioso */
+      }
+    })();
     const unsub = useNotificationStore.getState().subscribe(user.id);
     return () => unsub?.();
   }, [user?.id]);

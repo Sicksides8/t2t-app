@@ -36,101 +36,215 @@ export const PENPOT_FRAMES: Record<string, PenpotFrameMeta> = {
   '02_Welcome': {
     id: '02_Welcome',
     penId: '02',
-    title: 'Bienvenido a tu academia personal',
-    body: 'Primero detectamos tu perfil. Luego conectamos cursos, progreso y plan de acción.',
+    title: 'Tu gimnasio mental',
+    body: 'Las habilidades blandas son músculos. Te ayudamos a entrenarlas en sesiones cortas, cada día.',
     orbVariant: 'default',
     illustrationKey: 'welcome',
   },
-  '03_Impacto': {
-    id: '03_Impacto',
+  '03_ComoFunciona': {
+    id: '03_ComoFunciona',
     penId: '03',
-    title: 'Convierte habilidades humanas en ventaja real',
-    body: 'T2T entrena las competencias que definen tu crecimiento profesional.',
+    title: 'Tu plan creado con IA. Entrenado por ti.',
+    body: 'T2T Academy usa IA para armar tu entrenamiento de habilidades blandas, según tu diagnóstico y tus objetivos.',
     orbVariant: 'default',
     illustrationKey: 'story',
   },
-  '04_Identificacion': {
-    id: '04_Identificacion',
+  // ============================================================
+  // Carrusel onboarding (04 → 32) — copy real vive en
+  // `data/onboardingFlow.ts` y `data/diagnostic.ts`.
+  // Estas entries son referencia/auditoría, no se usan en render.
+  // ============================================================
+  '04_Impacto': {
+    id: '04_Impacto',
     penId: '04',
-    title: 'Sabemos donde estás',
-    body: 'Tu punto de partida importa. Por eso empezamos con un diagnóstico personal.',
+    title: 'El mundo laboral cambió.',
+    body: 'Y la mayoría todavía no lo entendió.',
     orbVariant: 'default',
-    illustrationKey: 'story',
   },
-  '05_Tension': {
-    id: '05_Tension',
+  '05_Identificacion': {
+    id: '05_Identificacion',
     penId: '05',
-    title: 'El talento ya no alcanza',
-    body: 'Comunicar, liderar y adaptarte es lo que acelera tus oportunidades.',
+    title: 'La universidad te da conocimientos.',
+    body: 'La IA tampoco te lo resuelve: necesita que te entrenes.',
     orbVariant: 'default',
-    illustrationKey: 'story',
   },
-  '06_Diferencial': {
-    id: '06_Diferencial',
+  '06_Tension': {
+    id: '06_Tension',
     penId: '06',
-    title: 'Un plan hecho para ti',
-    body: 'La academia recomienda cursos según tus fortalezas y brechas.',
+    title: 'Está en cómo piensas y trabajas con otros.',
+    body: 'Eso se entrena y se mejora.',
     orbVariant: 'default',
-    illustrationKey: 'story',
   },
-  '07_Transformacion': {
-    id: '07_Transformacion',
+  '07_Diferencial': {
+    id: '07_Diferencial',
     penId: '07',
-    title: 'Aprende en pequeñas victorias',
-    body: 'Lecciones cortas, progreso visible, coins, rachas y certificados.',
+    title: 'T2T tiene tu plan de entrenamiento.',
+    body: 'Solo invertirás 15-30 minutos por semana.',
     orbVariant: 'default',
-    illustrationKey: 'story',
   },
-  '08_Accion': {
-    id: '08_Accion',
+  '08_Transformacion': {
+    id: '08_Transformacion',
     penId: '08',
-    title: 'Empecemos el diagnóstico',
-    body: 'Responde con honestidad. La app construirá tu mapa de entrenamiento.',
+    title: 'quién te conviertes.',
+    body: 'Lo que entrenas todos los días termina definiendo quién te conviertes.',
     orbVariant: 'default',
-    illustrationKey: 'story',
+  },
+  '09_Accion': {
+    id: '09_Accion',
+    penId: '09',
+    title: 'Vamos a construir tu perfil profesional.',
+    body: 'Sin respuestas correctas. Solo una mirada honesta a cómo entrenas hoy.',
+    orbVariant: 'default',
+  },
+  '10_InicioDiagnostico': {
+    id: '10_InicioDiagnostico',
+    penId: '10',
+    title: '¿Quieres saber cómo estás entrenando hoy?',
+    body: 'Tu punto de partida',
+    orbVariant: 'diagnostic',
+  },
+  '11_Q_Liderazgo': { id: '11_Q_Liderazgo', penId: '11', title: 'LIDERAZGO', orbVariant: 'diagnostic' },
+  '12_Q_Influencia': { id: '12_Q_Influencia', penId: '12', title: 'INFLUENCIA', orbVariant: 'diagnostic' },
+  '13_Q_Adaptabilidad': { id: '13_Q_Adaptabilidad', penId: '13', title: 'ADAPTABILIDAD', orbVariant: 'diagnostic' },
+  '14_Q_Comunicacion': { id: '14_Q_Comunicacion', penId: '14', title: 'COMUNICACIÓN', orbVariant: 'diagnostic' },
+  '15_T_Reflexion_Q4': {
+    id: '15_T_Reflexion_Q4',
+    penId: '15',
+    title: 'Reflexión',
+    body: 'Muy pocos entrenan cómo pensar, liderar y adaptarse.',
+    orbVariant: 'thinking',
+  },
+  '16_T_Analizando': {
+    id: '16_T_Analizando',
+    penId: '16',
+    title: 'Analizando cómo entrenas hoy',
+    body: 'tus habilidades',
+    orbVariant: 'thinking',
+  },
+  '17_Q_TrabajoEquipo': { id: '17_Q_TrabajoEquipo', penId: '17', title: 'TRABAJO EN EQUIPO', orbVariant: 'diagnostic' },
+  '18_Q_Resolucion': { id: '18_Q_Resolucion', penId: '18', title: 'RESOLUCIÓN DE PROBLEMAS', orbVariant: 'diagnostic' },
+  '19_Q_Creatividad': { id: '19_Q_Creatividad', penId: '19', title: 'CREATIVIDAD', orbVariant: 'diagnostic' },
+  '20_Q_Escucha': { id: '20_Q_Escucha', penId: '20', title: 'ESCUCHA', orbVariant: 'diagnostic' },
+  '21_T_Reflexion_Q8': {
+    id: '21_T_Reflexion_Q8',
+    penId: '21',
+    title: 'Tiempo',
+    body: 'Por eso empezar hoy importa.',
+    orbVariant: 'thinking',
+  },
+  '22_T_Detectando': {
+    id: '22_T_Detectando',
+    penId: '22',
+    title: 'Detectando fortalezas',
+    body: 'y puntos ciegos',
+    orbVariant: 'thinking',
+  },
+  '23_Q_Productividad': { id: '23_Q_Productividad', penId: '23', title: 'PRODUCTIVIDAD', orbVariant: 'diagnostic' },
+  '24_Q_Aprendizaje': { id: '24_Q_Aprendizaje', penId: '24', title: 'APRENDIZAJE', orbVariant: 'diagnostic' },
+  '25_Q_LiderazgoHumano': { id: '25_Q_LiderazgoHumano', penId: '25', title: 'LIDERAZGO HUMANO', orbVariant: 'diagnostic' },
+  '26_Q_GestionEmocional': { id: '26_Q_GestionEmocional', penId: '26', title: 'GESTIÓN EMOCIONAL', orbVariant: 'diagnostic' },
+  '27_T_Reflexion_Q12': {
+    id: '27_T_Reflexion_Q12',
+    penId: '27',
+    title: 'Tu futuro',
+    body: 'Lo que hagas después depende de tus habilidades.',
+    orbVariant: 'thinking',
+  },
+  '28_T_Construyendo_Perfil': {
+    id: '28_T_Construyendo_Perfil',
+    penId: '28',
+    title: 'Construyendo',
+    body: 'tu perfil profesional',
+    orbVariant: 'thinking',
+  },
+  '29_Q_Autopercepcion': { id: '29_Q_Autopercepcion', penId: '29', title: 'AUTOPERCEPCIÓN', orbVariant: 'diagnostic' },
+  '30_Q_Motivacion': { id: '30_Q_Motivacion', penId: '30', title: 'MOTIVACIÓN', orbVariant: 'diagnostic' },
+  '31_T_Loading_Entrenamiento': {
+    id: '31_T_Loading_Entrenamiento',
+    penId: '31',
+    title: 'Construyendo tu entrenamiento',
+    body: 'Casi listo',
+    orbVariant: 'thinking',
+  },
+  '32_Resultado_Radar': {
+    id: '32_Resultado_Radar',
+    penId: '32',
+    title: 'Tu perfil hoy',
+    body: '12 habilidades · una mirada honesta',
+    orbVariant: 'diagnostic',
+    illustrationKey: 'result',
+  },
+  // ============================================================
+  // Auth (frames legacy — keys preservadas para no romper AuthScreens
+  // hasta que se redibuje auth completo).
+  // ============================================================
+  '36_SignUp': {
+    id: '36_SignUp',
+    penId: '36',
+    title: 'Crea tu cuenta',
+    body: 'Vamos a personalizar tu plan.',
+    orbVariant: 'auth',
+    illustrationKey: 'auth',
+  },
+  '37_Login': {
+    id: '37_Login',
+    penId: '37',
+    title: 'Bienvenido de vuelta',
+    body: 'Te esperamos en el gimnasio mental.',
+    orbVariant: 'auth',
+    illustrationKey: 'auth',
+  },
+  '38_Recuperar_Password': {
+    id: '38_Recuperar_Password',
+    penId: '38',
+    title: 'Recupera tu contraseña',
+    body: 'Te enviamos un link para restablecerla.',
+    orbVariant: 'auth',
+    illustrationKey: 'reset',
+  },
+  '39_Verificar_Email': {
+    id: '39_Verificar_Email',
+    penId: '39',
+    title: 'Verifica tu email',
+    body: 'Te enviamos un código a tu bandeja.',
+    orbVariant: 'auth',
+    illustrationKey: 'verify',
+  },
+  '33_Recibir_Email': {
+    id: '33_Recibir_Email',
+    penId: '33',
+    title: 'Recibe tu diagnóstico por email',
+    body: 'Te enviamos tu radar completo y un resumen de tus 12 habilidades.',
+    orbVariant: 'diagnostic',
+    illustrationKey: 'verify',
+  },
+  '34_Mapa_Cerebral': {
+    id: '34_Mapa_Cerebral',
+    penId: '34',
+    title: '6 zonas, una mirada honesta',
+    body: 'Cada zona agrupa 2 habilidades de tu diagnóstico',
+    orbVariant: 'diagnostic',
+    illustrationKey: 'result',
+  },
+  '35_Cierre_Onboarding': {
+    id: '35_Cierre_Onboarding',
+    penId: '35',
+    title: 'Aquí empieza tu entrenamiento',
+    body: 'Tu plan se adapta a ti: sesiones cortas, retos reales y feedback continuo.',
+    orbVariant: 'default',
+    illustrationKey: 'closure',
   },
   '31_Cierre': {
     id: '31_Cierre',
-    penId: '31',
+    penId: '31b',
     title: 'Tu plan te está esperando',
     body: 'Crea tu cuenta para guardar el diagnóstico y conectar con tus cursos recomendados.',
     orbVariant: 'default',
     illustrationKey: 'closure',
   },
-  '32_SignUp': {
-    id: '32_SignUp',
-    penId: '32',
-    title: 'Crea tu cuenta',
-    body: 'Guardá tu diagnóstico y conectá tu plan personalizado.',
-    orbVariant: 'auth',
-    illustrationKey: 'auth',
-  },
-  '33_Login': {
-    id: '33_Login',
-    penId: '33',
-    title: 'Bienvenido de nuevo',
-    body: 'Continuá donde dejaste tu entrenamiento.',
-    orbVariant: 'auth',
-    illustrationKey: 'auth',
-  },
-  '34_Recuperar_Password': {
-    id: '34_Recuperar_Password',
-    penId: '34',
-    title: 'Recuperá tu acceso',
-    body: 'Te enviaremos instrucciones a tu email.',
-    orbVariant: 'auth',
-    illustrationKey: 'reset',
-  },
-  '35_Verificar_Email': {
-    id: '35_Verificar_Email',
-    penId: '35',
-    title: 'Verificá tu email',
-    body: 'Ingresá el código de 6 dígitos que enviamos a tu bandeja.',
-    orbVariant: 'auth',
-    illustrationKey: 'verify',
-  },
 };
 
+/** @deprecated Mantenido por compatibilidad con `onboardingThinkingFrames` legacy. */
 export const THINKING_FRAME_IDS = [
   '21_T_Reflexion_Q12',
   '24_T_Validando',
@@ -141,6 +255,7 @@ export const THINKING_FRAME_IDS = [
   '29_T_Loading_Entrenamiento',
 ] as const;
 
+/** @deprecated Reemplazado por `progressLoaderFrames` en `data/onboardingFlow.ts`. */
 export const THINKING_FRAMES: PenpotFrameMeta[] = [
   {
     id: '21_T_Reflexion_Q12',
@@ -204,11 +319,11 @@ export function getPenpotFrame(id: string): PenpotFrameMeta | undefined {
   return PENPOT_FRAMES[id] ?? THINKING_FRAMES.find((f) => f.id === id);
 }
 
+/** @deprecated Reemplazado por `carouselSlides` en `data/onboardingFlow.ts`. */
 export const storyFrameIds = [
-  '03_Impacto',
-  '04_Identificacion',
-  '05_Tension',
-  '06_Diferencial',
-  '07_Transformacion',
-  '08_Accion',
+  '04_Impacto',
+  '05_Identificacion',
+  '06_Tension',
+  '07_Diferencial',
+  '08_Transformacion',
 ] as const;

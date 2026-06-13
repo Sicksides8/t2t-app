@@ -27,8 +27,8 @@ export function HomeSkillChip({ skill, onPress }: Props) {
       onPress={onPress}
       style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
     >
-      <View style={[styles.iconWrap, { backgroundColor: `${skill.color}26`, shadowColor: skill.color }]}>
-        <Ionicons name={icon} size={20} color={skill.color} />
+      <View style={[styles.iconWrap, { backgroundColor: `${skill.color}33`, shadowColor: skill.color }]}>
+        <Ionicons name={icon} size={22} color={skill.color} />
       </View>
       <Text style={styles.name} numberOfLines={1}>
         {skill.name}
@@ -41,13 +41,15 @@ const styles = StyleSheet.create({
   chip: {
     flex: 1,
     alignItems: 'center',
-    gap: 6,
-    padding: 10,
-    borderRadius: 14,
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 14,
+    borderRadius: 18,
     backgroundColor: Colors.glass,
     borderWidth: 1,
     borderColor: Colors.divider,
     minWidth: 72,
+    minHeight: 80,
   },
   pressed: {
     opacity: 0.9,
@@ -55,7 +57,7 @@ const styles = StyleSheet.create({
   iconWrap: {
     width: 36,
     height: 36,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     shadowOffset: { width: 0, height: 0 },
@@ -66,7 +68,7 @@ const styles = StyleSheet.create({
   name: {
     ...Typography.caption,
     color: Colors.textPrimary,
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: 11,
     textAlign: 'center',
   },

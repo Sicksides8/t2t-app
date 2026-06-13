@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Colors, Radius, Spacing, Typography } from '../../theme';
+import { Colors, Typography } from '../../theme';
 
 type ProfileStatsRowProps = {
   streakDays: number;
@@ -29,7 +29,7 @@ export function ProfileStatsRow({ streakDays, coins, modules }: ProfileStatsRowP
   return (
     <View style={styles.row}>
       <StatCard value={streakDays} label="días" />
-      <StatCard value={coins} label="T2T Coins" valueColor={Colors.accentSecondary} />
+      <StatCard value={coins} label="T2T Coins" valueColor={Colors.accentHighlight} />
       <StatCard value={modules} label="módulos" />
     </View>
   );
@@ -38,28 +38,33 @@ export function ProfileStatsRow({ streakDays, coins, modules }: ProfileStatsRowP
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    gap: Spacing.sm,
-    marginBottom: Spacing.lg,
+    gap: 10,
+    marginTop: 6,
+    marginBottom: 18,
   },
   card: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.xs,
-    borderRadius: 14,
-    backgroundColor: Colors.glass,
+    paddingVertical: 20,
+    paddingHorizontal: 8,
+    borderRadius: 20,
+    backgroundColor: '#2A1052',
     borderWidth: 1,
-    borderColor: Colors.divider,
+    borderColor: '#FFFFFF14',
   },
   value: {
     ...Typography.h2,
     color: Colors.textPrimary,
-    fontWeight: '800',
+    fontWeight: '900',
+    fontSize: 30,
+    lineHeight: 34,
   },
   label: {
     ...Typography.caption,
-    color: Colors.textSecondary,
-    marginTop: Spacing.xs,
+    color: '#C2AAD6',
+    marginTop: 6,
     textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '500',
   },
 });

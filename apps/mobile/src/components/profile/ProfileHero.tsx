@@ -1,53 +1,62 @@
 import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { profileInitials } from '../../utils/profileStats';
-import { Colors, Radius, Spacing, Typography } from '../../theme';
+import { Colors, Typography } from '../../theme';
 
 type ProfileHeroProps = {
   displayName: string;
   email: string;
   avatarUrl?: string;
   planName: string;
+  onPressAvatar?: () => void;
 };
 
-export function ProfileHero({ displayName, email, avatarUrl, planName }: ProfileHeroProps) {
+export function ProfileHero({ displayName, email, avatarUrl, planName, onPressAvatar }: ProfileHeroProps) {
   const initials = profileInitials(displayName);
+
+  const inner = avatarUrl ? (
+    <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+  ) : (
+    <LinearGradient
+      colors={[Colors.accentPrimary, Colors.accentTeal]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.avatar}
+    >
+      <Text style={styles.initials}>{initials}</Text>
+    </LinearGradient>
+  );
 
   return (
     <View style={styles.wrap}>
-      {avatarUrl ? (
-        <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+      {onPressAvatar ? (
+        <Pressable onPress={onPressAvatar} hitSlop={8}>
+          {inner}
+        </Pressable>
       ) : (
-        <LinearGradient
-          colors={[Colors.accentPrimary, Colors.accentSecondary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.avatar}
-        >
-          <Text style={styles.initials}>{initials}</Text>
-        </LinearGradient>
+        inner
       )}
-      <Text style={styles.name}>{displayName}</Text>
-      <Text style={styles.email}>{email}</Text>
+      <Pressable onPress={onPressAvatar} disabled={!onPressAvatar}>
+        <Text style={styles.name}>{displayName}</Text>
+        {email ? <Text style={styles.email}>{email}</Text> : null}
+      </Pressable>
       <View style={styles.planPill}>
-        <Ionicons name="ribbon" size={14} color={Colors.warning} />
-        <Text style={styles.planText}>
-          Plan {planName} · activo
-        </Text>
+        <MaterialCommunityIcons name="crown" size={15} color="#FFFFFF" />
+        <Text style={styles.planText}>Plan {planName} · activo</Text>
       </View>
     </View>
   );
 }
 
-const AVATAR = 96;
+const AVATAR = 124;
 
 const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.lg,
+    paddingTop: 14,
+    paddingBottom: 18,
   },
   avatar: {
     width: AVATAR,
@@ -56,42 +65,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: '#FFFFFF33',
+    borderWidth: 3,
+    borderColor: '#FFFFFF40',
   },
   initials: {
     ...Typography.h1,
     color: Colors.textPrimary,
-    fontSize: 32,
-    fontWeight: '800',
+    fontSize: 40,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   name: {
     ...Typography.h1,
     color: Colors.textPrimary,
-    marginTop: Spacing.md,
+    marginTop: 16,
     textAlign: 'center',
+    fontSize: 26,
+    fontWeight: '800',
   },
   email: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginTop: Spacing.xs,
+    color: '#C2AAD6',
+    marginTop: 4,
     textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '500',
   },
   planPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
-    marginTop: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.glass,
-    borderWidth: 1,
-    borderColor: Colors.divider,
+    gap: 6,
+    marginTop: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 999,
+    backgroundColor: Colors.accentPrimary,
   },
   planText: {
-    ...Typography.caption,
-    color: Colors.textPrimary,
-    fontWeight: '700',
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 13,
+    letterSpacing: 0.3,
   },
 });

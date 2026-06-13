@@ -1,9 +1,10 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { PenpotIllustrationKey } from '../../data/penpotFrames';
-import { Colors, Radius } from '../../theme';
+import { T2TLogo } from '../../assets/brand';
+import { Colors } from '../../theme';
 
 const ICON_MAP: Record<PenpotIllustrationKey, keyof typeof Ionicons.glyphMap> = {
   logo: 'school',
@@ -27,6 +28,19 @@ type Props = {
 
 /** Placeholder hasta exportar PNG desde Penpot → assets/penpot/ */
 export function PenpotIllustration({ illustrationKey, size = 120, label }: Props) {
+  if (illustrationKey === 'logo') {
+    return (
+      <View style={styles.logoWrap}>
+        <Image
+          source={T2TLogo}
+          style={{ width: size, height: size, borderRadius: size / 2 }}
+          resizeMode="cover"
+        />
+        {label ? <Text style={styles.label}>{label}</Text> : null}
+      </View>
+    );
+  }
+
   const icon = ICON_MAP[illustrationKey];
   return (
     <LinearGradient
@@ -40,6 +54,11 @@ export function PenpotIllustration({ illustrationKey, size = 120, label }: Props
 }
 
 const styles = StyleSheet.create({
+  logoWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+  },
   box: {
     alignItems: 'center',
     justifyContent: 'center',

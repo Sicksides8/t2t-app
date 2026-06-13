@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Colors } from '../../theme';
 
 type Props = {
@@ -8,10 +8,10 @@ type Props = {
   length?: number;
 };
 
-/** Penpot 35 — 6 celdas OTP (verificación email vía polling tras completar). */
+/** Penpot 39 — 6 celdas OTP. La celda activa se resalta con borde magenta. */
 export function OtpInput({ value, onChange, length = 6 }: Props) {
   const inputRef = useRef<TextInput>(null);
-  const digits = value.padEnd(length, ' ').slice(0, length).split('');
+  const activeIndex = Math.min(value.length, length - 1);
 
   return (
     <View style={styles.wrap}>
@@ -24,22 +24,35 @@ export function OtpInput({ value, onChange, length = 6 }: Props) {
         style={styles.hidden}
         autoFocus
       />
-      <View style={styles.row}>
-        {digits.map((d, i) => (
-          <View
-            key={i}
-            style={[styles.cell, d.trim() !== '' && styles.cellFilled]}
-            onTouchEnd={() => inputRef.current?.focus()}
-          >
-            <TextInput
-              editable={false}
-              value={d.trim()}
-              style={styles.cellText}
-              pointerEvents="none"
-            />
-          </View>
-        ))}
-      </View>
+      <Pressable
+        onPress={() => inputRef.current?.focus()}
+        style={styles.row}
+        accessibilityRole="button"
+        accessibilityLabel="Código de verificación"
+      >
+        {Array.from({ length }).map((_, i) => {
+          const digit = value[i] ?? '';
+          const isFilled = digit !== '';
+          const isActive = i === activeIndex && !isFilled;
+          return (
+            <View
+              key={i}
+              style={[
+                styles.cell,
+                isActive && styles.cellActive,
+                isFilled && styles.cellFilled,
+              ]}
+            >
+              <TextInput
+                editable={false}
+                value={digit}
+                style={styles.cellText}
+                pointerEvents="none"
+              />
+            </View>
+          );
+        })}
+      </Pressable>
     </View>
   );
 }
@@ -61,20 +74,24 @@ const styles = StyleSheet.create({
   },
   cell: {
     flex: 1,
-    height: 52,
-    borderRadius: 12,
-    backgroundColor: Colors.glass,
+    height: 56,
+    borderRadius: 14,
+    backgroundColor: '#2A1052',
     borderWidth: 1,
-    borderColor: Colors.divider,
+    borderColor: '#FFFFFF14',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  cellActive: {
+    borderColor: Colors.accentPrimary,
+    borderWidth: 1.5,
+  },
   cellFilled: {
     borderColor: Colors.accentPrimary,
-    backgroundColor: '#B73CEF33',
+    backgroundColor: '#B73CEF26',
   },
   cellText: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '700',
     color: Colors.textPrimary,
     textAlign: 'center',

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ProgressRing } from '../ui';
 import { skills } from '../../data/academy';
@@ -11,13 +12,25 @@ type Props = {
   progressPercent: number;
   completed?: boolean;
   onContinue: () => void;
+  /**
+   * Indica si el user ya no tiene acceso al curso (free después de cancelar,
+   * por ejemplo). Reemplaza el CTA por "Desbloquear" y muestra un chip
+   * "Bloqueado" en la card. El gating efectivo lo aplica CourseDetailScreen.
+   */
+  locked?: boolean;
 };
 
-export function MyCourseRow({ course, progressPercent, completed, onContinue }: Props) {
+export function MyCourseRow({
+  course,
+  progressPercent,
+  completed,
+  onContinue,
+  locked,
+}: Props) {
   const skill = skills.find((s) => s.id === course.skillId);
   const gradStart = skill?.color ?? Colors.accentPrimary;
   const gradEnd = Colors.bgSurface;
-  const cta = completed ? 'Repasar' : 'Continuar';
+  const cta = locked ? 'Desbloquear' : completed ? 'Repasar' : 'Continuar';
 
   return (
     <View style={styles.card}>
@@ -32,9 +45,17 @@ export function MyCourseRow({ course, progressPercent, completed, onContinue }: 
         />
       )}
       <View style={styles.body}>
-        <Text style={styles.title} numberOfLines={2}>
-          {course.title}
-        </Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title} numberOfLines={2}>
+            {course.title}
+          </Text>
+          {locked ? (
+            <View style={styles.lockedChip}>
+              <Ionicons name="lock-closed" size={11} color={Colors.textPrimary} />
+              <Text style={styles.lockedChipText}>Bloqueado</Text>
+            </View>
+          ) : null}
+        </View>
         <View style={styles.actions}>
           <ProgressRing value={progressPercent} size={32} />
           <Pressable style={styles.cta} onPress={onContinue}>
@@ -70,10 +91,33 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 6,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   title: {
+    flex: 1,
     fontSize: 14,
     fontWeight: '600',
     color: Colors.textPrimary,
+  },
+  lockedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+    backgroundColor: '#FFFFFF1F',
+    borderWidth: 1,
+    borderColor: '#FFFFFF33',
+  },
+  lockedChipText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    letterSpacing: 0.4,
   },
   actions: {
     flexDirection: 'row',

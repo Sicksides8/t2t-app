@@ -12,7 +12,8 @@ type Props = {
   onPress: () => void;
 };
 
-const SIZE = 104;
+const SIZE = 124;
+const BADGE = 38;
 
 export function ProfileEditAvatar({ displayName, avatarUrl, onPress }: Props) {
   const initials = profileInitials(displayName);
@@ -24,7 +25,7 @@ export function ProfileEditAvatar({ displayName, avatarUrl, onPress }: Props) {
           <Image source={{ uri: avatarUrl }} style={styles.avatar} />
         ) : (
           <LinearGradient
-            colors={[Colors.accentPrimary, Colors.accentTertiary]}
+            colors={[Colors.accentPrimary, Colors.accentTeal]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.avatar}
@@ -32,11 +33,13 @@ export function ProfileEditAvatar({ displayName, avatarUrl, onPress }: Props) {
             <Text style={styles.initials}>{initials}</Text>
           </LinearGradient>
         )}
-        <View style={styles.cam}>
-          <Ionicons name="camera" size={16} color={Colors.textPrimary} />
+        <View style={styles.cam} pointerEvents="none">
+          <Ionicons name="camera" size={18} color={Colors.textPrimary} />
         </View>
       </Pressable>
-      <Text style={styles.hint}>Tocá para cambiar tu foto</Text>
+      <Pressable onPress={onPress} hitSlop={8}>
+        <Text style={styles.hint}>Toca para cambiar tu foto</Text>
+      </Pressable>
     </View>
   );
 }
@@ -44,8 +47,8 @@ export function ProfileEditAvatar({ displayName, avatarUrl, onPress }: Props) {
 const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 16,
+    paddingTop: 6,
+    paddingBottom: 18,
   },
   avatarWrap: {
     width: SIZE,
@@ -58,30 +61,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
-    borderColor: '#FFFFFF1F',
+    borderColor: '#FFFFFF40',
     overflow: 'hidden',
   },
   initials: {
-    fontSize: 36,
-    fontWeight: '700',
+    fontSize: 40,
+    fontWeight: '900',
     color: Colors.textPrimary,
+    letterSpacing: 1,
   },
   cam: {
     position: 'absolute',
     right: 0,
-    bottom: 0,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    bottom: 4,
+    width: BADGE,
+    height: BADGE,
+    borderRadius: BADGE / 2,
     backgroundColor: Colors.accentPrimary,
     borderWidth: 3,
-    borderColor: Colors.bgPrimary,
+    borderColor: '#1F0A40',
     alignItems: 'center',
     justifyContent: 'center',
   },
   hint: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
     color: Colors.accentPrimary,
+    marginTop: 12,
   },
 });

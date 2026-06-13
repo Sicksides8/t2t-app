@@ -1,14 +1,18 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme';
 
-export function ProfileUpsellRow() {
+type Props = {
+  onPress?: () => void;
+};
+
+export function ProfileUpsellRow({ onPress }: Props) {
   return (
-    <Pressable style={styles.row}>
+    <Pressable onPress={onPress} style={styles.row}>
       <Ionicons name="sparkles" size={18} color={Colors.accentHighlight} />
       <Text style={styles.text}>Pasate a anual y ahorrá 20%</Text>
-      <Ionicons name="chevron-forward" size={16} color={Colors.accentHighlight} />
+      <Ionicons name="chevron-forward" size={18} color={Colors.accentPrimary} />
     </Pressable>
   );
 }
@@ -18,17 +22,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 14,
-    borderRadius: 14,
-    backgroundColor: '#4CC35B4D',
+    borderRadius: 16,
+    backgroundColor: '#4CC35B26',
     borderWidth: 1,
     borderColor: '#4CC35B66',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   text: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     color: Colors.accentHighlight,
   },

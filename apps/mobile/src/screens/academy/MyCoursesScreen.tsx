@@ -5,11 +5,11 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { navigateToExploreTab } from '../../navigation/tabNavigation';
-import { MyCourseRow, MyCoursesOrbs, MyCoursesTabPill } from '../../components/my-courses';
+import { MyCourseRow, MyCoursesTabPill } from '../../components/my-courses';
 import { ScreenWrapper, TAB_SCREEN_EDGES } from '../../components/ui';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { courses as seedCourses } from '../../data/academy';
-import { useAcademyStore, useCourseStore } from '../../stores';
+import { useAcademyStore, useAuthStore, useCourseStore } from '../../stores';
+import { canAccessCourse } from '../../utils/subscriptionAccess';
 import { Colors, Spacing } from '../../theme';
 import type { MainTabParamList, RootStackParamList } from '../../types';
 
@@ -25,13 +25,14 @@ export function MyCoursesScreen() {
   const loadCourses = useCourseStore((state) => state.load);
   const storeCourses = useCourseStore((state) => state.courses);
   const progressMap = useAcademyStore((state) => state.progress);
+  const user = useAuthStore((state) => state.user);
   const [tab, setTab] = useState<Tab>('in_progress');
 
   useEffect(() => {
     void loadCourses();
   }, [loadCourses]);
 
-  const allCourses = storeCourses.length ? storeCourses : seedCourses;
+  const allCourses = storeCourses;
 
   const lists = useMemo(() => {
     const inProgress: typeof allCourses = [];
@@ -54,8 +55,6 @@ export function MyCoursesScreen() {
 
   return (
     <ScreenWrapper scroll edges={TAB_SCREEN_EDGES} contentStyle={styles.screen}>
-      <MyCoursesOrbs />
-
       <Text style={styles.title}>Mis cursos</Text>
 
       <View style={styles.tabs}>
@@ -79,7 +78,7 @@ export function MyCoursesScreen() {
           message={
             tab === 'in_progress'
               ? 'Empezá un curso desde Explorar o Home.'
-              : 'Completá todas las lecciones de un curso para verlo aquí.'
+              : 'Completá todos los módulos de un curso para verlo aquí.'
           }
           actionLabel={tab === 'in_progress' ? 'Explorar cursos' : undefined}
           onAction={tab === 'in_progress' ? () => navigateToExploreTab(navigation) : undefined}
@@ -93,6 +92,7 @@ export function MyCoursesScreen() {
               course={course}
               progressPercent={pct}
               completed={tab === 'completed'}
+              locked={!canAccessCourse(course, user)}
               onContinue={() => openCourse(course.id)}
             />
           );

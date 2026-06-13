@@ -1,3 +1,4 @@
+export { AppBackground } from './AppBackground';
 export { PenpotFlowShell } from './PenpotFlowShell';
 export { PenpotIllustration } from './PenpotIllustration';
 export { PenpotOrbs } from './PenpotOrbs';

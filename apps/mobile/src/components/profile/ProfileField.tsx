@@ -44,30 +44,34 @@ export function ProfileField({
 
 const styles = StyleSheet.create({
   wrap: {
-    gap: 6,
+    gap: 8,
+    marginBottom: 14,
   },
   label: {
     fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
+    fontWeight: '800',
+    letterSpacing: 1.2,
     color: Colors.textSecondary,
     textTransform: 'uppercase',
   },
   input: {
-    minHeight: 48,
-    paddingHorizontal: 16,
+    minHeight: 52,
+    paddingHorizontal: 14,
     paddingVertical: 14,
-    borderRadius: 16,
-    backgroundColor: Colors.bgSurface,
+    borderRadius: 14,
+    backgroundColor: '#2A1052',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF14',
     color: Colors.textPrimary,
     fontSize: 15,
   },
   multiline: {
-    minHeight: 90,
+    minHeight: 120,
     textAlignVertical: 'top',
   },
   readonly: {
     justifyContent: 'center',
+    opacity: 0.7,
   },
   value: {
     fontSize: 15,

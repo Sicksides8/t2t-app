@@ -2,25 +2,36 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors } from '../../theme';
 
 type Props = {
   streakDays: number;
+  longestStreak?: number;
+  freezes?: number;
 };
 
-export function ProfileProgressStreakHero({ streakDays }: Props) {
+export function ProfileProgressStreakHero({ streakDays, longestStreak = 0, freezes = 0 }: Props) {
+  const showRecord = longestStreak > streakDays;
+
   return (
     <LinearGradient
-      colors={['#FF6B35', Colors.accentPrimary]}
+      colors={['#F953C6', '#FF7A1A']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.card}
     >
-      <Ionicons name="flame" size={48} color={Colors.textPrimary} />
+      <Ionicons name="flame" size={40} color="#FFFFFF" />
       <View style={styles.col}>
         <Text style={styles.days}>{streakDays} días</Text>
-        <Text style={styles.label}>de racha · ¡mantenela viva!</Text>
+        <Text style={styles.label}>
+          de racha · {showRecord ? `récord ${longestStreak}` : '¡mantenela viva!'}
+        </Text>
       </View>
+      {freezes > 0 ? (
+        <View style={styles.freezePill}>
+          <Ionicons name="snow" size={16} color="#FFFFFF" />
+          <Text style={styles.freezeText}>{freezes}</Text>
+        </View>
+      ) : null}
     </LinearGradient>
   );
 }
@@ -30,24 +41,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
-    padding: 24,
+    padding: 20,
     borderRadius: 24,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   col: {
     flex: 1,
     gap: 4,
   },
   days: {
-    fontSize: 48,
-    fontWeight: '700',
+    fontSize: 36,
+    fontWeight: '900',
     letterSpacing: -1,
-    color: Colors.textPrimary,
-    lineHeight: 52,
+    color: '#FFFFFF',
+    lineHeight: 40,
   },
   label: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: Colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFFCC',
+  },
+  freezePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF33',
+    borderWidth: 1,
+    borderColor: '#FFFFFF55',
+  },
+  freezeText: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 13,
   },
 });

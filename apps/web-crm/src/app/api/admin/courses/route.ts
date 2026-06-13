@@ -4,6 +4,7 @@ import { MOCK_VIDEO_URL } from '../../../../lib/courseConstants';
 import {
   computeCourseStats,
   sanitizeModuleLinks,
+  sanitizeSubtitles,
   syncCourseCurriculum,
 } from '../../../../lib/courseAdminServer';
 import { adminDb } from '../../../../lib/firebase-admin';
@@ -50,11 +51,13 @@ export async function POST(request: NextRequest) {
     const lessonsInput = (body.lessons || []).map((lesson, index) => {
       const pdfUrl = lesson.pdfUrl ? String(lesson.pdfUrl).trim() : '';
       const links = sanitizeModuleLinks(lesson.links);
+      const subtitles = sanitizeSubtitles(lesson.subtitles);
       return {
         title: String(lesson.title || `Modulo ${index + 1}`).trim(),
         videoUrl: String(lesson.videoUrl || MOCK_VIDEO_URL).trim(),
         ...(pdfUrl ? { pdfUrl } : {}),
         ...(links.length > 0 ? { links } : {}),
+        ...(subtitles.length > 0 ? { subtitles } : {}),
         durationSec: Math.max(30, Number(lesson.durationSec) || 420),
         order: index + 1,
         isFree: Boolean(lesson.isFree ?? index === 0),

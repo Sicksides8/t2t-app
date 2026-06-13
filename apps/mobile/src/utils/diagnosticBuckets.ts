@@ -1,8 +1,8 @@
 export type DiagnosticBucket = 'strength' | 'developing' | 'train';
 
 export function bucketSkill(score: number): DiagnosticBucket {
-  if (score >= 72) return 'strength';
-  if (score >= 48) return 'developing';
+  if (score >= 80) return 'strength';
+  if (score >= 50) return 'developing';
   return 'train';
 }
 

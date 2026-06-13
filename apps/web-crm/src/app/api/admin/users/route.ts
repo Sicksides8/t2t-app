@@ -1,23 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '../../../../lib/firebase-admin';
 import { requireAdmin } from '../../../../lib/authHelper';
 import { FS_COL } from '../../../../lib/firestoreCollections';
 import { handleRouteError } from '../../../../lib/routeError';
+import { mapPaymentDoc, toIso } from '../../../../lib/paymentsServer';
 import type { AdminUserRow } from '../../../../types';
-
-function toIso(value: unknown): string | null {
-  if (value instanceof Timestamp) return value.toDate().toISOString();
-  if (value instanceof Date) return value.toISOString();
-  return null;
-}
 
 export async function GET(request: NextRequest) {
   try {
     await requireAdmin(request);
-    const snapshot = await adminDb.collection(FS_COL.users).limit(250).get();
-    const rows: AdminUserRow[] = snapshot.docs.map((doc) => {
-      const data = doc.data();
+
+    const [usersSnap, paymentsSnap] = await Promise.all([
+      adminDb.collection(FS_COL.users).limit(500).get(),
+      adminDb.collection(FS_COL.payments).limit(5000).get(),
+    ]);
+
+    // Agregar pagos por userId en 1 sola pasada (evita N+1).
+    type PayAgg = { total: number; lastPaidAt: string | null };
+    const payAgg = new Map<string, PayAgg>();
+    for (const doc of paymentsSnap.docs) {
+      const p = mapPaymentDoc(doc.id, doc.data());
+      if (!p.userId || p.status !== 'paid') continue;
+      const agg = payAgg.get(p.userId) ?? { total: 0, lastPaidAt: null };
+      agg.total += p.amount;
+      if (p.paidAt && (!agg.lastPaidAt || p.paidAt > agg.lastPaidAt)) {
+        agg.lastPaidAt = p.paidAt;
+      }
+      payAgg.set(p.userId, agg);
+    }
+
+    const rows: AdminUserRow[] = usersSnap.docs.map((doc) => {
+      const data = doc.data() as Record<string, unknown>;
+      const agg = payAgg.get(doc.id);
       return {
         id: doc.id,
         displayName: String(data.displayName || 'Sin nombre'),
@@ -25,8 +39,12 @@ export async function GET(request: NextRequest) {
         role: data.role === 'admin' ? 'admin' : 'student',
         selectedPlan: data.selectedPlan ? String(data.selectedPlan) : undefined,
         subscriptionId: data.subscriptionId ? String(data.subscriptionId) : undefined,
+        subscriptionPlan: data.subscriptionPlan ? String(data.subscriptionPlan) : undefined,
+        subscriptionStatus: data.subscriptionStatus ? String(data.subscriptionStatus) : undefined,
         onboardingCompleted: Boolean(data.onboardingCompleted),
         coins: typeof data.coins === 'number' ? data.coins : undefined,
+        totalSpent: agg ? Math.round(agg.total * 100) / 100 : 0,
+        lastPaymentAt: agg?.lastPaidAt ?? null,
         createdAt: toIso(data.createdAt),
       };
     });
@@ -42,3 +60,5 @@ export async function GET(request: NextRequest) {
     return handleRouteError(error);
   }
 }
+
+export const dynamic = 'force-dynamic';

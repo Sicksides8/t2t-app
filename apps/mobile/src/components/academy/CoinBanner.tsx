@@ -1,8 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { CardGlass } from '../ui';
-import { Colors, Spacing, Typography } from '../../theme';
+import { T2TCoin } from '../ui';
+import { Colors, Typography } from '../../theme';
 
 type Props = {
   amount: number;
@@ -11,12 +10,12 @@ type Props = {
 
 export function CoinBanner({ amount, message }: Props) {
   return (
-    <CardGlass style={styles.banner}>
-      <Ionicons name="logo-bitcoin" size={22} color={Colors.accentSecondary} />
+    <View style={styles.banner}>
+      <T2TCoin size={28} />
       <Text style={styles.text}>
         {message || `Ganás +${amount} T2T Coins al completar el curso`}
       </Text>
-    </CardGlass>
+    </View>
   );
 }
 
@@ -24,13 +23,19 @@ const styles = StyleSheet.create({
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
-    marginTop: Spacing.lg,
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: '#4CC35B26',
+    borderWidth: 1,
+    borderColor: '#4CC35B66',
   },
   text: {
     ...Typography.bodyMedium,
-    color: Colors.textPrimary,
+    color: Colors.accentHighlight,
     flex: 1,
     fontWeight: '700',
+    fontSize: 14,
   },
 });

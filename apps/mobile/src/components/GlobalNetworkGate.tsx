@@ -16,19 +16,23 @@ export function GlobalNetworkGate({ children }: { children: React.ReactNode }) {
       {children}
       <Modal visible={isMaintenance} animationType="fade" transparent={false}>
         <SystemStateLayout
-          penpotFrame="75_Mantenimiento"
+          penpotFrame="80_Mantenimiento"
           icon="construct-outline"
-          title="Mantenimiento"
-          body="Estamos mejorando T2T Academy. Volvé a intentar más tarde."
+          glowColor="#FFB54766"
+          title="Estamos mejorando"
+          scriptLine="ya volvemos"
+          body="Hacemos mejoras al gimnasio mental. Volvemos en unos minutos."
+          etaChip={{ icon: 'time-outline', label: 'ETA · 15 min' }}
         />
       </Modal>
       <Modal visible={isOffline && !isMaintenance} animationType="fade" transparent>
         <View style={styles.offline}>
           <SystemStateLayout
-            penpotFrame="73_Sin_Conexion"
+            penpotFrame="78_Sin_Conexion"
             icon="cloud-offline-outline"
+            glowColor="#B73CEF60"
             title="Sin conexión"
-            body="Revisá tu Wi‑Fi o datos móviles para continuar."
+            body="Revisá tu internet y volvé a intentar. Tu progreso se guarda localmente."
           />
         </View>
       </Modal>

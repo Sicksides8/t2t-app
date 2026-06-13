@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps } from 'react';
-import { Colors, Spacing, Typography } from '../../theme';
+import { Colors, Typography } from '../../theme';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -12,6 +12,7 @@ type ProfileMenuCardProps = {
   onPress: () => void;
   highlight?: boolean;
   iconColor?: string;
+  iconNode?: React.ReactNode;
 };
 
 export function ProfileMenuCard({
@@ -20,9 +21,8 @@ export function ProfileMenuCard({
   onPress,
   highlight = false,
   iconColor,
+  iconNode,
 }: ProfileMenuCardProps) {
-  const tint = iconColor ?? (highlight ? Colors.textPrimary : Colors.accentPrimary);
-
   return (
     <Pressable
       onPress={onPress}
@@ -33,12 +33,24 @@ export function ProfileMenuCard({
       ]}
     >
       <View style={styles.left}>
-        <View style={[styles.iconWrap, highlight && styles.iconWrapHighlight]}>
-          <Ionicons name={icon} size={20} color={tint} />
+        <View style={styles.iconSlot}>
+          {iconNode ? (
+            iconNode
+          ) : (
+            <Ionicons
+              name={icon}
+              size={22}
+              color={highlight ? '#FFFFFF' : iconColor ?? Colors.accentHighlight}
+            />
+          )}
         </View>
         <Text style={[styles.label, highlight && styles.labelHighlight]}>{label}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+      <Ionicons
+        name="chevron-forward"
+        size={18}
+        color={highlight ? '#FFFFFFCC' : Colors.accentPrimary}
+      />
     </Pressable>
   );
 }
@@ -48,17 +60,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    borderRadius: 14,
-    backgroundColor: Colors.glass,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    backgroundColor: 'rgba(42, 16, 82, 0.45)',
     borderWidth: 1,
-    borderColor: Colors.divider,
-    marginBottom: Spacing.sm,
+    borderColor: '#FFFFFF1F',
+    marginBottom: 10,
   },
   cardHighlight: {
-    backgroundColor: '#B73CEF33',
-    borderColor: '#B73CEF66',
+    backgroundColor: Colors.accentPrimary,
+    borderColor: Colors.accentPrimary,
   },
   pressed: {
     opacity: 0.88,
@@ -66,26 +78,23 @@ const styles = StyleSheet.create({
   left: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
+    gap: 14,
     flex: 1,
   },
-  iconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#FFFFFF14',
+  iconSlot: {
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  iconWrapHighlight: {
-    backgroundColor: '#FFFFFF22',
   },
   label: {
     ...Typography.bodyMedium,
     color: Colors.textPrimary,
-    fontWeight: '600',
+    fontWeight: '700',
+    fontSize: 15,
   },
   labelHighlight: {
     fontWeight: '800',
+    color: '#FFFFFF',
   },
 });

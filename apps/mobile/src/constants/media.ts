@@ -1,4 +1,4 @@
-/** Mock de desarrollo — video único para bienvenida y lecciones hasta tener assets reales. */
+/** Mock de desarrollo — video único para bienvenida y módulos hasta tener assets reales. */
 export const MOCK_VIDEO_URL =
   'https://pub-cbb826460242448e83ebe8b4ed4e375e.r2.dev/t2t-video-mock.mp4';
 

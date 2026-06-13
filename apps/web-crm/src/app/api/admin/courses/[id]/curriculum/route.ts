@@ -3,6 +3,7 @@ import { requireAdmin } from '../../../../../../lib/authHelper';
 import {
   fetchCourseCurriculum,
   sanitizeModuleLinks,
+  sanitizeSubtitles,
   syncCourseCurriculum,
 } from '../../../../../../lib/courseAdminServer';
 import { adminDb } from '../../../../../../lib/firebase-admin';
@@ -24,12 +25,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const lessons = (body.lessons || []).map((lesson, index) => {
       const pdfUrl = lesson.pdfUrl ? String(lesson.pdfUrl).trim() : '';
       const links = sanitizeModuleLinks(lesson.links);
+      const subtitles = sanitizeSubtitles(lesson.subtitles);
       return {
         id: lesson.id,
         title: String(lesson.title || '').trim(),
         videoUrl: String(lesson.videoUrl || '').trim(),
         ...(pdfUrl ? { pdfUrl } : {}),
         ...(links.length > 0 ? { links } : {}),
+        ...(subtitles.length > 0 ? { subtitles } : {}),
         durationSec: Math.max(30, Number(lesson.durationSec) || 420),
         order: typeof lesson.order === 'number' ? lesson.order : index + 1,
         isFree: Boolean(lesson.isFree),

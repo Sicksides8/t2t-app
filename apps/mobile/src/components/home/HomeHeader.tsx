@@ -46,7 +46,7 @@ export function HomeHeader({
             <Image source={{ uri: avatarUrl }} style={styles.avatar} />
           ) : (
             <LinearGradient
-              colors={[Colors.accentPrimary, Colors.accentSecondary]}
+              colors={[Colors.accentPrimary, Colors.accentTeal]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.avatar}
@@ -60,7 +60,7 @@ export function HomeHeader({
   );
 }
 
-const AVATAR = 40;
+const AVATAR = 44;
 
 const styles = StyleSheet.create({
   row: {
@@ -76,10 +76,10 @@ const styles = StyleSheet.create({
   },
   greeting: {
     fontFamily: Typography.h2.fontFamily,
-    fontSize: 22,
-    lineHeight: 28,
-    fontWeight: '700',
-    letterSpacing: -0.4,
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: '800',
+    letterSpacing: -0.5,
     color: Colors.textPrimary,
   },
   subtitle: {

@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "com.t2tacademy.mobile",
-      "versionCode": 2,
+      "versionCode": 4,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#1D083A"
@@ -40,9 +40,20 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#B73CEF",
+      "androidMode": "default"
+    },
     "plugins": [
       "expo-font",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#B73CEF"
+        }
+      ],
       "expo-video",
       "expo-apple-authentication",
       [
@@ -59,7 +70,8 @@
       ],
       "expo-web-browser",
       "./plugins/withGoogleServicesAndroid.js",
-      "./plugins/withAndroidReleaseSigning.js"
+      "./plugins/withAndroidReleaseSigning.js",
+      "expo-sharing"
     ],
     "extra": {
       "eas": {

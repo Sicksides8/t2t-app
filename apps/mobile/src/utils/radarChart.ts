@@ -1,33 +1,47 @@
-import { DIAGNOSTIC_SKILLS } from '../data/diagnostic';
-import { skills } from '../data/academy';
+/**
+ * Utilidades del radar chart. Generalizadas para soportar N ejes — no hay
+ * dependencia con un set fijo de habilidades.
+ */
 
-export type RadarPoint = {
-  skillId: string;
+export type RadarPointInput = {
+  /** Identificador único del eje (skill id o cualquier key estable). */
+  key: string;
+  /** Label corto para mostrar fuera del eje. */
   label: string;
+  /** Score 0..100 del eje. */
+  value: number;
+};
+
+export type RadarPoint = RadarPointInput & {
+  /** Score normalizado 0..100. */
   score: number;
   x: number;
   y: number;
 };
 
+function clamp01(value: number): number {
+  if (value < 0) return 0;
+  if (value > 100) return 100;
+  return value;
+}
+
 export function buildRadarPoints(
-  scores: Record<string, number>,
+  axes: RadarPointInput[],
   size: number,
   maxRadius: number,
 ): RadarPoint[] {
   const cx = size / 2;
   const cy = size / 2;
-  const n = DIAGNOSTIC_SKILLS.length;
+  const n = axes.length;
   const start = -Math.PI / 2;
 
-  return DIAGNOSTIC_SKILLS.map((skillId, i) => {
+  return axes.map((axis, i) => {
     const angle = start + (2 * Math.PI * i) / n;
-    const pct = Math.max(0, Math.min(100, scores[skillId] ?? 0)) / 100;
-    const r = pct * maxRadius;
-    const name = skills.find((s) => s.id === skillId)?.name ?? skillId;
+    const score = clamp01(axis.value);
+    const r = (score / 100) * maxRadius;
     return {
-      skillId,
-      label: name,
-      score: scores[skillId] ?? 0,
+      ...axis,
+      score,
       x: cx + r * Math.cos(angle),
       y: cy + r * Math.sin(angle),
     };
@@ -38,24 +52,32 @@ export function polygonPointsString(points: { x: number; y: number }[]): string 
   return points.map((p) => `${p.x},${p.y}`).join(' ');
 }
 
-export function gridRingPoints(size: number, maxRadius: number, level: number): string {
+export function gridRingPoints(
+  axisCount: number,
+  size: number,
+  maxRadius: number,
+  level: number,
+): string {
   const cx = size / 2;
   const cy = size / 2;
-  const n = DIAGNOSTIC_SKILLS.length;
   const start = -Math.PI / 2;
   const r = (maxRadius * level) / 3;
-  const pts = Array.from({ length: n }, (_, i) => {
-    const angle = start + (2 * Math.PI * i) / n;
+  const pts = Array.from({ length: axisCount }, (_, i) => {
+    const angle = start + (2 * Math.PI * i) / axisCount;
     return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
   });
   return polygonPointsString(pts);
 }
 
-export function axisLine(size: number, maxRadius: number, index: number): { x1: number; y1: number; x2: number; y2: number } {
+export function axisLine(
+  axisCount: number,
+  size: number,
+  maxRadius: number,
+  index: number,
+): { x1: number; y1: number; x2: number; y2: number } {
   const cx = size / 2;
   const cy = size / 2;
-  const n = DIAGNOSTIC_SKILLS.length;
-  const angle = -Math.PI / 2 + (2 * Math.PI * index) / n;
+  const angle = -Math.PI / 2 + (2 * Math.PI * index) / axisCount;
   return {
     x1: cx,
     y1: cy,
@@ -64,11 +86,16 @@ export function axisLine(size: number, maxRadius: number, index: number): { x1: 
   };
 }
 
-export function labelPosition(size: number, maxRadius: number, index: number): { x: number; y: number } {
+export function labelPosition(
+  axisCount: number,
+  size: number,
+  maxRadius: number,
+  index: number,
+  offset: number = 22,
+): { x: number; y: number } {
   const cx = size / 2;
   const cy = size / 2;
-  const n = DIAGNOSTIC_SKILLS.length;
-  const angle = -Math.PI / 2 + (2 * Math.PI * index) / n;
-  const r = maxRadius + 22;
+  const angle = -Math.PI / 2 + (2 * Math.PI * index) / axisCount;
+  const r = maxRadius + offset;
   return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
 }

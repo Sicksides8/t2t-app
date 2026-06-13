@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from './Button';
-import { Colors, Spacing, Typography } from '../../theme';
+import { Colors } from '../../theme';
 
 type Props = {
   title: string;
@@ -12,13 +12,23 @@ type Props = {
   onAction?: () => void;
 };
 
-export function EmptyState({ title, message, icon = 'folder-open-outline', actionLabel, onAction }: Props) {
+export function EmptyState({
+  title,
+  message,
+  icon = 'folder-open-outline',
+  actionLabel,
+  onAction,
+}: Props) {
   return (
     <View style={styles.wrap}>
-      <Ionicons name={icon} size={48} color={Colors.textTertiary} />
+      <View style={styles.tile}>
+        <Ionicons name={icon} size={28} color={Colors.accentPrimary} />
+      </View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.message}>{message}</Text>
-      {actionLabel && onAction ? <Button title={actionLabel} variant="secondary" onPress={onAction} /> : null}
+      {actionLabel && onAction ? (
+        <Button title={actionLabel} variant="secondary" onPress={onAction} />
+      ) : null}
     </View>
   );
 }
@@ -26,18 +36,30 @@ export function EmptyState({ title, message, icon = 'folder-open-outline', actio
 const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
-    gap: Spacing.md,
-    paddingVertical: Spacing.xxl,
-    paddingHorizontal: Spacing.lg,
+    gap: 10,
+    paddingVertical: 36,
+    paddingHorizontal: 16,
+  },
+  tile: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF14',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
   },
   title: {
-    ...Typography.h2,
     color: Colors.textPrimary,
+    fontWeight: '800',
+    fontSize: 16,
     textAlign: 'center',
   },
   message: {
-    ...Typography.body,
     color: Colors.textSecondary,
+    fontSize: 13,
     textAlign: 'center',
+    lineHeight: 18,
+    maxWidth: 280,
   },
 });

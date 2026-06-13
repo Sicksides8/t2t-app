@@ -127,7 +127,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         if (k) r2Keys.add(k);
       }
       for (const doc of lessonsSnap.docs) {
-        const data = doc.data() as { videoUrl?: string; pdfUrl?: string };
+        const data = doc.data() as {
+          videoUrl?: string;
+          pdfUrl?: string;
+          subtitles?: { url?: string }[];
+        };
         if (data.videoUrl) {
           const k = keyFromPublicUrl(data.videoUrl);
           if (k) r2Keys.add(k);
@@ -135,6 +139,14 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         if (data.pdfUrl) {
           const k = keyFromPublicUrl(data.pdfUrl);
           if (k) r2Keys.add(k);
+        }
+        if (Array.isArray(data.subtitles)) {
+          for (const sub of data.subtitles) {
+            if (sub?.url) {
+              const k = keyFromPublicUrl(sub.url);
+              if (k) r2Keys.add(k);
+            }
+          }
         }
       }
     }

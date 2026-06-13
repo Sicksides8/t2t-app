@@ -1,10 +1,12 @@
 import React from 'react';
 import { ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
+import { AppBackground } from '../penpot/AppBackground';
+import { TAB_BAR_OVERLAY_PADDING } from '../../navigation/tabBarConstants';
 import { Colors, Spacing } from '../../theme';
 
-/** Pantallas dentro del bottom tab (Android edge-to-edge): sin inset inferior duplicado. */
+/** Pantallas dentro del bottom tab: omitir el inset bottom porque el tab bar
+ *  flotante ya cubre el safe area inferior. */
 export const TAB_SCREEN_EDGES: Edge[] = ['top', 'left', 'right'];
 
 interface ScreenWrapperProps {
@@ -18,33 +20,38 @@ interface ScreenWrapperProps {
 }
 
 export function ScreenWrapper({ children, scroll, style, contentStyle, gradient = true, edges }: ScreenWrapperProps) {
+  const inTabs = edges === TAB_SCREEN_EDGES;
+  const tabPaddingStyle: ViewStyle | null = inTabs
+    ? { paddingBottom: TAB_BAR_OVERLAY_PADDING + Spacing.lg }
+    : null;
   const body = scroll ? (
-    <ScrollView contentContainerStyle={[styles.content, contentStyle]} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      contentContainerStyle={[styles.content, contentStyle, tabPaddingStyle]}
+      showsVerticalScrollIndicator={false}
+    >
       {children}
     </ScrollView>
   ) : (
-    <View style={[styles.content, contentStyle]}>{children}</View>
+    <View style={[styles.content, contentStyle, tabPaddingStyle]}>{children}</View>
   );
 
   return (
-    <SafeAreaView style={[styles.safe, style]} edges={edges}>
-      {gradient ? (
-        <LinearGradient
-          colors={[Colors.heroGradStart, Colors.heroGradMid, Colors.heroGradEnd]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-      ) : null}
-      {body}
-    </SafeAreaView>
+    <View style={[styles.root, style]}>
+      {gradient ? <AppBackground variant="default" /> : null}
+      <SafeAreaView style={styles.safe} edges={edges}>
+        {body}
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
+  root: {
     flex: 1,
     backgroundColor: Colors.bgPrimary,
+  },
+  safe: {
+    flex: 1,
   },
   content: {
     flexGrow: 1,

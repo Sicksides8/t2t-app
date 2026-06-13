@@ -33,6 +33,9 @@ export function draftsFromLessons(lessons: Lesson[]): LessonDraft[] {
       videoUrl: lesson.videoUrl,
       pdfUrl: lesson.pdfUrl,
       links: Array.isArray(lesson.links) ? lesson.links.map((l) => ({ ...l })) : undefined,
+      subtitles: Array.isArray(lesson.subtitles)
+        ? lesson.subtitles.map((s) => ({ ...s }))
+        : undefined,
       durationSec: lesson.durationSec,
       order: lesson.order,
       isFree: lesson.isFree,
@@ -69,6 +72,9 @@ export function duplicateDraft(drafts: LessonDraft[], clientId: string): LessonD
     id: undefined,
     title: original.title ? `${original.title} (copia)` : '',
     links: Array.isArray(original.links) ? original.links.map((l) => ({ ...l })) : undefined,
+    subtitles: Array.isArray(original.subtitles)
+      ? original.subtitles.map((s) => ({ ...s }))
+      : undefined,
   };
   const next = [...drafts.slice(0, index + 1), copy, ...drafts.slice(index + 1)];
   return next.map(lessonFromDraft);

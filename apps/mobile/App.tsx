@@ -9,6 +9,7 @@ import { GlobalNetworkGate } from './src/components/GlobalNetworkGate';
 import RootNavigator from './src/navigation/RootNavigator';
 import OfflineBanner from './src/components/OfflineBanner';
 import { configureGoogleSignIn } from './src/services/googleSignIn';
+import { useAppFonts } from './src/hooks/useAppFonts';
 import { Colors } from './src/theme';
 
 configureGoogleSignIn();
@@ -26,6 +27,12 @@ const navigationTheme = {
 };
 
 export default function App() {
+  const [fontsLoaded] = useAppFonts();
+
+  if (!fontsLoaded) {
+    return null;
+  }
+
   return (
     <SafeAreaProvider>
       <AndroidSystemChrome />

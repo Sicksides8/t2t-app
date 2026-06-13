@@ -33,6 +33,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { LessonDraft, ModuleLink } from '../../types';
 import { MediaUploader } from './MediaUploader';
+import { SubtitlesEditor } from './SubtitlesEditor';
 import {
   draftsFromTitles,
   duplicateDraft,
@@ -314,6 +315,14 @@ function SortableLessonRow({
             disabled={disabled}
             onPrevReplaced={(url) => onAssetReplaced?.(url)}
             onChange={(url) => onUpdate({ pdfUrl: url || '' })}
+          />
+          <div className={styles.lessonExpandedLabel}>Subtítulos por idioma (opcional)</div>
+          <SubtitlesEditor
+            value={lesson.subtitles || []}
+            scope={scope}
+            disabled={disabled}
+            onPrevReplaced={(url) => onAssetReplaced?.(url)}
+            onChange={(next) => onUpdate({ subtitles: next.length > 0 ? next : undefined })}
           />
           <div className={styles.lessonExpandedLabel}>Enlaces externos</div>
           <LinksEditor

@@ -1,0 +1,36 @@
+name: Streak warning emails
+
+on:
+  schedule:
+    # 23:00 UTC = 20:00 ART. Mantener alineado con el público objetivo.
+    - cron: '0 23 * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: streak-emails
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Send streak warning emails
+        run: npx --yes tsx apps/web-crm/scripts/send-streak-emails.ts
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
+          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          WAITLIST_FROM_EMAIL: ${{ secrets.WAITLIST_FROM_EMAIL }}
+          WAITLIST_FROM_NAME: ${{ secrets.WAITLIST_FROM_NAME }}

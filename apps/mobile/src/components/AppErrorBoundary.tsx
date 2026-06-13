@@ -20,8 +20,9 @@ export class AppErrorBoundary extends React.Component<Props, State> {
     if (this.state.hasError) {
       return (
         <SystemStateLayout
-          penpotFrame="74_Error_Generico"
-          icon="alert-circle-outline"
+          penpotFrame="79_Error_Generico"
+          icon="warning-outline"
+          glowColor="#FF5C5C60"
           title="Algo salió mal"
           body="Ocurrió un error inesperado. Reintentá o reiniciá la app."
           primaryLabel="Reintentar"

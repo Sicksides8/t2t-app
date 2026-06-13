@@ -2,23 +2,20 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ProgressBar } from '../ui';
 import { Colors } from '../../theme';
 
 type Props = {
   label: string;
   title: string;
-  progress: number;
-  target: number;
   reward: number;
+  daysLeft?: number;
+  hoursLeft?: number;
 };
 
-export function ProfileChallengeHero({ label, title, progress, target, reward }: Props) {
-  const pct = target > 0 ? Math.min(100, (progress / target) * 100) : 0;
-
+export function ProfileChallengeHero({ label, title, reward, daysLeft = 3, hoursLeft = 12 }: Props) {
   return (
     <LinearGradient
-      colors={[Colors.accentPrimary, '#5B1B9E']}
+      colors={['#7A22B5', '#B73CEF']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.card}
@@ -27,39 +24,37 @@ export function ProfileChallengeHero({ label, title, progress, target, reward }:
       <Text style={styles.title}>{title}</Text>
       <View style={styles.metaRow}>
         <View style={styles.timer}>
-          <Ionicons name="time-outline" size={14} color={Colors.textSecondary} />
-          <Text style={styles.metaText}>Esta semana</Text>
+          <Ionicons name="time-outline" size={16} color="#FFFFFF" />
+          <Text style={styles.metaText}>
+            {daysLeft} días {hoursLeft} hs
+          </Text>
         </View>
         <View style={styles.coins}>
-          <Ionicons name="logo-bitcoin" size={14} color={Colors.accentHighlight} />
-          <Text style={styles.coinsText}>+{reward} coins</Text>
+          <Ionicons name="trophy-outline" size={14} color={Colors.accentHighlight} />
+          <Text style={styles.coinsText}>+{reward} Coins</Text>
         </View>
       </View>
-      <Text style={styles.progressLabel}>
-        {Math.min(progress, target)}/{target} lecciones
-      </Text>
-      <ProgressBar value={pct} />
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 20,
-    padding: 18,
-    gap: 10,
-    marginBottom: 14,
+    borderRadius: 22,
+    padding: 20,
+    gap: 12,
+    marginBottom: 16,
   },
   badge: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
     letterSpacing: 1.4,
-    color: Colors.textSecondary,
+    color: '#FFFFFFB3',
   },
   title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: Colors.textPrimary,
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#FFFFFF',
   },
   metaRow: {
     flexDirection: 'row',
@@ -75,19 +70,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#4CC35B33',
+    borderWidth: 1,
+    borderColor: '#4CC35B66',
   },
   metaText: {
-    fontSize: 12,
-    color: Colors.textSecondary,
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   coinsText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
     color: Colors.accentHighlight,
-  },
-  progressLabel: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 4,
   },
 });

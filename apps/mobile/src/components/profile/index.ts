@@ -18,3 +18,4 @@ export { ProfileStatTiles } from './ProfileStatTiles';
 export { ProfileStatsRow } from './ProfileStatsRow';
 export { ProfileSubScreenHeader } from './ProfileSubScreenHeader';
 export { ProfileUpsellRow } from './ProfileUpsellRow';
+export { SkillStrengthRow } from './SkillStrengthRow';

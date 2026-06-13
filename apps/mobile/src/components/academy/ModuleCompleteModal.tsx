@@ -1,30 +1,40 @@
 import React from 'react';
 import { CelebrationModal } from './CelebrationModal';
 
-const MODULE_COINS = 50;
+const MODULE_COINS = 10;
 
 type Props = {
   visible: boolean;
   moduleTitle?: string;
+  progressPercent?: number;
+  streakDelta?: number;
   onContinue: () => void;
+  onBackHome?: () => void;
   onClose: () => void;
 };
 
-/** Penpot: 58_Modulo_Completado_Modal */
-export function ModuleCompleteModal({ visible, moduleTitle, onContinue, onClose }: Props) {
+export function ModuleCompleteModal({
+  visible,
+  moduleTitle,
+  progressPercent = 0,
+  streakDelta = 1,
+  onContinue,
+  onBackHome,
+  onClose,
+}: Props) {
   return (
     <CelebrationModal
       variant="module"
       visible={visible}
-      title="¡Módulo completado!"
-      body={
-        moduleTitle
-          ? `Terminaste «${moduleTitle}». Seguí con la siguiente lección.`
-          : 'Completaste un módulo de tu curso. ¡Seguí así!'
-      }
+      title={moduleTitle || 'Módulo completado'}
+      body={undefined}
       coins={MODULE_COINS}
-      primaryLabel="Siguiente lección"
+      progressPercent={progressPercent}
+      streakDelta={streakDelta}
+      primaryLabel="Siguiente módulo →"
+      secondaryLabel={onBackHome ? 'Volver al inicio' : undefined}
       onPrimary={onContinue}
+      onSecondary={onBackHome}
       onClose={onClose}
     />
   );

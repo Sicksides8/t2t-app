@@ -1,17 +1,29 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { DiagnosticResultCarousel } from '../../components/diagnostic';
-import { DiagnosticQuestionScreen } from '../../components/diagnostic/DiagnosticQuestionScreen';
-import { OnboardingStorySlide, PenpotClosureScreen, SplashPenpotScreen } from '../../components/onboarding';
-import { PenpotFlowShell, PenpotThinkingScreen } from '../../components/penpot';
-import { Button } from '../../components/ui';
 import {
-  diagnosticQuestions,
-  onboardingThinkingFrames,
-  REFLEXION_AFTER_QUESTION_INDEX,
-} from '../../data/diagnostic';
-import { getPenpotFrame, PENPOT_FRAMES, storyFrameIds } from '../../data/penpotFrames';
+  DiagnosticBrainMapScreen,
+  DiagnosticQuestionScreen,
+  DiagnosticRadarResultScreen,
+  EmailDeliveryScreen,
+} from '../../components/diagnostic';
+import {
+  ComoFuncionaScreen,
+  DiagnosticActionScreen,
+  DiagnosticOpenerScreen,
+  OnboardingCarouselSlide,
+  OnboardingCierreScreen,
+  ProgressLoaderScreen,
+  ReflectionScreen,
+  SplashPenpotScreen,
+  WelcomeIntroScreen,
+} from '../../components/onboarding';
+import { diagnosticQuestions } from '../../data/diagnostic';
+import {
+  ACTION_FRAME,
+  carouselSlides,
+  progressLoaderFrames,
+  reflectionFrames,
+} from '../../data/onboardingFlow';
 import { saveDiagnosticResult } from '../../services/diagnosticService';
 import { useAcademyStore, useAuthStore } from '../../stores';
 import type { RootStackParamList } from '../../types';
@@ -24,92 +36,139 @@ export { MyCoursesScreen } from './MyCoursesScreen';
 export { VideoPlayerScreen } from './VideoPlayerScreen';
 export { SkillCatalogScreen } from './SkillCatalogScreen';
 
-const LOADING_STEP_MS = 1400;
+const TOTAL_CAROUSEL_DOTS = carouselSlides.length + 1; // 5 story + 1 action = 6
 
 type OnboardingStep =
   | { kind: 'splash' }
   | { kind: 'welcome' }
-  | { kind: 'story'; frameId: (typeof storyFrameIds)[number] }
-  | { kind: 'question'; index: number }
-  | { kind: 'thinking'; index: number }
-  | { kind: 'result' }
+  | { kind: 'comoFunciona' }
+  | { kind: 'carouselSlide'; slideIndex: number } // 04-08
+  | { kind: 'action' } // 09
+  | { kind: 'opener' } // 10
+  | { kind: 'question'; index: number } // 11-14, 17-20, 23-26, 29-30
+  | { kind: 'reflection'; reflectionIndex: number } // 15, 21, 27
+  | { kind: 'loader'; loaderIndex: number } // 16, 22, 28, 31
+  | { kind: 'result' } // 32
   | { kind: 'closure' };
 
+/**
+ * Construye la secuencia exacta del flujo:
+ * splash → welcome → comoFunciona →
+ * 5 carouselSlide (04-08) → action (09) → opener (10) →
+ * Q1..Q4 → reflection 0 (15) → loader 0 (16) →
+ * Q5..Q8 → reflection 1 (21) → loader 1 (22) →
+ * Q9..Q12 → reflection 2 (27) → loader 2 (28) →
+ * Q13 → Q14 → loader 3 (31) → result (32) → closure
+ *
+ * Cada loader funciona como punto de "cálculo" tras la sección
+ * correspondiente del diagnóstico (33% → 67% → 83% → 100%).
+ */
 function buildOnboardingSteps(): OnboardingStep[] {
-  const steps: OnboardingStep[] = [{ kind: 'splash' }, { kind: 'welcome' }];
-  for (const frameId of storyFrameIds) {
-    steps.push({ kind: 'story', frameId });
-  }
+  const steps: OnboardingStep[] = [
+    { kind: 'splash' },
+    { kind: 'welcome' },
+    { kind: 'comoFunciona' },
+  ];
+  carouselSlides.forEach((_, slideIndex) => {
+    steps.push({ kind: 'carouselSlide', slideIndex });
+  });
+  steps.push({ kind: 'action' });
+  steps.push({ kind: 'opener' });
+
+  const insertAfter = new Map<number, OnboardingStep[]>([
+    [
+      3,
+      [
+        { kind: 'reflection', reflectionIndex: 0 },
+        { kind: 'loader', loaderIndex: 0 },
+      ],
+    ],
+    [
+      7,
+      [
+        { kind: 'reflection', reflectionIndex: 1 },
+        { kind: 'loader', loaderIndex: 1 },
+      ],
+    ],
+    [
+      11,
+      [
+        { kind: 'reflection', reflectionIndex: 2 },
+        { kind: 'loader', loaderIndex: 2 },
+      ],
+    ],
+    [13, [{ kind: 'loader', loaderIndex: 3 }]],
+  ]);
+
   diagnosticQuestions.forEach((_, index) => {
     steps.push({ kind: 'question', index });
-    if (index === REFLEXION_AFTER_QUESTION_INDEX) {
-      steps.push({ kind: 'thinking', index: 0 });
+    const extras = insertAfter.get(index);
+    if (extras) {
+      for (const extra of extras) steps.push(extra);
     }
   });
-  for (let i = 1; i < onboardingThinkingFrames.length; i += 1) {
-    steps.push({ kind: 'thinking', index: i });
-  }
-  steps.push({ kind: 'result' }, { kind: 'closure' });
+
+  steps.push({ kind: 'result' });
+  steps.push({ kind: 'closure' });
   return steps;
 }
 
 const ONBOARDING_STEPS = buildOnboardingSteps();
+const RESULT_INDEX = ONBOARDING_STEPS.findIndex((s) => s.kind === 'result');
 
 /** Penpot: 01_Splash */
 export function SplashScreen({ navigation }: Partial<NativeStackScreenProps<RootStackParamList, 'Bootstrap'>>) {
   return <SplashPenpotScreen onComplete={() => navigation?.navigate('Onboarding')} />;
 }
 
-/** Flujo onboarding + diagnóstico Penpot 01–31 */
+type ResultView = 'radar' | 'brainMap' | 'email';
+
+/** Flujo onboarding + diagnóstico Penpot 01–35 */
 export function OnboardingFlow({ navigation }: Partial<NativeStackScreenProps<RootStackParamList, 'Onboarding'>>) {
   const [stepIndex, setStepIndex] = useState(0);
+  const [resultView, setResultView] = useState<ResultView>('radar');
   const resultInitialized = useRef(false);
   const setAnswer = useAcademyStore((state) => state.setAnswer);
   const completeDiagnostic = useAcademyStore((state) => state.completeDiagnostic);
   const diagnostic = useAcademyStore((state) => state.diagnostic);
-  const hasSeenOnboarding = useAuthStore((state) => state.setHasSeenOnboarding);
+  const setHasSeenOnboarding = useAuthStore((state) => state.setHasSeenOnboarding);
+  const setPendingAuthRoute = useAuthStore((state) => state.setPendingAuthRoute);
 
   const totalSteps = ONBOARDING_STEPS.length;
-  const progress = ((stepIndex + 1) / totalSteps) * 100;
   const step = ONBOARDING_STEPS[stepIndex];
 
-  const finish = async () => {
-    const snapshot = useAcademyStore.getState().completeDiagnostic();
-    await saveDiagnosticResult(snapshot);
-    await hasSeenOnboarding(true);
-    navigation?.navigate('Auth');
-  };
-
-  const goNext = () => setStepIndex((i) => Math.min(i + 1, totalSteps - 1));
-  const goBack = () => setStepIndex((i) => Math.max(i - 1, 0));
-
-  const thinkingIndices = useMemo(
-    () => ONBOARDING_STEPS.map((s, i) => (s.kind === 'thinking' ? i : -1)).filter((i) => i >= 0),
+  const goNext = useCallback(
+    () => setStepIndex((i) => Math.min(i + 1, totalSteps - 1)),
+    [totalSteps],
+  );
+  const goBack = useCallback(
+    () => setStepIndex((i) => Math.max(i - 1, 0)),
     [],
   );
-  const firstThinkingIndex = thinkingIndices[0] ?? -1;
-  const lastThinkingIndex = thinkingIndices[thinkingIndices.length - 1] ?? -1;
 
-  useEffect(() => {
-    if (step.kind !== 'thinking' || stepIndex < firstThinkingIndex || stepIndex > lastThinkingIndex) {
-      return undefined;
+  const ensureDiagnosticReady = useCallback(() => {
+    if (!resultInitialized.current) {
+      completeDiagnostic();
+      resultInitialized.current = true;
     }
+  }, [completeDiagnostic]);
 
-    const timer = setTimeout(() => {
-      if (stepIndex >= lastThinkingIndex) {
-        if (!resultInitialized.current) {
-          completeDiagnostic();
-          resultInitialized.current = true;
-        }
-        const resultIdx = ONBOARDING_STEPS.findIndex((s) => s.kind === 'result');
-        setStepIndex(resultIdx >= 0 ? resultIdx : stepIndex + 1);
-      } else {
-        setStepIndex((i) => i + 1);
-      }
-    }, LOADING_STEP_MS);
+  const skipToResult = useCallback(() => {
+    ensureDiagnosticReady();
+    setStepIndex(RESULT_INDEX >= 0 ? RESULT_INDEX : (i) => i);
+  }, [ensureDiagnosticReady]);
 
-    return () => clearTimeout(timer);
-  }, [step.kind, stepIndex, firstThinkingIndex, lastThinkingIndex, completeDiagnostic]);
+  const finish = useCallback(async () => {
+    const snapshot = useAcademyStore.getState().completeDiagnostic();
+    await saveDiagnosticResult(snapshot);
+    await setHasSeenOnboarding(true);
+    navigation?.navigate('Auth');
+  }, [navigation, setHasSeenOnboarding]);
+
+  const skipToLogin = useCallback(async () => {
+    setPendingAuthRoute('Login');
+    await setHasSeenOnboarding(true);
+  }, [setHasSeenOnboarding, setPendingAuthRoute]);
 
   useEffect(() => {
     if (step.kind === 'result' && !resultInitialized.current) {
@@ -123,28 +182,47 @@ export function OnboardingFlow({ navigation }: Partial<NativeStackScreenProps<Ro
   }
 
   if (step.kind === 'welcome') {
-    const frame = PENPOT_FRAMES['02_Welcome'];
     return (
-      <OnboardingStorySlide
-        frame={frame}
-        progress={progress}
-        primaryLabel="Ver cómo funciona"
+      <WelcomeIntroScreen
+        onNext={goNext}
+        onSkipToLogin={() => void skipToLogin()}
+      />
+    );
+  }
+
+  if (step.kind === 'comoFunciona') {
+    return (
+      <ComoFuncionaScreen
+        onNext={goNext}
+        onSkipToLogin={() => void skipToLogin()}
+      />
+    );
+  }
+
+  if (step.kind === 'carouselSlide') {
+    const slide = carouselSlides[step.slideIndex];
+    return (
+      <OnboardingCarouselSlide
+        slide={slide}
+        dotIndex={step.slideIndex}
+        totalDots={TOTAL_CAROUSEL_DOTS}
         onNext={goNext}
       />
     );
   }
 
-  if (step.kind === 'story') {
-    const frame = getPenpotFrame(step.frameId)!;
+  if (step.kind === 'action') {
     return (
-      <OnboardingStorySlide
-        frame={frame}
-        progress={progress}
-        primaryLabel="Siguiente"
+      <DiagnosticActionScreen
+        totalDots={TOTAL_CAROUSEL_DOTS}
         onNext={goNext}
-        onBack={goBack}
+        onSkip={skipToResult}
       />
     );
+  }
+
+  if (step.kind === 'opener') {
+    return <DiagnosticOpenerScreen onNext={goNext} />;
   }
 
   if (step.kind === 'question') {
@@ -154,7 +232,6 @@ export function OnboardingFlow({ navigation }: Partial<NativeStackScreenProps<Ro
         question={q}
         questionIndex={step.index}
         totalQuestions={diagnosticQuestions.length}
-        progress={progress}
         onBack={step.index > 0 ? goBack : undefined}
         onSubmit={(value) => {
           setAnswer(q.id, value);
@@ -164,49 +241,61 @@ export function OnboardingFlow({ navigation }: Partial<NativeStackScreenProps<Ro
     );
   }
 
-  if (step.kind === 'thinking') {
-    const frame = onboardingThinkingFrames[step.index];
-    const skip = () => {
-      if (!resultInitialized.current) {
-        completeDiagnostic();
-        resultInitialized.current = true;
+  if (step.kind === 'reflection') {
+    const frame = reflectionFrames[step.reflectionIndex];
+    return <ReflectionScreen frame={frame} onNext={goNext} />;
+  }
+
+  if (step.kind === 'loader') {
+    const frame = progressLoaderFrames[step.loaderIndex];
+    const isLastLoader = step.loaderIndex === progressLoaderFrames.length - 1;
+    const onComplete = () => {
+      if (isLastLoader) {
+        ensureDiagnosticReady();
       }
-      const resultIdx = ONBOARDING_STEPS.findIndex((s) => s.kind === 'result');
-      setStepIndex(resultIdx >= 0 ? resultIdx : stepIndex + 1);
+      goNext();
     };
-    return <PenpotThinkingScreen frame={frame} progress={progress} onSkip={skip} />;
+    return <ProgressLoaderScreen frame={frame} onComplete={onComplete} />;
   }
 
   if (step.kind === 'result') {
-    return (
-      <PenpotFlowShell orbVariant="diagnostic" scroll contentStyle={styles.result}>
-        <DiagnosticResultCarousel
-          diagnostic={diagnostic}
-          title="Tu perfil T2T está listo"
-          subtitle="Deslizá para ver tu radar y tu mapa de habilidades."
+    if (resultView === 'email') {
+      return (
+        <EmailDeliveryScreen
+          onBack={() => setResultView('radar')}
+          onSubmit={async () => {
+            /* TODO: integrar envío real cuando exista el endpoint. */
+          }}
         />
-        <View style={styles.resultBtn}>
-          <Button title="Crear mi cuenta" onPress={goNext} />
-        </View>
-      </PenpotFlowShell>
+      );
+    }
+    if (resultView === 'brainMap') {
+      return (
+        <DiagnosticBrainMapScreen
+          diagnostic={diagnostic}
+          onBack={() => setResultView('radar')}
+          onPrimary={() => {
+            setResultView('radar');
+            goNext();
+          }}
+          onSecondary={() => setResultView('radar')}
+        />
+      );
+    }
+    return (
+      <DiagnosticRadarResultScreen
+        diagnostic={diagnostic}
+        onPrimary={goNext}
+        onSecondary={() => setResultView('email')}
+        onBrainMap={() => setResultView('brainMap')}
+      />
     );
   }
 
   return (
-    <PenpotClosureScreen
-      progress={100}
-      primaryLabel="Continuar a registro"
-      onNext={() => void finish()}
+    <OnboardingCierreScreen
+      onStart={() => void finish()}
+      onExplore={() => void finish()}
     />
   );
 }
-
-const styles = StyleSheet.create({
-  result: {
-    paddingBottom: 24,
-  },
-  resultBtn: {
-    marginTop: 16,
-    paddingHorizontal: 4,
-  },
-});

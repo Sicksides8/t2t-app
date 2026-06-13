@@ -16,29 +16,55 @@ import {
   CelebrationModal,
   LessonResourcesSheet,
   ModuleCompleteModal,
+  StreakMilestoneModal,
+  VideoSettingsSheet,
+  VideoSubtitleOverlay,
+  type VideoSettingsOption,
 } from '../../components/academy';
 import { AppBackground } from '../../components/penpot';
 import { ScreenWrapper } from '../../components/ui';
 import { getLessonVideoUrl } from '../../constants/media';
+import { useSubtitles } from '../../hooks/useSubtitles';
 import { auth } from '../../services/firebase';
 import { getLessons, getModules } from '../../services/academyService';
-import { awardLessonCompletion, COURSE_COINS, LESSON_COINS } from '../../services/gamificationService';
+import { fetchCourseById } from '../../services/courseService';
+import {
+  awardCourseAchievement,
+  awardCourseCompletion,
+  awardLessonCompletion,
+  COURSE_COINS,
+  LESSON_COINS,
+} from '../../services/gamificationService';
 import {
   completeLesson,
   enrollInCourse,
   localProgressUpdate,
   saveProgressToFirestore,
 } from '../../services/progressService';
-import { useAcademyStore, useAuthStore, useProgressStore } from '../../stores';
+import { recordActivity } from '../../services/streakService';
+import { scheduleStreakReminder } from '../../services/streakReminder';
+import {
+  useAcademyStore,
+  useAuthStore,
+  usePreferencesStore,
+  useProgressStore,
+  VIDEO_PLAYBACK_RATES,
+} from '../../stores';
 import { isModuleJustCompleted } from '../../utils/moduleProgress';
+import { canAccessLesson } from '../../utils/subscriptionAccess';
 import { Colors, Spacing } from '../../theme';
-import type { CourseModule, Lesson, RootStackParamList } from '../../types';
+import type { Course, CourseModule, Lesson, RootStackParamList } from '../../types';
 
 function formatTime(seconds: number): string {
   const s = Math.max(0, Math.floor(seconds));
   const m = Math.floor(s / 60);
   const rest = s % 60;
   return `${String(m).padStart(2, '0')}:${String(rest).padStart(2, '0')}`;
+}
+
+function formatRate(rate: number): string {
+  // 1 -> "1x", 1.25 -> "1.25x"
+  return `${Number.isInteger(rate) ? rate.toFixed(0) : rate.toString()}x`;
 }
 
 type VideoAspect = 'portrait' | 'landscape' | 'unknown';
@@ -48,33 +74,51 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
   const markCourseStarted = useAcademyStore((state) => state.markCourseStarted);
   const progressMap = useAcademyStore((state) => state.progress);
   const refreshUserProfile = useAuthStore((state) => state.refreshUserProfile);
+  const user = useAuthStore((state) => state.user);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [modules, setModules] = useState<CourseModule[]>([]);
+  const [course, setCourse] = useState<Course | null>(null);
+  const [courseTitle, setCourseTitle] = useState<string>('');
   const [listOpen, setListOpen] = useState(false);
   const [resourcesOpen, setResourcesOpen] = useState(false);
   const [courseModal, setCourseModal] = useState(false);
-  const [moduleModal, setModuleModal] = useState<{ title?: string } | null>(null);
+  const [moduleModal, setModuleModal] = useState<{ title?: string; streakDelta?: number } | null>(null);
+  const [streakMilestone, setStreakMilestone] = useState<{ days: number; bonus: number } | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [aspect, setAspect] = useState<VideoAspect>('unknown');
+  const [speedSheetOpen, setSpeedSheetOpen] = useState(false);
+  const [subsSheetOpen, setSubsSheetOpen] = useState(false);
+  const playbackRate = usePreferencesStore((s) => s.videoPlaybackRate);
+  const subtitleLang = usePreferencesStore((s) => s.videoSubtitleLang);
+  const setVideoPlaybackRate = usePreferencesStore((s) => s.setVideoPlaybackRate);
+  const setVideoSubtitleLang = usePreferencesStore((s) => s.setVideoSubtitleLang);
+  const hydratePreferences = usePreferencesStore((s) => s.hydrate);
   const insets = useSafeAreaInsets();
   const busyRef = useRef(false);
   const startedRef = useRef(false);
   const autoCompletedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    void hydratePreferences();
+  }, [hydratePreferences]);
 
   const activeLessonId = route.params.lessonId;
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const [remoteLessons, remoteModules] = await Promise.all([
+      const [remoteLessons, remoteModules, remoteCourse] = await Promise.all([
         getLessons(route.params.courseId),
         getModules(route.params.courseId),
+        fetchCourseById(route.params.courseId),
       ]);
       if (!cancelled) {
         setLessons([...remoteLessons].sort((a, b) => a.order - b.order));
         setModules(remoteModules);
+        setCourse(remoteCourse ?? null);
+        if (remoteCourse?.title) setCourseTitle(remoteCourse.title);
       }
     })();
     return () => {
@@ -86,6 +130,20 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
     return lessons.find((item) => item.id === activeLessonId) || lessons[0] || null;
   }, [lessons, activeLessonId]);
 
+  /**
+   * Gating defensivo: si el user llega al VideoPlayer (deep link, error de UX,
+   * cambio de plan) sin acceso a la lección, lo devolvemos al CourseDetail
+   * donde el `PaywallModal` está cableado al play.
+   *
+   * TODO MERCADOPAGO: cuando exista la pasarela real, este flujo puede
+   * abrir el paywall inline en vez de hacer replace.
+   */
+  useEffect(() => {
+    if (!course || !lesson) return;
+    if (canAccessLesson(lesson, course, user)) return;
+    navigation.replace('CourseDetail', { courseId: course.id });
+  }, [course, lesson, user, navigation]);
+
   const totalLessons = lessons.length || 1;
   const courseProgress = progressMap[route.params.courseId];
   const completedBefore = lesson ? courseProgress?.lessonsCompleted.includes(lesson.id) : false;
@@ -95,6 +153,26 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
     instance.loop = false;
     instance.pause();
   });
+
+  // Aplicamos velocidad y preservación de pitch cada vez que cambia la
+  // preferencia o la lección activa (cambia el player interno de expo-video).
+  useEffect(() => {
+    try {
+      player.preservesPitch = true;
+      player.playbackRate = playbackRate;
+    } catch {
+      /* ignore */
+    }
+  }, [player, playbackRate, lesson?.id]);
+
+  // Resolución del track de subtítulo activo y carga del .vtt asociado.
+  const subtitleTracks = lesson?.subtitles ?? [];
+  const activeSubtitleTrack =
+    subtitleLang ? subtitleTracks.find((t) => t.lang === subtitleLang) ?? null : null;
+  const { activeCue: activeSubtitleCue } = useSubtitles(
+    activeSubtitleTrack?.url ?? null,
+    currentTime,
+  );
 
   useEffect(() => {
     setAspect('unknown');
@@ -275,6 +353,26 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
         await completeLesson(courseId, lesson.id, updated);
         if (!wasCompleted) {
           await awardLessonCompletion(courseId, lesson.id);
+          if (justFinishedCourse) {
+            await awardCourseCompletion(courseId);
+            // Emite el certificado (Achievement) en Firestore de forma idempotente
+            // (un único achievement por usuario+curso, doc id `{userId}_{courseId}`).
+            await awardCourseAchievement(courseId, courseTitle || 'Curso T2T');
+          }
+        }
+        const streak = await recordActivity();
+        if (moduleDone.completed && !wasCompleted) {
+          setModuleModal((prev) => (prev ? { ...prev, streakDelta: streak.delta } : prev));
+        }
+        if (streak.milestoneReached) {
+          const { STREAK_MILESTONE_BONUS } = await import('../../services/streakService');
+          setStreakMilestone({
+            days: streak.milestoneReached,
+            bonus: STREAK_MILESTONE_BONUS[streak.milestoneReached],
+          });
+        }
+        await scheduleStreakReminder();
+        if (!wasCompleted || streak.delta > 0 || streak.milestoneReached) {
           await refreshUserProfile();
         }
       } catch {
@@ -308,6 +406,21 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
   const progressPct = duration > 0 ? Math.min(1, currentTime / duration) : 0;
   const lessonLinks = lesson.links ?? [];
   const hasResources = lessonLinks.length > 0 || Boolean(lesson.pdfUrl);
+
+  const speedOptions: VideoSettingsOption[] = VIDEO_PLAYBACK_RATES.map((rate) => ({
+    id: String(rate),
+    label: formatRate(rate),
+    sublabel: rate === 1 ? 'Normal' : undefined,
+  }));
+
+  const subtitleOptions: VideoSettingsOption[] = [
+    { id: 'off', label: 'Desactivado' },
+    ...subtitleTracks.map((track) => ({
+      id: track.lang,
+      label: track.label || track.lang,
+      sublabel: track.label && track.label !== track.lang ? track.lang.toUpperCase() : undefined,
+    })),
+  ];
 
   return (
     <View style={styles.screen}>
@@ -353,6 +466,7 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
               </View>
             </View>
           </Pressable>
+          <VideoSubtitleOverlay cue={activeSubtitleCue} />
         </View>
 
         <View style={styles.bottom}>
@@ -369,11 +483,28 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
 
           <View style={styles.controlsRow}>
             <View style={styles.controlsLeft}>
-              <Pressable style={styles.flatControl} accessibilityLabel="Velocidad">
-                <Text style={styles.flatControlText}>1x</Text>
+              <Pressable
+                style={styles.flatControl}
+                accessibilityLabel="Velocidad de reproducción"
+                onPress={() => setSpeedSheetOpen(true)}
+              >
+                <Text style={styles.flatControlText}>{formatRate(playbackRate)}</Text>
               </Pressable>
-              <Pressable style={styles.flatControl} accessibilityLabel="Subtítulos">
-                <Ionicons name="text" size={18} color={Colors.textPrimary} />
+              <Pressable
+                style={[styles.flatControl, subtitleTracks.length === 0 && styles.flatControlDisabled]}
+                accessibilityLabel="Subtítulos"
+                accessibilityState={{ disabled: subtitleTracks.length === 0 }}
+                onPress={() => {
+                  if (subtitleTracks.length === 0) return;
+                  setSubsSheetOpen(true);
+                }}
+              >
+                <Ionicons
+                  name="text"
+                  size={18}
+                  color={activeSubtitleTrack ? Colors.accentHighlight : Colors.textPrimary}
+                />
+                {activeSubtitleTrack ? <View style={styles.resourceDot} /> : null}
               </Pressable>
               <Pressable
                 style={styles.flatControl}
@@ -445,13 +576,20 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
         visible={moduleModal != null}
         moduleTitle={moduleModal?.title}
         progressPercent={courseProgress?.percentComplete ?? 0}
-        streakDelta={1}
+        streakDelta={moduleModal?.streakDelta ?? 0}
         onContinue={continueAfterModule}
         onBackHome={() => {
           setModuleModal(null);
           navigation.goBack();
         }}
         onClose={() => setModuleModal(null)}
+      />
+
+      <StreakMilestoneModal
+        visible={streakMilestone != null}
+        days={streakMilestone?.days ?? 0}
+        bonus={streakMilestone?.bonus ?? 0}
+        onClose={() => setStreakMilestone(null)}
       />
 
       <CelebrationModal
@@ -472,6 +610,32 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
           navigation.goBack();
         }}
         onClose={() => setCourseModal(false)}
+      />
+
+      <VideoSettingsSheet
+        visible={speedSheetOpen}
+        title="Velocidad de reproducción"
+        options={speedOptions}
+        selectedId={String(playbackRate)}
+        onSelect={(id) => {
+          const value = Number(id);
+          if (!Number.isNaN(value)) setVideoPlaybackRate(value);
+          setSpeedSheetOpen(false);
+        }}
+        onClose={() => setSpeedSheetOpen(false)}
+      />
+
+      <VideoSettingsSheet
+        visible={subsSheetOpen}
+        title="Subtítulos"
+        options={subtitleOptions}
+        selectedId={subtitleLang ?? 'off'}
+        onSelect={(id) => {
+          setVideoSubtitleLang(id === 'off' ? null : id);
+          setSubsSheetOpen(false);
+        }}
+        emptyLabel="Esta lección aún no tiene subtítulos."
+        onClose={() => setSubsSheetOpen(false)}
       />
     </View>
   );
@@ -621,6 +785,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+  },
+  flatControlDisabled: {
+    opacity: 0.4,
   },
   flatControlText: {
     color: Colors.textPrimary,

@@ -1,5 +1,4 @@
 import type { Course } from '../types';
-import { courses as seedCourses } from '../data/academy';
 import { getCourseById as getCourseFirestore, getCourses as getCoursesFirestore } from './academyService';
 import { apiFetch, hasApiBaseUrl } from './api';
 
@@ -10,14 +9,13 @@ export async function fetchCourses(skillId?: string): Promise<Course[]> {
     try {
       const query = skillId ? `?skillId=${encodeURIComponent(skillId)}` : '';
       const response = await apiFetch<CoursesResponse>(`/api/courses${query}`);
-      if (response.data?.length) return response.data as Course[];
+      if (Array.isArray(response.data)) return response.data as Course[];
     } catch {
       // fall through to Firestore
     }
   }
 
-  const fromDb = await getCoursesFirestore(skillId);
-  return fromDb.length ? fromDb : skillId ? seedCourses.filter((c) => c.skillId === skillId) : seedCourses;
+  return getCoursesFirestore(skillId);
 }
 
 export async function fetchCourseById(id: string): Promise<Course | null> {
@@ -31,5 +29,5 @@ export async function fetchCourseById(id: string): Promise<Course | null> {
   }
 
   const fromDb = await getCourseFirestore(id);
-  return fromDb || seedCourses.find((c) => c.id === id) || null;
+  return fromDb || null;
 }

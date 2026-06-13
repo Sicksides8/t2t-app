@@ -15,6 +15,7 @@ import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { Platform } from 'react-native';
 import { FS_COL } from '../constants/firestoreCollections';
+import { apiFetch, hasApiBaseUrl } from './api';
 import { auth, db } from './firebase';
 import type { User } from '../types';
 
@@ -138,10 +139,33 @@ async function createUserProfile(uid: string, data: { email: string; displayName
     updatedAt: serverTimestamp(),
   });
 
+  // Welcome email: dispara el endpoint del CRM que envía vía Resend.
+  // Idempotente del lado server (welcomeEmailSentAt en t2t_users). Fire-and-forget:
+  // si el endpoint o la API base no están disponibles, no rompe el alta.
+  void triggerWelcomeEmail();
+
   return { id: uid, ...profile };
 }
 
+async function triggerWelcomeEmail(): Promise<void> {
+  if (!hasApiBaseUrl()) return;
+  try {
+    await apiFetch('/api/welcome-email', { method: 'POST' });
+  } catch (error) {
+    if (__DEV__) {
+      console.warn('[authService] welcome-email no enviado', error);
+    }
+  }
+}
+
 function fromFirestore(id: string, data: any): User {
+  const isPlanId = (v: unknown): v is User['subscriptionPlan'] =>
+    v === 'free' || v === 'pro' || v === 'elite';
+  const isStatus = (v: unknown): v is User['subscriptionStatus'] =>
+    v === 'free' || v === 'trialing' || v === 'active' || v === 'cancelled' || v === 'expired';
+  const isSource = (v: unknown): v is User['subscriptionSource'] =>
+    v === 'apple' || v === 'google' || v === 'mercadopago' || v === 'code' || v === 'mock';
+
   return {
     id,
     email: data.email || '',
@@ -154,9 +178,27 @@ function fromFirestore(id: string, data: any): User {
     diagnosticCompleted: Boolean(data.diagnosticCompleted),
     hookSelections: data.hookSelections && typeof data.hookSelections === 'object' ? data.hookSelections : undefined,
     selectedPlan: data.selectedPlan,
+    subscriptionPlan: isPlanId(data.subscriptionPlan) ? data.subscriptionPlan : undefined,
+    subscriptionStatus: isStatus(data.subscriptionStatus) ? data.subscriptionStatus : undefined,
+    subscriptionSource: isSource(data.subscriptionSource) ? data.subscriptionSource : undefined,
+    trialStartedAt: data.trialStartedAt?.toDate?.() || undefined,
+    trialEndsAt: data.trialEndsAt?.toDate?.() || undefined,
+    subscriptionRenewsAt: data.subscriptionRenewsAt?.toDate?.() || undefined,
+    subscriptionCancelledAt: data.subscriptionCancelledAt?.toDate?.() || undefined,
+    appliedCouponCode: typeof data.appliedCouponCode === 'string' ? data.appliedCouponCode : undefined,
     coins: typeof data.coins === 'number' ? data.coins : undefined,
     level: typeof data.level === 'number' ? data.level : undefined,
     savedCourseIds: Array.isArray(data.savedCourseIds) ? data.savedCourseIds : undefined,
+    currentStreak: typeof data.currentStreak === 'number' ? data.currentStreak : undefined,
+    longestStreak: typeof data.longestStreak === 'number' ? data.longestStreak : undefined,
+    lastActiveDay: typeof data.lastActiveDay === 'string' ? data.lastActiveDay : undefined,
+    streakFreezesAvailable:
+      typeof data.streakFreezesAvailable === 'number' ? data.streakFreezesAvailable : undefined,
+    streakFreezeWeekKey:
+      typeof data.streakFreezeWeekKey === 'string' ? data.streakFreezeWeekKey : undefined,
+    streakMilestonesAwarded: Array.isArray(data.streakMilestonesAwarded)
+      ? data.streakMilestonesAwarded.filter((n: unknown): n is number => typeof n === 'number')
+      : undefined,
     notificationTokens: data.notificationTokens || [],
     createdAt: data.createdAt?.toDate?.() || new Date(),
     updatedAt: data.updatedAt?.toDate?.() || new Date(),
@@ -176,9 +218,23 @@ export async function updateUserFields(
       | 'subscriptionId'
       | 'hookSelections'
       | 'selectedPlan'
+      | 'subscriptionPlan'
+      | 'subscriptionStatus'
+      | 'subscriptionSource'
+      | 'trialStartedAt'
+      | 'trialEndsAt'
+      | 'subscriptionRenewsAt'
+      | 'subscriptionCancelledAt'
+      | 'appliedCouponCode'
       | 'coins'
       | 'level'
       | 'savedCourseIds'
+      | 'currentStreak'
+      | 'longestStreak'
+      | 'lastActiveDay'
+      | 'streakFreezesAvailable'
+      | 'streakFreezeWeekKey'
+      | 'streakMilestonesAwarded'
     >
   >,
 ): Promise<void> {

@@ -3,13 +3,14 @@ import { ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { PenpotOrbVariant } from '../../data/penpotFrames';
 import { Colors } from '../../theme';
-import { PenpotOrbs } from './PenpotOrbs';
+import { AppBackground } from './AppBackground';
 
 type Props = {
   children: React.ReactNode;
   orbVariant?: PenpotOrbVariant;
   scroll?: boolean;
   contentStyle?: ViewStyle;
+  header?: React.ReactNode;
   footer?: React.ReactNode;
 };
 
@@ -19,6 +20,7 @@ export function PenpotFlowShell({
   orbVariant = 'default',
   scroll = false,
   contentStyle,
+  header,
   footer,
 }: Props) {
   const body = (
@@ -29,10 +31,15 @@ export function PenpotFlowShell({
 
   return (
     <View style={styles.root}>
-      <PenpotOrbs variant={orbVariant} />
+      <AppBackground variant={orbVariant} />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        {header ? <View style={styles.header}>{header}</View> : null}
         {scroll ? (
-          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
             {body}
           </ScrollView>
         ) : (
@@ -63,8 +70,12 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 24,
   },
+  header: {
+    paddingHorizontal: 20,
+  },
   footer: {
     paddingHorizontal: 20,
+    paddingTop: 12,
     paddingBottom: 16,
   },
 });

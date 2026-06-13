@@ -1,162 +1,215 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { DIAGNOSTIC_SKILLS } from '../../data/diagnostic';
+import Svg, { Circle, Line, Polygon } from 'react-native-svg';
+import {
+  DIAGNOSTIC_SKILLS,
+  SKILL_LABELS_SHORT,
+  type DiagnosticSkillId,
+} from '../../data/diagnostic';
 import { bucketSkill } from '../../utils/diagnosticBuckets';
-import { axisLine, buildRadarPoints, gridRingPoints, labelPosition } from '../../utils/radarChart';
+import {
+  axisLine,
+  buildRadarPoints,
+  gridRingPoints,
+  labelPosition,
+  type RadarPointInput,
+} from '../../utils/radarChart';
 import { Colors } from '../../theme';
 
-const SIZE = 280;
-const MAX_R = 95;
-const CX = SIZE / 2;
-const CY = SIZE / 2;
+const DEFAULT_SIZE = 280;
+const DEFAULT_MAX_R = 95;
 
-type Props = {
-  scores: Record<string, number>;
+export type RadarLevel = 'strong' | 'developing' | 'toTrain';
+
+export type RadarAxis = {
+  key: string;
+  label: string;
+  value: number;
+  level: RadarLevel;
 };
 
-type Point = { x: number; y: number };
+type Props = {
+  /** Lista explícita de ejes con su nivel. Si se provee, tiene precedencia. */
+  axes?: RadarAxis[];
+  /** Map legacy: `scores[skillId] => 0..100`. Usa DIAGNOSTIC_SKILLS como ejes. */
+  scores?: Record<string, number>;
+  /** Polígono comparativo "antes" (gris claro), opcional. */
+  previousScores?: Record<string, number>;
+  size?: number;
+  maxRadius?: number;
+};
 
-function parsePointsString(points: string): Point[] {
-  return points.split(' ').map((pair) => {
-    const [x, y] = pair.split(',').map(Number);
-    return { x, y };
+function colorForLevel(level: RadarLevel): string {
+  if (level === 'strong') return Colors.accentHighlight;
+  if (level === 'toTrain') return Colors.warning;
+  return Colors.accentPrimary;
+}
+
+function bucketToLevel(score: number): RadarLevel {
+  const bucket = bucketSkill(score);
+  if (bucket === 'strength') return 'strong';
+  if (bucket === 'train') return 'toTrain';
+  return 'developing';
+}
+
+function buildAxesFromScores(scores: Record<string, number>): RadarAxis[] {
+  return DIAGNOSTIC_SKILLS.map((skillId) => {
+    const value = scores[skillId] ?? 0;
+    return {
+      key: skillId,
+      label: SKILL_LABELS_SHORT[skillId as DiagnosticSkillId] ?? skillId,
+      value,
+      level: bucketToLevel(value),
+    };
   });
 }
 
-function RadarLine({
-  x1,
-  y1,
-  x2,
-  y2,
-  color,
-  thickness = 1,
-}: {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-  color: string;
-  thickness?: number;
-}) {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const length = Math.sqrt(dx * dx + dy * dy);
-  if (length < 0.5) return null;
+export function DiagnosticRadarChart({
+  axes,
+  scores,
+  previousScores,
+  size = DEFAULT_SIZE,
+  maxRadius = DEFAULT_MAX_R,
+}: Props) {
+  const resolvedAxes: RadarAxis[] = useMemo(() => {
+    if (axes && axes.length > 0) return axes;
+    if (scores) return buildAxesFromScores(scores);
+    return [];
+  }, [axes, scores]);
 
-  const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
-  const midX = (x1 + x2) / 2;
-  const midY = (y1 + y2) / 2;
-
-  return (
-    <View
-      style={{
-        position: 'absolute',
-        left: midX - length / 2,
-        top: midY - thickness / 2,
-        width: length,
-        height: thickness,
-        backgroundColor: color,
-        transform: [{ rotate: `${angle}deg` }],
-      }}
-    />
+  const dataPoints = useMemo(
+    () =>
+      buildRadarPoints(
+        resolvedAxes.map<RadarPointInput>((axis) => ({
+          key: axis.key,
+          label: axis.label,
+          value: axis.value,
+        })),
+        size,
+        maxRadius,
+      ),
+    [resolvedAxes, size, maxRadius],
   );
-}
 
-function PolygonEdges({ points, color, thickness }: { points: Point[]; color: string; thickness?: number }) {
-  return (
-    <>
-      {points.map((p, i) => {
-        const next = points[(i + 1) % points.length];
-        return (
-          <RadarLine
-            key={i}
-            x1={p.x}
-            y1={p.y}
-            x2={next.x}
-            y2={next.y}
-            color={color}
-            thickness={thickness}
-          />
-        );
-      })}
-    </>
+  const previousPoints = useMemo(() => {
+    if (!previousScores) return [] as Array<{ x: number; y: number }>;
+    return buildRadarPoints(
+      resolvedAxes.map<RadarPointInput>((axis) => ({
+        key: axis.key,
+        label: axis.label,
+        value: previousScores[axis.key] ?? 0,
+      })),
+      size,
+      maxRadius,
+    );
+  }, [previousScores, resolvedAxes, size, maxRadius]);
+
+  const previousPolygonPoints = useMemo(
+    () => previousPoints.map((p) => `${p.x},${p.y}`).join(' '),
+    [previousPoints],
   );
-}
 
-export function DiagnosticRadarChart({ scores }: Props) {
-  const dataPoints = useMemo(() => buildRadarPoints(scores, SIZE, MAX_R), [scores]);
+  const axisCount = resolvedAxes.length;
 
   const gridRings = useMemo(
-    () => [1, 2, 3].map((level) => parsePointsString(gridRingPoints(SIZE, MAX_R, level))),
-    [],
+    () =>
+      [1, 2, 3].map((level) =>
+        gridRingPoints(axisCount, size, maxRadius, level),
+      ),
+    [axisCount, size, maxRadius],
   );
 
+  const dataPolygonPoints = useMemo(
+    () => dataPoints.map((p) => `${p.x},${p.y}`).join(' '),
+    [dataPoints],
+  );
+
+  if (axisCount === 0) {
+    return <View style={[styles.wrap, { width: size, height: size }]} />;
+  }
+
   return (
-    <View style={styles.wrap}>
-      <View style={styles.chart} pointerEvents="none">
-        {gridRings.map((ring, level) => (
-          <PolygonEdges key={level} points={ring} color="#FFFFFF26" thickness={1} />
+    <View style={[styles.wrap, { width: size, height: size }]}>
+      <Svg width={size} height={size} style={styles.chart}>
+        {/* Grid concentric rings */}
+        {gridRings.map((points, i) => (
+          <Polygon
+            key={`ring-${i}`}
+            points={points}
+            fill="none"
+            stroke="#FFFFFF26"
+            strokeWidth={1}
+          />
         ))}
-        {DIAGNOSTIC_SKILLS.map((_, i) => {
-          const line = axisLine(SIZE, MAX_R, i);
+        {/* Axes (radii) */}
+        {resolvedAxes.map((axis, i) => {
+          const line = axisLine(axisCount, size, maxRadius, i);
           return (
-            <RadarLine
-              key={i}
+            <Line
+              key={`axis-${axis.key}`}
               x1={line.x1}
               y1={line.y1}
               x2={line.x2}
               y2={line.y2}
-              color="#FFFFFF26"
-              thickness={0.5}
+              stroke="#FFFFFF26"
+              strokeWidth={0.5}
             />
           );
         })}
+        {/* Previous polygon (gris) si existe */}
+        {previousPoints.length > 0 ? (
+          <Polygon
+            points={previousPolygonPoints}
+            fill="#FFFFFF22"
+            stroke="#FFFFFF66"
+            strokeWidth={1.5}
+            strokeLinejoin="round"
+          />
+        ) : null}
+        {/* Filled data polygon */}
+        <Polygon
+          points={dataPolygonPoints}
+          fill={previousPoints.length > 0 ? `${Colors.accentHighlight}4D` : '#B73CEF66'}
+          stroke={previousPoints.length > 0 ? Colors.accentHighlight : Colors.accentPrimary}
+          strokeWidth={2}
+          strokeLinejoin="round"
+        />
+        {/* Vertex dots colored by level */}
         {dataPoints.map((p, i) => (
-          <RadarLine
-            key={`fill-${i}`}
-            x1={CX}
-            y1={CY}
-            x2={p.x}
-            y2={p.y}
-            color="#B73CEF59"
-            thickness={1}
+          <Circle
+            key={`dot-${resolvedAxes[i].key}`}
+            cx={p.x}
+            cy={p.y}
+            r={4.5}
+            fill={colorForLevel(resolvedAxes[i].level)}
           />
         ))}
-        <PolygonEdges points={dataPoints} color={Colors.accentPrimary} thickness={1.5} />
-        {dataPoints.map((p, i) => (
-          <View
-            key={`dot-${i}`}
-            style={[
-              styles.vertexDot,
-              { left: p.x - 3, top: p.y - 3, backgroundColor: Colors.accentPrimary },
-            ]}
-          />
-        ))}
-      </View>
-      {DIAGNOSTIC_SKILLS.map((skillId, i) => {
-        const pos = labelPosition(SIZE, MAX_R, i);
-        const bucket = bucketSkill(scores[skillId] ?? 0);
-        const color =
-          bucket === 'strength'
-            ? Colors.accentHighlight
-            : bucket === 'train'
-              ? Colors.warning
-              : Colors.textSecondary;
-        const short = dataPoints[i]?.label ?? skillId;
+      </Svg>
+      {resolvedAxes.map((axis, i) => {
+        const offset = axisCount > 8 ? 18 : 22;
+        const pos = labelPosition(axisCount, size, maxRadius, i, offset);
+        const color = colorForLevel(axis.level);
+        const labelWidth = axisCount > 8 ? 60 : 72;
+        const fontSize = axisCount > 8 ? 8 : 9;
+        const maxChars = axisCount > 8 ? 10 : 12;
+        const label =
+          axis.label.length > maxChars ? `${axis.label.slice(0, maxChars - 1)}…` : axis.label;
         return (
           <Text
-            key={skillId}
+            key={axis.key}
             style={[
               styles.label,
               {
-                left: pos.x - 36,
+                left: pos.x - labelWidth / 2,
                 top: pos.y - 8,
+                width: labelWidth,
                 color,
+                fontSize,
               },
             ]}
             numberOfLines={1}
           >
-            {short.length > 12 ? `${short.slice(0, 10)}…` : short}
+            {label}
           </Text>
         );
       })}
@@ -166,23 +219,13 @@ export function DiagnosticRadarChart({ scores }: Props) {
 
 const styles = StyleSheet.create({
   wrap: {
-    width: SIZE,
-    height: SIZE,
     alignSelf: 'center',
   },
   chart: {
     ...StyleSheet.absoluteFillObject,
   },
-  vertexDot: {
-    position: 'absolute',
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
   label: {
     position: 'absolute',
-    width: 72,
-    fontSize: 9,
     fontWeight: '600',
     textAlign: 'center',
   },

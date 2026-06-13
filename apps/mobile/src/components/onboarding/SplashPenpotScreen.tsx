@@ -1,65 +1,88 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { PENPOT_FRAMES } from '../../data/penpotFrames';
+import { Image, StyleSheet, Text, View } from 'react-native';
+import { T2TLogo } from '../../assets/brand';
 import { PenpotFlowShell } from '../penpot';
-import { PenpotIllustration } from '../penpot/PenpotIllustration';
 import { Colors, Spacing, Typography } from '../../theme';
 
 type Props = { onComplete: () => void };
 
-/** Penpot: 01_Splash — auto-advance con dots. */
-export function SplashPenpotScreen({ onComplete }: Props) {
-  const frame = PENPOT_FRAMES['01_Splash'];
+const APP_VERSION = 'v1.0.0';
 
+/** Penpot: 01_Splash — "Tu gimnasio mental" + logo + dots + versión. */
+export function SplashPenpotScreen({ onComplete }: Props) {
   useEffect(() => {
     const t = setTimeout(onComplete, 2400);
     return () => clearTimeout(t);
   }, [onComplete]);
 
   return (
-    <PenpotFlowShell orbVariant="splash" contentStyle={styles.center}>
-      <PenpotIllustration illustrationKey="logo" size={104} label="T2T" />
-      <Text style={styles.script}>T2T</Text>
-      <Text style={styles.hero}>Academy</Text>
-      {frame.body ? <Text style={styles.subtitle}>{frame.body}</Text> : null}
-      <View style={styles.dots}>
-        {[0, 1, 2].map((i) => (
-          <View key={i} style={[styles.dot, i === 1 && styles.dotActive]} />
-        ))}
+    <PenpotFlowShell orbVariant="splash" contentStyle={styles.content}>
+      <View style={styles.center}>
+        <Text style={styles.script}>Tu gimnasio{'\n'}mental</Text>
+        <View style={styles.logoWrap}>
+          <Image source={T2TLogo} style={styles.logo} resizeMode="cover" />
+        </View>
+        <Text style={styles.brand}>T2T Academy</Text>
+      </View>
+
+      <View style={styles.bottom}>
+        <View style={styles.dots}>
+          {[0, 1, 2].map((i) => (
+            <View key={i} style={[styles.dot, i === 0 && styles.dotActive]} />
+          ))}
+        </View>
+        <Text style={styles.version}>{APP_VERSION}</Text>
       </View>
     </PenpotFlowShell>
   );
 }
 
 const styles = StyleSheet.create({
+  content: {
+    flex: 1,
+    justifyContent: 'space-between',
+    paddingTop: Spacing.xxxl,
+    paddingBottom: Spacing.xl,
+  },
   center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.md,
+    gap: Spacing.xl,
   },
   script: {
-    ...Typography.script,
-    color: Colors.accentHighlight,
-    fontSize: 48,
-    marginTop: Spacing.lg,
-  },
-  hero: {
-    ...Typography.hero,
+    ...Typography.handwritten,
     color: Colors.textPrimary,
-    fontSize: 36,
-  },
-  subtitle: {
-    ...Typography.body,
-    color: Colors.textSecondary,
+    fontSize: 56,
+    lineHeight: 60,
     textAlign: 'center',
-    paddingHorizontal: 32,
-    marginTop: Spacing.sm,
+  },
+  logoWrap: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logo: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+  },
+  brand: {
+    ...Typography.h1,
+    color: Colors.textPrimary,
+    fontSize: 28,
+    textAlign: 'center',
+  },
+  bottom: {
+    alignItems: 'center',
+    gap: Spacing.lg,
   },
   dots: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: Spacing.xxl,
+    alignItems: 'center',
   },
   dot: {
     width: 8,
@@ -68,7 +91,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.divider,
   },
   dotActive: {
-    backgroundColor: Colors.accentHighlight,
+    backgroundColor: Colors.accentPrimary,
     width: 24,
+  },
+  version: {
+    ...Typography.caption,
+    color: Colors.textTertiary,
+    fontSize: 12,
   },
 });

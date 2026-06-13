@@ -2,7 +2,7 @@ import type { Firestore } from 'firebase-admin/firestore';
 import { FieldValue } from 'firebase-admin/firestore';
 import { FS_COL } from './firestoreCollections';
 import { DEFAULT_MODULE_TITLE } from './courseConstants';
-import type { Course, CourseModule, Lesson, ModuleLink } from '../types';
+import type { Course, CourseModule, Lesson, ModuleLink, SubtitleTrack } from '../types';
 
 export type LessonInput = {
   id?: string;
@@ -10,6 +10,7 @@ export type LessonInput = {
   videoUrl: string;
   pdfUrl?: string;
   links?: ModuleLink[];
+  subtitles?: SubtitleTrack[];
   durationSec: number;
   order: number;
   isFree: boolean;
@@ -28,6 +29,37 @@ export function sanitizeModuleLinks(input: unknown): ModuleLink[] {
     const label = typeof labelRaw === 'string' ? labelRaw.trim().slice(0, 80) : '';
     cleaned.push(label ? { label, url } : { url });
     if (cleaned.length >= 25) break;
+  }
+  return cleaned;
+}
+
+/**
+ * Sanitiza el array de subtítulos {lang, label, url} de una lección:
+ * - Sólo acepta URLs http(s).
+ * - Hace dedupe por código ISO normalizado.
+ * - Recorta etiquetas a 40 caracteres.
+ * - Limita a 12 idiomas por lección como máximo.
+ */
+export function sanitizeSubtitles(input: unknown): SubtitleTrack[] {
+  if (!Array.isArray(input)) return [];
+  const cleaned: SubtitleTrack[] = [];
+  const seen = new Set<string>();
+  for (const raw of input) {
+    if (!raw || typeof raw !== 'object') continue;
+    const lang = String((raw as { lang?: unknown }).lang || '')
+      .trim()
+      .toLowerCase()
+      .slice(0, 8);
+    if (!lang) continue;
+    if (!/^[a-z]{2}([-_][a-z0-9]{2,8})?$/i.test(lang)) continue;
+    if (seen.has(lang)) continue;
+    const url = String((raw as { url?: unknown }).url || '').trim();
+    if (!url || !/^https?:\/\//i.test(url) || url.length > 500) continue;
+    const labelRaw = (raw as { label?: unknown }).label;
+    const label = (typeof labelRaw === 'string' ? labelRaw.trim() : '').slice(0, 40) || lang;
+    cleaned.push({ lang, label, url });
+    seen.add(lang);
+    if (cleaned.length >= 12) break;
   }
   return cleaned;
 }
@@ -90,6 +122,7 @@ export async function syncCourseCurriculum(
       const id = item.id || `${modId}_l${order}`;
       const pdfUrl = item.pdfUrl ? String(item.pdfUrl).trim() : '';
       const links = sanitizeModuleLinks(item.links);
+      const subtitles = sanitizeSubtitles(item.subtitles);
       return {
         id,
         courseId,
@@ -98,6 +131,7 @@ export async function syncCourseCurriculum(
         videoUrl: item.videoUrl.trim(),
         ...(pdfUrl ? { pdfUrl } : {}),
         ...(links.length > 0 ? { links } : {}),
+        ...(subtitles.length > 0 ? { subtitles } : {}),
         durationSec: Math.max(30, item.durationSec),
         order,
         isFree: Boolean(item.isFree),
@@ -125,6 +159,9 @@ export async function syncCourseCurriculum(
     }
     if (!lesson.links || lesson.links.length === 0) {
       docPayload.links = FieldValue.delete();
+    }
+    if (!lesson.subtitles || lesson.subtitles.length === 0) {
+      docPayload.subtitles = FieldValue.delete();
     }
     batch.set(db.collection(FS_COL.lessons).doc(lesson.id), docPayload, { merge: true });
   }

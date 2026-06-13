@@ -1,0 +1,40 @@
+import type { Payment } from '../types';
+
+export const seedPayments: Payment[] = [
+  {
+    id: 'pay-2026-05',
+    userId: 'seed',
+    plan: 'pro',
+    planLabel: 'PRO · mensual',
+    amount: 9.9,
+    currency: 'USD',
+    method: 'Apple IAP',
+    txId: '#TXN-2026-0522-001',
+    paidAt: new Date('2026-05-22T10:32:00'),
+    status: 'paid',
+  },
+  {
+    id: 'pay-2026-04',
+    userId: 'seed',
+    plan: 'pro',
+    planLabel: 'PRO · mensual',
+    amount: 9.9,
+    currency: 'USD',
+    method: 'Apple IAP',
+    txId: '#TXN-2026-0422-001',
+    paidAt: new Date('2026-04-22T10:30:00'),
+    status: 'paid',
+  },
+  {
+    id: 'pay-2026-03',
+    userId: 'seed',
+    plan: 'pro',
+    planLabel: 'PRO · mensual',
+    amount: 9.9,
+    currency: 'USD',
+    method: 'Apple Pay',
+    txId: '#TXN-2026-0322-001',
+    paidAt: new Date('2026-03-22T11:14:00'),
+    status: 'paid',
+  },
+];

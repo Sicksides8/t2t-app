@@ -6,7 +6,7 @@ Constantes en código: `apps/mobile/src/constants/firestoreCollections.ts` y `ap
 
 ## Colecciones MVP
 
-- `t2t_users/{uid}`: perfil, role, subscriptionId, onboardingCompleted, diagnosticCompleted, notificationTokens.
+- `t2t_users/{uid}`: perfil, role, subscriptionId, onboardingCompleted, diagnosticCompleted, notificationTokens. Campos transaccionales de email (Resend): `welcomeEmailSentAt: Timestamp` (idempotencia del welcome email; se setea la primera vez que el endpoint del CRM envía el correo) y `lastStreakWarningEmailSentAt: Timestamp` (último envío del warning anti-churn; usado por el job diario de GitHub Actions para evitar reenviar el mismo día UTC).
 - `t2t_skills/{id}`: categorías de habilidades.
 - `t2t_courses/{id}`: cursos publicados.
 - `t2t_modules/{id}`: módulos asociados a cursos.

@@ -1,3 +1,11 @@
+export { ComoFuncionaScreen } from './ComoFuncionaScreen';
+export { DiagnosticActionScreen } from './DiagnosticActionScreen';
+export { DiagnosticOpenerScreen } from './DiagnosticOpenerScreen';
+export { OnboardingCarouselSlide } from './OnboardingCarouselSlide';
+export { OnboardingCierreScreen } from './OnboardingCierreScreen';
 export { OnboardingStorySlide } from './OnboardingStorySlide';
 export { PenpotClosureScreen } from './PenpotClosureScreen';
+export { ProgressLoaderScreen } from './ProgressLoaderScreen';
+export { ReflectionScreen } from './ReflectionScreen';
 export { SplashPenpotScreen } from './SplashPenpotScreen';
+export { WelcomeIntroScreen } from './WelcomeIntroScreen';

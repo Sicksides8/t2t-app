@@ -5,7 +5,7 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { navigateToExploreTab } from '../../navigation/tabNavigation';
-import { SectionHeader } from '../../components/academy';
+import { PaywallModal, SectionHeader } from '../../components/academy';
 import {
   ContinueCourseCard,
   HomeHeader,
@@ -20,9 +20,21 @@ import { getLessons, getRecommendedCourses } from '../../services/academyService
 import { useAcademyStore, useAuthStore, useCourseStore, useNotificationStore } from '../../stores';
 import { Spacing } from '../../theme';
 import { computeProfileStats } from '../../utils/profileStats';
+import { dayKey } from '../../services/streakService';
 import { formatHeroMeta, pickHeroCourse, pickNextLesson } from '../../utils/homeRoutine';
 import { sameSkillId } from '../../utils/skillId';
-import type { Course, Lesson, MainTabParamList, RootStackParamList } from '../../types';
+import {
+  canAccessCourse,
+  canAccessLesson,
+  getRequiredPlan,
+} from '../../utils/subscriptionAccess';
+import type {
+  Course,
+  Lesson,
+  MainTabParamList,
+  RootStackParamList,
+  SubscriptionPlanId,
+} from '../../types';
 
 type HomeNav = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'HomeTab'>,
@@ -32,6 +44,7 @@ type HomeNav = CompositeNavigationProp<
 export function HomeScreen() {
   const navigation = useNavigation<HomeNav>();
   const user = useAuthStore((state) => state.user);
+  const refreshUserProfile = useAuthStore((state) => state.refreshUserProfile);
   const loadCourses = useCourseStore((state) => state.load);
   const loading = useCourseStore((state) => state.loading);
   const storeCourses = useCourseStore((state) => state.courses);
@@ -40,6 +53,8 @@ export function HomeScreen() {
   const notifications = useNotificationStore((state) => state.items);
   const [recommended, setRecommended] = useState<Course[]>([]);
   const [heroLessons, setHeroLessons] = useState<Lesson[]>([]);
+  const [paywallVisible, setPaywallVisible] = useState(false);
+  const [paywallPlan, setPaywallPlan] = useState<SubscriptionPlanId>('pro');
 
   useEffect(() => {
     void loadCourses();
@@ -98,9 +113,23 @@ export function HomeScreen() {
 
   const featuredSkills = useMemo(() => [...skills].sort((a, b) => a.order - b.order).slice(0, 4), []);
 
+  const openPaywallForCourse = (course: Course) => {
+    const required = getRequiredPlan(course);
+    setPaywallPlan(required === 'free' ? 'pro' : required);
+    setPaywallVisible(true);
+  };
+
   const openHero = () => {
     if (!heroCourse) {
       navigateToExploreTab(navigation);
+      return;
+    }
+    if (heroLesson && !canAccessLesson(heroLesson, heroCourse, user)) {
+      openPaywallForCourse(heroCourse);
+      return;
+    }
+    if (!heroLesson && !canAccessCourse(heroCourse, user)) {
+      openPaywallForCourse(heroCourse);
       return;
     }
     if (heroLesson) {
@@ -108,6 +137,14 @@ export function HomeScreen() {
       return;
     }
     navigation.navigate('CourseDetail', { courseId: heroCourse.id });
+  };
+
+  const openCourseFromCarousel = (course: Course) => {
+    if (!canAccessCourse(course, user)) {
+      openPaywallForCourse(course);
+      return;
+    }
+    navigation.navigate('CourseDetail', { courseId: course.id });
   };
 
   return (
@@ -123,7 +160,11 @@ export function HomeScreen() {
         onAvatarPress={() => navigation.navigate('ProfileTab', { screen: 'ProfileMain' })}
       />
 
-      <HomeStreakCard streakDays={stats.streakDays} />
+      <HomeStreakCard
+        streakDays={stats.streakDays}
+        activeToday={user?.lastActiveDay === dayKey()}
+        freezes={stats.freezes}
+      />
 
       {heroCourse ? (
         <HomeTodayHero
@@ -166,7 +207,8 @@ export function HomeScreen() {
                   key={course.id}
                   course={course}
                   progressPercent={progressMap[course.id]?.percentComplete ?? 0}
-                  onPress={() => navigation.navigate('CourseDetail', { courseId: course.id })}
+                  locked={!canAccessCourse(course, user)}
+                  onPress={() => openCourseFromCarousel(course)}
                 />
               ))}
             </ScrollView>
@@ -189,6 +231,16 @@ export function HomeScreen() {
         ))}
         </View>
       </View>
+
+      <PaywallModal
+        visible={paywallVisible}
+        planId={paywallPlan}
+        userId={user?.id}
+        onClose={() => setPaywallVisible(false)}
+        onSuccess={() => {
+          void refreshUserProfile();
+        }}
+      />
     </ScreenWrapper>
   );
 }

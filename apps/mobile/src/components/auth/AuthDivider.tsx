@@ -2,11 +2,15 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Colors } from '../../theme';
 
-export function AuthDivider() {
+type Props = {
+  label?: string;
+};
+
+export function AuthDivider({ label = 'o' }: Props) {
   return (
     <View style={styles.row}>
       <View style={styles.line} />
-      <Text style={styles.text}>o</Text>
+      <Text style={styles.text}>{label}</Text>
       <View style={styles.line} />
     </View>
   );

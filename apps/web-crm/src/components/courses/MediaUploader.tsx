@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { FileText, ImagePlus, Trash2, UploadCloud, Video } from 'lucide-react';
+import { Captions, FileText, ImagePlus, Trash2, UploadCloud, Video } from 'lucide-react';
 import { apiFetch, getAuthToken } from '../../lib/api';
 import styles from './CourseModal.module.css';
 
-type MediaKind = 'video' | 'thumbnail' | 'pdf';
+type MediaKind = 'video' | 'thumbnail' | 'pdf' | 'subtitle';
 
 type MediaUploaderProps = {
   kind: MediaKind;
@@ -27,9 +27,11 @@ type PresignResponse = {
 const VIDEO_ACCEPT = 'video/mp4,video/webm,video/quicktime';
 const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp';
 const PDF_ACCEPT = 'application/pdf';
+const SUBTITLE_ACCEPT = 'text/vtt,.vtt';
 const VIDEO_MAX_MB = 2048;
 const IMAGE_MAX_MB = 5;
 const PDF_MAX_MB = 100;
+const SUBTITLE_MAX_MB = 2;
 
 function formatSizeLabel(mb: number): string {
   if (mb >= 1024) {
@@ -42,24 +44,21 @@ function formatSizeLabel(mb: number): string {
 function acceptFor(kind: MediaKind): string {
   if (kind === 'video') return VIDEO_ACCEPT;
   if (kind === 'pdf') return PDF_ACCEPT;
+  if (kind === 'subtitle') return SUBTITLE_ACCEPT;
   return IMAGE_ACCEPT;
-}
-
-function maxMbFor(kind: MediaKind): number {
-  if (kind === 'video') return VIDEO_MAX_MB;
-  if (kind === 'pdf') return PDF_MAX_MB;
-  return IMAGE_MAX_MB;
 }
 
 function dropzoneTitle(kind: MediaKind): string {
   if (kind === 'video') return 'Arrastrá tu video o hacé clic';
   if (kind === 'pdf') return 'Arrastrá un PDF o hacé clic';
+  if (kind === 'subtitle') return 'Arrastrá un .vtt o hacé clic';
   return 'Arrastrá una imagen o hacé clic';
 }
 
 function dropzoneHint(kind: MediaKind): string {
   if (kind === 'video') return `mp4, webm o mov · hasta ${formatSizeLabel(VIDEO_MAX_MB)}`;
   if (kind === 'pdf') return `pdf · hasta ${formatSizeLabel(PDF_MAX_MB)}`;
+  if (kind === 'subtitle') return `vtt · hasta ${formatSizeLabel(SUBTITLE_MAX_MB)}`;
   return `jpg, png o webp · hasta ${formatSizeLabel(IMAGE_MAX_MB)}`;
 }
 
@@ -98,11 +97,12 @@ function uploadWithProgress(
   file: File,
   onProgress: (pct: number) => void,
   authToken?: string,
+  contentTypeOverride?: string,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', url);
-    xhr.setRequestHeader('Content-Type', file.type);
+    xhr.setRequestHeader('Content-Type', contentTypeOverride || file.type);
     if (authToken) {
       // R2 ignora cabeceras adicionales del client si no van firmadas; este header
       // se incluye solo si el endpoint lo necesita en algún proxy futuro.
@@ -169,6 +169,18 @@ export function MediaUploader({
         setError(`PDF demasiado grande. Máximo ${formatSizeLabel(PDF_MAX_MB)}.`);
         return;
       }
+    } else if (kind === 'subtitle') {
+      // Algunos browsers asignan text/plain a los .vtt. Validamos por extensión
+      // y aceptamos ambos contentTypes.
+      const isVtt = file.name.toLowerCase().endsWith('.vtt');
+      if (!isVtt) {
+        setError('Formato no soportado. Solo se acepta .vtt.');
+        return;
+      }
+      if (file.size > SUBTITLE_MAX_MB * 1024 * 1024) {
+        setError(`Archivo demasiado grande. Máximo ${formatSizeLabel(SUBTITLE_MAX_MB)}.`);
+        return;
+      }
     } else {
       if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
         setError('Formato no soportado. Usá jpg, png o webp.');
@@ -187,11 +199,16 @@ export function MediaUploader({
     }
 
     if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
-    const previewUrl = kind === 'pdf' ? null : URL.createObjectURL(file);
+    const previewUrl = kind === 'pdf' || kind === 'subtitle' ? null : URL.createObjectURL(file);
     setLocalPreviewUrl(previewUrl);
     setFilename(file.name);
     setBusy(true);
     setProgress(0);
+
+    // Para .vtt el browser puede reportar 'text/plain' o vacío. Forzamos
+    // 'text/vtt' al firmar y al subir para que ambos coincidan.
+    const effectiveContentType =
+      kind === 'subtitle' ? 'text/vtt' : file.type || 'application/octet-stream';
 
     try {
       const presigned = await apiFetch<PresignResponse>('/api/admin/uploads/presign', {
@@ -199,13 +216,19 @@ export function MediaUploader({
         body: JSON.stringify({
           kind,
           filename: file.name,
-          contentType: file.type,
+          contentType: effectiveContentType,
           size: file.size,
           scope,
         }),
       });
       const token = await getAuthToken();
-      await uploadWithProgress(presigned.uploadUrl, file, setProgress, token ?? undefined);
+      await uploadWithProgress(
+        presigned.uploadUrl,
+        file,
+        setProgress,
+        token ?? undefined,
+        effectiveContentType,
+      );
 
       const prev = previousUrlRef.current;
       if (prev && prev !== presigned.publicUrl) {
@@ -254,8 +277,16 @@ export function MediaUploader({
 
   const accept = acceptFor(kind);
   const previewSrc = localPreviewUrl || value;
-  const hasValue = kind === 'pdf' ? Boolean(value || filename) : Boolean(previewSrc);
-  const Icon = kind === 'video' ? Video : kind === 'pdf' ? FileText : ImagePlus;
+  const hasValue =
+    kind === 'pdf' || kind === 'subtitle' ? Boolean(value || filename) : Boolean(previewSrc);
+  const Icon =
+    kind === 'video'
+      ? Video
+      : kind === 'pdf'
+        ? FileText
+        : kind === 'subtitle'
+          ? Captions
+          : ImagePlus;
   const dropzoneClass = `${styles.dropzone} ${compact ? styles.dropzoneSmall : ''} ${
     dragOver ? styles.dropzoneActive : ''
   }`;
@@ -307,16 +338,36 @@ export function MediaUploader({
               </div>
             </div>
           ) : null}
+          {kind === 'subtitle' ? (
+            <div className={styles.pdfPreview}>
+              <Captions size={28} aria-hidden />
+              <div className={styles.pdfPreviewText}>
+                <strong>{filename || (value ? fileBasenameFromUrl(value) : 'Subtítulos VTT')}</strong>
+                {value ? (
+                  <a href={value} target="_blank" rel="noreferrer" className={styles.pdfPreviewLink}>
+                    Descargar archivo
+                  </a>
+                ) : (
+                  <span>Listo para subir.</span>
+                )}
+              </div>
+            </div>
+          ) : null}
           <div className={styles.uploaderInfo}>
             <span>
-              <Icon size={14} aria-hidden /> {filename ||
+              <Icon size={14} aria-hidden />{' '}
+              {filename ||
                 (kind === 'video'
                   ? 'Video subido'
                   : kind === 'pdf'
                     ? value
                       ? fileBasenameFromUrl(value)
                       : 'PDF subido'
-                    : 'Imagen subida')}
+                    : kind === 'subtitle'
+                      ? value
+                        ? fileBasenameFromUrl(value)
+                        : 'Subtítulos VTT'
+                      : 'Imagen subida')}
             </span>
             {busy ? <span>{progress}%</span> : null}
           </div>

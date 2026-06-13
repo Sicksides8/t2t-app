@@ -14,28 +14,6 @@ Lista de funcionalidades que ya están implementadas en el CRM (`apps/web-crm`) 
   - Mostrar pill/badge del tier en el catálogo y en el detalle del curso.
   - Bloquear/permitir acceso según el tier vs el plan activo del usuario.
 
-### Material PDF del curso (`Course.pdfUrl`)
-
-- **Origen**: commit `11ab614`.
-- **Estado en CRM**: se sube a R2 y queda como `t2t_courses.{id}.pdfUrl`.
-- **Pendiente en mobile**: agregar un botón "Material PDF" en el detalle del curso que abra el archivo (visor nativo o WebView).
-
-### Material PDF por módulo (`Lesson.pdfUrl`)
-
-- **Origen**: commit `11ab614`.
-- **Estado en CRM**: se sube por módulo, queda en `t2t_lessons.{id}.pdfUrl`.
-- **Pendiente en mobile**: dentro de la pantalla de la lección/módulo, mostrar un acceso al PDF cuando exista.
-
-### Enlaces externos por módulo (`Lesson.links`)
-
-- **Origen**: commit `ab6cecb` — `crm(courses): enlaces externos por módulo`.
-- **Estado en CRM**: el creador puede sumar N enlaces (`{ label?, url }`) por módulo desde el panel expandido del módulo. Se persiste en `t2t_lessons.{id}.links: ModuleLink[]`.
-- **Pendiente en mobile**:
-  - Renderizar la lista de enlaces dentro de la pantalla del módulo (debajo del video, junto al PDF si existe).
-  - Cada item: `label || url` como texto, abrir en navegador externo (`Linking.openURL`) o WebView interno.
-  - Iconito de cadenita o flecha externa para distinguirlos del resto del contenido.
-  - Si no hay enlaces, no mostrar la sección.
-
 ### Niveles del alumno (`beginner | master | expert`)
 
 - **Origen**: commit `11ab614`.

@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { AppShell } from './layout/AppShell';
+import { MetricCard } from './ui/MetricCard';
 import { apiFetch } from '../lib/api';
-import { formatNumber } from '../lib/format';
-import type { AdminStats, Course } from '../types';
+import { formatCurrency, formatNumber, formatPercent } from '../lib/format';
+import type { AdminStats, Course, RetentionKpis, RevenueKpis } from '../types';
 import styles from '../app/dashboard.module.css';
 
 type CourseWithMeta = Course & {
@@ -29,6 +30,8 @@ function toMillis(value: CourseWithMeta['createdAt']): number {
 export function DashboardView() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [courses, setCourses] = useState<CourseWithMeta[]>([]);
+  const [revenue, setRevenue] = useState<RevenueKpis | null>(null);
+  const [retention, setRetention] = useState<RetentionKpis | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,13 +42,17 @@ export function DashboardView() {
       setLoading(true);
       setError(null);
       try {
-        const [statsData, coursesData] = await Promise.all([
+        const [statsData, coursesData, revenueData, retentionData] = await Promise.all([
           apiFetch<AdminStats>('/api/admin/stats'),
           apiFetch<CourseWithMeta[]>('/api/admin/courses?includeInactive=1'),
+          apiFetch<RevenueKpis>('/api/admin/revenue/summary').catch(() => null),
+          apiFetch<RetentionKpis>('/api/admin/retention/summary').catch(() => null),
         ]);
         if (!cancelled) {
           setStats(statsData);
           setCourses(coursesData);
+          setRevenue(revenueData);
+          setRetention(retentionData);
         }
       } catch (err) {
         if (!cancelled) {
@@ -80,10 +87,29 @@ export function DashboardView() {
       {error ? <p className={styles.error}>{error}</p> : null}
 
       <section className={styles.grid}>
-        <Metric label="Alumnos registrados" value={stats ? formatNumber(stats.totalUsers) : '—'} />
-        <Metric label="Cursos en catalogo" value={stats ? formatNumber(stats.totalCourses) : '—'} />
-        <Metric label="Suscripciones activas" value={stats ? formatNumber(stats.activeSubscriptions) : '—'} />
-        <Metric label="Cursos en el panel" value={formatNumber(courses.length)} />
+        <MetricCard label="Alumnos registrados" value={stats ? formatNumber(stats.totalUsers) : '—'} />
+        <MetricCard label="Cursos en catalogo" value={stats ? formatNumber(stats.totalCourses) : '—'} />
+        <MetricCard label="Suscripciones activas" value={stats ? formatNumber(stats.activeSubscriptions) : '—'} />
+        <MetricCard label="Cursos en el panel" value={formatNumber(courses.length)} />
+      </section>
+
+      <section className={styles.grid} style={{ marginTop: 18 }}>
+        <MetricCard
+          label="MRR"
+          value={revenue ? formatCurrency(revenue.mrr, revenue.currency) : '—'}
+        />
+        <MetricCard
+          label="Ingresos del mes"
+          value={revenue ? formatCurrency(revenue.monthRevenue, revenue.currency) : '—'}
+        />
+        <MetricCard
+          label="Churn mensual"
+          value={retention ? formatPercent(retention.churnMonthly) : '—'}
+        />
+        <MetricCard
+          label="Retencion D7"
+          value={retention ? formatPercent(retention.d7) : '—'}
+        />
       </section>
 
       <section className={styles.panel}>
@@ -130,11 +156,3 @@ export function DashboardView() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <article className={styles.card}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
-  );
-}

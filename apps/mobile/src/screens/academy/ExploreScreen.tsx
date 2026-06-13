@@ -19,6 +19,7 @@ import { fetchCourses } from '../../services/courseService';
 import type { Skill } from '../../types';
 import { useAcademyStore, useAuthStore, useCourseStore } from '../../stores';
 import { humanizeSkillId, normalizeSkillId, sameSkillId } from '../../utils/skillId';
+import { canAccessCourse, getRequiredPlan } from '../../utils/subscriptionAccess';
 import { Colors, Spacing, Typography } from '../../theme';
 import type { Course, RootStackParamList } from '../../types';
 
@@ -146,11 +147,14 @@ export function ExploreScreen() {
 
     if (filters.maxDurationMin) base = base.filter((c) => c.durationMin <= filters.maxDurationMin!);
     if (filters.plan) {
+      // Filtramos contra el plan canónico requerido del curso (deriva de
+      // accessTier; isPremium queda como fallback). FREE/PRO/ELITE matchean
+      // exactamente el tier del curso.
       base = base.filter((c) => {
-        const isPremium = c.isPremium === true;
-        if (filters.plan === 'FREE') return !isPremium;
-        if (filters.plan === 'PRO') return isPremium; // PRO -> incluye premium
-        return isPremium; // MASTER -> incluye premium también (futura granularidad)
+        const required = getRequiredPlan(c);
+        if (filters.plan === 'FREE') return required === 'free';
+        if (filters.plan === 'PRO') return required === 'pro';
+        return required === 'elite';
       });
     }
 
@@ -268,6 +272,7 @@ export function ExploreScreen() {
                 key={course.id}
                 course={course}
                 width={180}
+                locked={!canAccessCourse(course, user)}
                 matchSkillName={
                   isForYou && hasDiagnostic ? skillNameById[course.skillId] : undefined
                 }

@@ -11,15 +11,20 @@ type Props = {
   onPress: () => void;
   progressPercent?: number;
   compact?: boolean;
+  /**
+   * Indica si el user actual NO tiene acceso al curso. Controla el chip de
+   * candado y el gradiente. Si es `undefined` se hace fallback a
+   * `course.isPremium` (compat con callers que aún no calculan acceso).
+   */
+  locked?: boolean;
 };
 
 const MAGENTA_GRADIENT = ['#6E1AAE', '#C040EE'] as const;
 const TEAL_GRADIENT = ['#0E5A52', '#34D6C2'] as const;
 
-export function CourseCard({ course, onPress, progressPercent, compact }: Props) {
-  const tileGradient: readonly [string, string] = course.isPremium
-    ? TEAL_GRADIENT
-    : MAGENTA_GRADIENT;
+export function CourseCard({ course, onPress, progressPercent, compact, locked }: Props) {
+  const showLock = locked ?? Boolean(course.isPremium);
+  const tileGradient: readonly [string, string] = showLock ? TEAL_GRADIENT : MAGENTA_GRADIENT;
 
   return (
     <Pressable
@@ -50,7 +55,7 @@ export function CourseCard({ course, onPress, progressPercent, compact }: Props)
           </View>
         ) : null}
       </View>
-      {course.isPremium ? (
+      {showLock ? (
         <View style={styles.lockChip}>
           <Ionicons name="lock-closed" size={14} color={Colors.textPrimary} />
         </View>

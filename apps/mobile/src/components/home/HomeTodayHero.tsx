@@ -15,7 +15,7 @@ export function HomeTodayHero({ title, meta, thumbnail, onPress }: Props) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.wrap, pressed && styles.pressed]}>
       <LinearGradient
-        colors={[Colors.accentPrimary, Colors.bgSurface]}
+        colors={[Colors.accentHighlight, Colors.accentPrimary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
@@ -33,7 +33,7 @@ export function HomeTodayHero({ title, meta, thumbnail, onPress }: Props) {
         </View>
         <View style={styles.playWrap} pointerEvents="none">
           <View style={styles.playBtn}>
-            <Ionicons name="play" size={28} color={Colors.textPrimary} />
+            <Ionicons name="play" size={28} color={Colors.textPrimary} style={styles.playIcon} />
           </View>
         </View>
         <View style={styles.info}>
@@ -83,17 +83,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 14,
     left: 14,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.accentHighlight,
+    backgroundColor: '#1A003088',
+    borderWidth: 1,
+    borderColor: '#FFFFFF1F',
   },
   badgeText: {
     fontFamily: Typography.caption.fontFamily,
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    color: Colors.bgPrimary,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.3,
+    color: Colors.textPrimary,
   },
   playWrap: {
     position: 'absolute',
@@ -105,13 +107,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   playBtn: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#FFFFFF26',
+    borderWidth: 1,
+    borderColor: '#FFFFFF66',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingLeft: 4,
+  },
+  playIcon: {
+    marginLeft: 3,
   },
   info: {
     paddingHorizontal: 14,

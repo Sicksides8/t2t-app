@@ -1,12 +1,13 @@
 import {
-  addDoc,
   collection,
   doc,
   getDoc,
   getDocs,
+  increment,
   limit,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   where,
@@ -26,6 +27,13 @@ export interface IGamificationRepository {
   getWeeklyChallenge(): Promise<WeeklyChallenge | null>;
   getUserAchievements(userId: string): Promise<Achievement[]>;
   awardLessonCoins(userId: string, courseId: string, lessonId: string): Promise<number>;
+  awardCourseCoins(userId: string, courseId: string): Promise<number>;
+  awardStreakMilestone(userId: string, milestone: number, amount: number): Promise<number>;
+  /**
+   * Emite el certificado / Achievement de finalización de curso de forma idempotente.
+   * Si ya existe un Achievement con el mismo `{userId}_{courseId}` no se vuelve a crear.
+   */
+  awardCourseAchievement(userId: string, courseId: string, courseTitle: string): Promise<Achievement>;
 }
 
 export type WeeklyChallenge = {
@@ -48,20 +56,44 @@ async function firestoreCoins(userId: string): Promise<number> {
   return Number(snap.data()?.coins ?? 0);
 }
 
-async function firestoreAddCoins(userId: string, amount: number, reason: string): Promise<number> {
-  const ref = doc(db, FS_COL.users, userId);
-  const snap = await getDoc(ref);
-  const current = Number(snap.data()?.coins ?? 0);
-  const next = current + amount;
-  await setDoc(ref, { coins: next, updatedAt: serverTimestamp() }, { merge: true });
-  await addDoc(collection(db, FS_COL.coinsTransactions), {
-    userId,
-    amount,
-    type: 'earned',
-    reason,
-    createdAt: serverTimestamp(),
+/**
+ * Suma coins de forma atómica e idempotente.
+ *
+ * - `dedupeKey` arma el id determinista `{userId}_{dedupeKey}` en
+ *   `t2t_coins_transactions`. Si ese doc ya existe, no se vuelve a otorgar.
+ * - Usa `runTransaction` + `increment(amount)` para evitar races entre
+ *   múltiples completaciones simultáneas (dos dispositivos / doble tap).
+ */
+async function firestoreAddCoins(
+  userId: string,
+  amount: number,
+  reason: string,
+  dedupeKey: string,
+): Promise<number> {
+  const userRef = doc(db, FS_COL.users, userId);
+  const txRef = doc(db, FS_COL.coinsTransactions, `${userId}_${dedupeKey}`);
+
+  return runTransaction(db, async (tx) => {
+    const txSnap = await tx.get(txRef);
+    const userSnap = await tx.get(userRef);
+    const current = Number(userSnap.data()?.coins ?? 0);
+
+    if (txSnap.exists()) {
+      return current;
+    }
+
+    tx.set(userRef, { coins: increment(amount), updatedAt: serverTimestamp() }, { merge: true });
+    tx.set(txRef, {
+      userId,
+      amount,
+      type: 'earned',
+      reason,
+      dedupeKey,
+      createdAt: serverTimestamp(),
+    });
+
+    return current + amount;
   });
-  return next;
 }
 
 export const firestoreGamificationRepo: IGamificationRepository = {
@@ -113,7 +145,7 @@ export const firestoreGamificationRepo: IGamificationRepository = {
       return {
         id: 'local_challenge',
         title: 'Desafío de la semana',
-        description: 'Completa 3 micro-lecciones para ganar bonus coins.',
+        description: 'Completa 3 micro-módulos para ganar bonus coins.',
         xpReward: 50,
         targetLessons: 3,
       };
@@ -132,6 +164,7 @@ export const firestoreGamificationRepo: IGamificationRepository = {
           type: data.type || 'course_completed',
           title: data.title,
           description: data.description,
+          courseId: data.courseId,
           earnedAt: data.earnedAt?.toDate?.() || new Date(),
         } as Achievement;
       });
@@ -141,7 +174,68 @@ export const firestoreGamificationRepo: IGamificationRepository = {
   },
 
   async awardLessonCoins(userId, courseId, lessonId) {
-    return firestoreAddCoins(userId, LESSON_COINS, `Lección completada · ${courseId}/${lessonId}`);
+    return firestoreAddCoins(
+      userId,
+      LESSON_COINS,
+      `Módulo completado · ${courseId}/${lessonId}`,
+      `lesson_${courseId}_${lessonId}`,
+    );
+  },
+
+  async awardCourseCoins(userId, courseId) {
+    return firestoreAddCoins(
+      userId,
+      COURSE_COINS,
+      `Curso completado · ${courseId}`,
+      `course_${courseId}`,
+    );
+  },
+
+  async awardStreakMilestone(userId, milestone, amount) {
+    return firestoreAddCoins(
+      userId,
+      amount,
+      `Racha de ${milestone} días`,
+      `streak_${milestone}`,
+    );
+  },
+
+  async awardCourseAchievement(userId, courseId, courseTitle) {
+    // ID determinista para garantizar idempotencia (un certificado por usuario+curso).
+    const achievementId = `${userId}_${courseId}`;
+    const ref = doc(db, FS_COL.achievements, achievementId);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      const data = snap.data();
+      return {
+        id: snap.id,
+        userId: data.userId,
+        type: data.type || 'course_completed',
+        title: data.title,
+        description: data.description,
+        courseId: data.courseId,
+        earnedAt: data.earnedAt?.toDate?.() || new Date(),
+      } as Achievement;
+    }
+
+    await setDoc(ref, {
+      userId,
+      type: 'course_completed',
+      title: courseTitle,
+      description: `Certificado por completar el curso ${courseTitle}`,
+      courseId,
+      earnedAt: serverTimestamp(),
+    });
+
+    return {
+      id: achievementId,
+      userId,
+      type: 'course_completed',
+      title: courseTitle,
+      description: `Certificado por completar el curso ${courseTitle}`,
+      courseId,
+      earnedAt: new Date(),
+    };
   },
 };
 
@@ -182,6 +276,39 @@ const apiGamificationRepo: IGamificationRepository = {
     if (api) return api.coins;
     return firestoreGamificationRepo.awardLessonCoins(userId, courseId, lessonId);
   },
+
+  async awardCourseCoins(userId, courseId) {
+    const api = await tryApi(() =>
+      apiFetch<{ coins: number }>('/api/gamification/course-complete', {
+        method: 'POST',
+        body: JSON.stringify({ courseId }),
+      }),
+    );
+    if (api) return api.coins;
+    return firestoreGamificationRepo.awardCourseCoins(userId, courseId);
+  },
+
+  async awardStreakMilestone(userId, milestone, amount) {
+    const api = await tryApi(() =>
+      apiFetch<{ coins: number }>('/api/gamification/streak-milestone', {
+        method: 'POST',
+        body: JSON.stringify({ milestone, amount }),
+      }),
+    );
+    if (api) return api.coins;
+    return firestoreGamificationRepo.awardStreakMilestone(userId, milestone, amount);
+  },
+
+  async awardCourseAchievement(userId, courseId, courseTitle) {
+    const api = await tryApi(() =>
+      apiFetch<{ achievement: Achievement }>('/api/gamification/course-achievement', {
+        method: 'POST',
+        body: JSON.stringify({ courseId, courseTitle }),
+      }),
+    );
+    if (api?.achievement) return api.achievement;
+    return firestoreGamificationRepo.awardCourseAchievement(userId, courseId, courseTitle);
+  },
 };
 
 export function getGamificationRepo(): IGamificationRepository {
@@ -191,6 +318,24 @@ export function getGamificationRepo(): IGamificationRepository {
 export async function awardLessonCompletion(courseId: string, lessonId: string): Promise<number> {
   const userId = uid();
   return getGamificationRepo().awardLessonCoins(userId, courseId, lessonId);
+}
+
+export async function awardCourseCompletion(courseId: string): Promise<number> {
+  const userId = uid();
+  return getGamificationRepo().awardCourseCoins(userId, courseId);
+}
+
+export async function awardCourseAchievement(
+  courseId: string,
+  courseTitle: string,
+): Promise<Achievement> {
+  const userId = uid();
+  return getGamificationRepo().awardCourseAchievement(userId, courseId, courseTitle);
+}
+
+export async function awardStreakMilestoneCoins(milestone: number, amount: number): Promise<number> {
+  const userId = uid();
+  return getGamificationRepo().awardStreakMilestone(userId, milestone, amount);
 }
 
 export async function getUserCoinsBalance(): Promise<number> {

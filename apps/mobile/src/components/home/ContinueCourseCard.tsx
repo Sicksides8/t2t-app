@@ -11,10 +11,18 @@ type Props = {
   progressPercent: number;
   width?: number;
   onPress: () => void;
+  /** Si true, sustituye el play por un candado para indicar que el user perdió acceso. */
+  locked?: boolean;
 };
 
 /** Tarjeta «Continuá viendo» alineada a Component/Card Continue (NUxQ7) en 52_Home. */
-export function ContinueCourseCard({ course, progressPercent, width = 165, onPress }: Props) {
+export function ContinueCourseCard({
+  course,
+  progressPercent,
+  width = 165,
+  onPress,
+  locked,
+}: Props) {
   const skill = skills.find((s) => s.id === course.skillId);
   const label = skill?.name ?? course.title;
 
@@ -35,7 +43,11 @@ export function ContinueCourseCard({ course, progressPercent, width = 165, onPre
           />
         )}
         <View style={styles.playWrap} pointerEvents="none">
-          <Ionicons name="play" size={18} color={Colors.textPrimary} />
+          <Ionicons
+            name={locked ? 'lock-closed' : 'play'}
+            size={18}
+            color={Colors.textPrimary}
+          />
         </View>
       </View>
       <View style={styles.body}>

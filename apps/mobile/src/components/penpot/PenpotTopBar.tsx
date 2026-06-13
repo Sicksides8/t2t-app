@@ -10,10 +10,18 @@ type Props = {
   onBack?: () => void;
   rightLabel?: string;
   onRightPress?: () => void;
+  hideProgress?: boolean;
 };
 
 /** Barra superior Penpot: back glass 40px + progreso opcional. */
-export function PenpotTopBar({ title, progress, onBack, rightLabel, onRightPress }: Props) {
+export function PenpotTopBar({
+  title,
+  progress,
+  onBack,
+  rightLabel,
+  onRightPress,
+  hideProgress = false,
+}: Props) {
   return (
     <View style={styles.wrap}>
       <View style={styles.row}>
@@ -39,7 +47,7 @@ export function PenpotTopBar({ title, progress, onBack, rightLabel, onRightPress
           <View style={styles.backPlaceholder} />
         )}
       </View>
-      {progress != null ? (
+      {progress != null && !hideProgress ? (
         <View style={styles.progress}>
           <ProgressBar value={progress} />
         </View>

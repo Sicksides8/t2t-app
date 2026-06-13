@@ -7,12 +7,14 @@ import {
   BarChart3,
   Bell,
   BookOpen,
+  DollarSign,
   Gift,
   GraduationCap,
   LayoutDashboard,
   LogOut,
   Settings,
   Tags,
+  TrendingUp,
   Users,
 } from 'lucide-react';
 import { auth } from '../../lib/firebase';
@@ -25,6 +27,8 @@ const items = [
   { href: '/courses', label: 'Cursos', icon: BookOpen },
   { href: '/skills', label: 'Habilidades', icon: Tags },
   { href: '/subscriptions', label: 'Suscripciones', icon: GraduationCap },
+  { href: '/ingresos', label: 'Ingresos', icon: DollarSign },
+  { href: '/retencion', label: 'Retencion', icon: TrendingUp },
   { href: '/codes', label: 'Codigos', icon: Gift },
   { href: '/notifications', label: 'Notificaciones', icon: Bell },
   { href: '/settings', label: 'Settings', icon: Settings },

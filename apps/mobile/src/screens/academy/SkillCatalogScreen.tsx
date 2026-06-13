@@ -9,8 +9,9 @@ import { CourseListSkeleton } from '../../components/ui/Skeleton';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { skills } from '../../data/academy';
 import { fetchCourses } from '../../services/courseService';
-import { useAcademyStore } from '../../stores';
+import { useAcademyStore, useAuthStore } from '../../stores';
 import { sameSkillId } from '../../utils/skillId';
+import { canAccessCourse } from '../../utils/subscriptionAccess';
 import { Colors, Spacing, Typography } from '../../theme';
 import type { Course, RootStackParamList } from '../../types';
 
@@ -38,6 +39,7 @@ export function SkillCatalogScreen({ route, navigation }: NativeStackScreenProps
   const [filters] = useState<CourseFilters>({});
   const [tab, setTab] = useState<Tab>('all');
   const progressMap = useAcademyStore((state) => state.progress);
+  const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,6 +144,7 @@ export function SkillCatalogScreen({ route, navigation }: NativeStackScreenProps
               key={course.id}
               course={course}
               progressPercent={progressMap[course.id]?.percentComplete}
+              locked={!canAccessCourse(course, user)}
               onPress={() => navigation.navigate('CourseDetail', { courseId: course.id })}
             />
           ))}
