@@ -5,16 +5,21 @@ export const MOCK_VIDEO_URL =
 /** @deprecated Usar MOCK_VIDEO_URL */
 export const MOCK_WELCOME_VIDEO_URL = MOCK_VIDEO_URL;
 
+export function isMockVideoUrl(url?: string | null): boolean {
+  const trimmed = (url || '').trim();
+  return !trimmed || trimmed === MOCK_VIDEO_URL || trimmed.includes('t2t-video-mock.mp4');
+}
+
 export function getWelcomeVideoUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_WELCOME_VIDEO_URL?.trim();
   return fromEnv && fromEnv.startsWith('http') ? fromEnv : MOCK_VIDEO_URL;
 }
 
 export function getLessonVideoUrl(url?: string): string {
-  if (url && url.startsWith('http') && !url.includes('example.com')) {
-    return url;
+  const trimmed = (url || '').trim();
+  if (isMockVideoUrl(trimmed)) return '';
+  if (trimmed && trimmed.startsWith('http') && !trimmed.includes('example.com')) {
+    return trimmed;
   }
-  const fromEnv = process.env.EXPO_PUBLIC_MOCK_VIDEO_URL?.trim() || process.env.EXPO_PUBLIC_WELCOME_VIDEO_URL?.trim();
-  if (fromEnv && fromEnv.startsWith('http')) return fromEnv;
-  return MOCK_VIDEO_URL;
+  return '';
 }

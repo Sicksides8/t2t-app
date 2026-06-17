@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
+import type { TextInputProps } from 'react-native';
 import { Colors } from '../../theme';
 
 type Props = {
@@ -9,6 +10,7 @@ type Props = {
   placeholder?: string;
   editable?: boolean;
   multiline?: boolean;
+  autoCapitalize?: TextInputProps['autoCapitalize'];
 };
 
 export function ProfileField({
@@ -18,6 +20,7 @@ export function ProfileField({
   placeholder,
   editable = true,
   multiline,
+  autoCapitalize,
 }: Props) {
   return (
     <View style={styles.wrap}>
@@ -32,6 +35,7 @@ export function ProfileField({
           multiline={multiline}
           editable={editable}
           selectionColor={Colors.accentPrimary}
+          autoCapitalize={autoCapitalize}
         />
       ) : (
         <View style={[styles.input, styles.readonly]}>

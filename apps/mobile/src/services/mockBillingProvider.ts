@@ -129,16 +129,22 @@ async function writePayment(payment: Payment): Promise<void> {
 }
 
 async function mirrorToUser(userId: string, sub: Subscription): Promise<void> {
-  await updateUserFields(userId, {
+  // Firestore rechaza valores `undefined` en setDoc, así que armamos el payload
+  // sólo con los campos definidos para evitar el error
+  // "Unsupported field value: undefined" cuando, por ejemplo, una suscripción
+  // pasa de trial a active y deja de tener trialStartedAt/trialEndsAt.
+  const fields: Parameters<typeof updateUserFields>[1] = {
     subscriptionPlan: sub.planId,
     subscriptionStatus: sub.status,
     subscriptionSource: sub.source,
-    trialStartedAt: sub.trialStartedAt,
-    trialEndsAt: sub.trialEndsAt,
     subscriptionRenewsAt: sub.endDate,
-    subscriptionCancelledAt: sub.cancelledAt,
     subscriptionId: sub.id,
-  });
+  };
+  if (sub.trialStartedAt) fields.trialStartedAt = sub.trialStartedAt;
+  if (sub.trialEndsAt) fields.trialEndsAt = sub.trialEndsAt;
+  if (sub.cancelledAt) fields.subscriptionCancelledAt = sub.cancelledAt;
+
+  await updateUserFields(userId, fields);
 }
 
 // ---------- provider ----------
@@ -178,7 +184,14 @@ export const mockBillingProvider: IBillingProvider = {
     const now = new Date();
     // TODO MERCADOPAGO: en producción el ciclo anual debe consumir el SKU
     // anual de MP/IAP. Fase 1 cobra monthly siempre aunque cycle === 'yearly'.
-    const renewDays = cycle === 'yearly' ? 365 : 30;
+    // Si el caller (ej. canje de código del CRM) pasó durationDaysOverride,
+    // ese valor prevalece sobre el ciclo standard.
+    const renewDays =
+      typeof options?.durationDaysOverride === 'number' && options.durationDaysOverride > 0
+        ? options.durationDaysOverride
+        : cycle === 'yearly'
+        ? 365
+        : 30;
     const endDate = addDays(now, renewDays);
 
     const basePrice = cycle === 'yearly' ? plan.priceYearly : plan.priceMonthly;

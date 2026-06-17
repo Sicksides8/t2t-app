@@ -452,7 +452,7 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
               player={player}
               style={styles.video}
               nativeControls={false}
-              contentFit="contain"
+              contentFit={aspect === 'landscape' ? 'contain' : 'cover'}
               fullscreenOptions={{ enable: true }}
             />
             <View pointerEvents="none" style={styles.centerOverlay}>

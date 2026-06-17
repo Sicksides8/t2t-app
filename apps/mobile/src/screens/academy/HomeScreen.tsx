@@ -9,6 +9,7 @@ import { PaywallModal, SectionHeader } from '../../components/academy';
 import {
   ContinueCourseCard,
   HomeHeader,
+  HomePlanProgressCard,
   HomeSkillChip,
   HomeStreakCard,
   HomeTodayHero,
@@ -165,6 +166,14 @@ export function HomeScreen() {
         activeToday={user?.lastActiveDay === dayKey()}
         freezes={stats.freezes}
       />
+
+      {user?.planHorizonDays ? (
+        <HomePlanProgressCard
+          horizonDays={user.planHorizonDays}
+          startedAt={user.planStartedAt}
+          onPress={() => navigation.navigate('ProfileTab', { screen: 'DiagnosticApp' })}
+        />
+      ) : null}
 
       {heroCourse ? (
         <HomeTodayHero

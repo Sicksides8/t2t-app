@@ -1,5 +1,8 @@
 import { Timestamp } from 'firebase-admin/firestore';
+import type { androidpublisher_v3 } from 'googleapis';
 import type { PaymentRow, PaymentStatus, PaymentMethod, PaymentCycle } from '../types';
+import { getCanonicalPlan, monthlyPriceFor } from './plans';
+import { hasTrialOffer, parsePlayProductId } from './googlePlay';
 
 export function toIso(value: unknown): string | null {
   if (value instanceof Timestamp) return value.toDate().toISOString();
@@ -65,5 +68,61 @@ export function mapPaymentDoc(id: string, data: Record<string, unknown>): Paymen
     status: normalizeStatus(data.status),
     cycle: normalizeCycle(data.cycle),
     couponCode: data.couponCode ? String(data.couponCode) : undefined,
+  };
+}
+
+/**
+ * Convierte una respuesta de purchases.subscriptionsv2.get (Play) en un
+ * `PaymentRow` listo para escribir en `t2t_payments/{orderId}`.
+ *
+ * Usado por googlePlaySync.syncSubscriptionFromPlay y disponible para
+ * cualquier futura herramienta admin que necesite proyectar un purchase
+ * de Play sin reescribir el mapping.
+ *
+ * - Si la sub esta en trial (offer trial-7d), devuelve amount=0 y status=pending
+ *   (Play recien cobra al terminar el trial — el primer cobro real entra como
+ *   un evento RENEWED separado).
+ * - Currency y amount se toman del catalogo canonico de planes, NO del precio
+ *   localizado que Google reporta, para que MRR / LTV sigan en USD.
+ */
+export function mapPlayPurchaseToPayment(params: {
+  userId: string;
+  productId: string;
+  sub: androidpublisher_v3.Schema$SubscriptionPurchaseV2;
+}): PaymentRow | null {
+  const { userId, productId, sub } = params;
+  const parsed = parsePlayProductId(productId);
+  if (!parsed) return null;
+  const orderId = sub.latestOrderId;
+  if (!orderId) return null;
+
+  const { planId, cycle } = parsed;
+  const isTrial = hasTrialOffer(sub);
+  const canonical = getCanonicalPlan(planId);
+  const amount = isTrial
+    ? 0
+    : canonical
+      ? cycle === 'yearly'
+        ? canonical.priceYearly
+        : canonical.priceMonthly
+      : monthlyPriceFor(planId, cycle);
+  const currency = canonical?.currency || 'USD';
+  const planName = canonical?.name || planId.toUpperCase();
+  const cycleLabel = cycle === 'yearly' ? 'anual' : 'mensual';
+
+  const startMs = sub.startTime ? Date.parse(sub.startTime) : Date.now();
+
+  return {
+    id: orderId,
+    userId,
+    plan: planId,
+    planLabel: `${planName} · ${cycleLabel}`,
+    amount,
+    currency,
+    method: 'Google Play',
+    txId: `#${orderId}`,
+    paidAt: new Date(isTrial ? Date.now() : startMs).toISOString(),
+    status: isTrial ? 'pending' : 'paid',
+    cycle,
   };
 }

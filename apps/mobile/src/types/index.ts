@@ -18,6 +18,14 @@ export type SubscriptionSource = 'apple' | 'google' | 'mercadopago' | 'code' | '
 /** Ciclo de facturación. La UI ya muestra anual con descuento, pero en Fase 1 sólo se persiste 'monthly'. */
 export type BillingCycle = 'monthly' | 'yearly';
 
+/**
+ * Horizonte temporal del plan de entrenamiento que el usuario elige
+ * en el onboarding (post-diagnóstico). Activa la versión personalizada
+ * del frame `53_Plan_Personalizado`: título, packs y ruta de hitos
+ * (día 1 / 1+N / checkpoint) se escalan según este valor.
+ */
+export type PlanHorizonDays = 30 | 60 | 90;
+
 export interface User {
   id: string;
   email: string;
@@ -30,6 +38,18 @@ export interface User {
   diagnosticCompleted: boolean;
   /** Respuestas del HooksFlow post-registro: clave = id del paso (ej. 36_Hook_TipoUsuario). */
   hookSelections?: Record<string, string[]>;
+  /**
+   * Horizonte del plan de entrenamiento elegido en el onboarding (30/60/90 días).
+   * Se setea en el step `46b_Hook_Horizonte` y consume el frame final
+   * `53_Plan_Personalizado` para escalar título, packs y ruta de hitos.
+   */
+  planHorizonDays?: PlanHorizonDays;
+  /**
+   * Fecha en la que el usuario arrancó (o re-arrancó) su plan de entrenamiento.
+   * Se setea junto con `planHorizonDays`. La home la usa para calcular
+   * "Día X de N" en el banner del plan.
+   */
+  planStartedAt?: Date;
   selectedPlan?: string;
   /** Espejo del plan canónico del Subscription doc (free|pro|elite). */
   subscriptionPlan?: SubscriptionPlanId;
@@ -188,23 +208,34 @@ export interface Subscription {
 }
 
 /**
- * Cupón / código promocional.
- * - 'percent': descuento porcentual al precio.
- * - 'amount': descuento por monto fijo.
- * - 'trial_extension': suma días al trial (extendsTrialDays).
- * - 'unlock_plan': desbloquea un plan determinado por X días sin cobro (unlocksPlan).
+ * A qué planes aplica un código promocional creado desde el CRM.
+ *  - 'pro' / 'elite': fuerza ese plan al canjear.
+ *  - 'any_paid'    : el usuario elige (o se infiere de selectedPlan).
  */
-export interface Coupon {
+export type SubscriptionCodeAppliesTo = 'pro' | 'elite' | 'any_paid';
+
+/**
+ * Código promocional (fuente de verdad: t2t_subscription_codes/{CODE}).
+ *
+ * Es la representación cliente del doc que crea el CRM en
+ * apps/web-crm/src/app/api/admin/codes/route.ts. Single-use: el campo
+ * `used` queda true tras el primer canje (con `usedBy` + `usedAt`).
+ *
+ * Reglas:
+ *  - `discountPercent` entre 1 y 100. 100 ≡ acceso gratis por `durationDays`.
+ *  - `expiresAt` null/undefined = no expira.
+ *  - `appliesTo` decide el plan al que se aplica.
+ */
+export interface SubscriptionCode {
   code: string;
-  kind: 'percent' | 'amount' | 'trial_extension' | 'unlock_plan';
-  value: number;
-  unlocksPlan?: SubscriptionPlanId;
-  extendsTrialDays?: number;
-  validUntil?: Date;
-  maxRedemptions?: number;
-  redemptionsCount?: number;
-  isActive: boolean;
-  description?: string;
+  title?: string;
+  discountPercent: number;
+  appliesTo: SubscriptionCodeAppliesTo;
+  durationDays: number;
+  expiresAt?: Date;
+  used: boolean;
+  usedBy?: string;
+  usedAt?: Date;
 }
 
 export interface DiagnosticResult {

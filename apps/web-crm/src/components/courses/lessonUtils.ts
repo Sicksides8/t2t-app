@@ -1,4 +1,3 @@
-import { MOCK_VIDEO_URL } from '../../lib/courseConstants';
 import type { Lesson, LessonDraft } from '../../types';
 
 let counter = 0;
@@ -85,7 +84,7 @@ export function draftsFromTitles(titles: string[], startOrder: number): LessonDr
   return cleaned.map((title, i) => ({
     clientId: nextClientId(),
     title,
-    videoUrl: MOCK_VIDEO_URL,
+    videoUrl: '',
     durationSec: 420,
     order: startOrder + i,
     isFree: startOrder + i === 1,

@@ -8,6 +8,7 @@ import {
 } from '../../../../../../lib/courseAdminServer';
 import { adminDb } from '../../../../../../lib/firebase-admin';
 import { FS_COL } from '../../../../../../lib/firestoreCollections';
+import { isMockVideoUrl } from '../../../../../../lib/courseConstants';
 import { handleRouteError } from '../../../../../../lib/routeError';
 import type { SyncCurriculumBody } from '../../../../../../types';
 
@@ -39,9 +40,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       };
     });
 
-    if (lessons.some((l) => !l.title || !l.videoUrl)) {
+    if (lessons.some((l) => !l.title || !l.videoUrl || isMockVideoUrl(l.videoUrl))) {
       return NextResponse.json(
-        { success: false, error: { message: 'Cada modulo requiere titulo y URL de video' } },
+        { success: false, error: { message: 'Cada modulo requiere titulo y video subido (no demo)' } },
         { status: 400 },
       );
     }

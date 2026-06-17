@@ -78,8 +78,24 @@ service cloud.firestore {
     }
 
     match /t2t_subscription_codes/{code} {
-      allow read: if isSignedIn();
-      allow write: if false;
+      // Cualquier user logueado puede consultar un codigo puntual para
+      // canjearlo (get-by-id), pero no listar la coleccion entera.
+      allow get: if isSignedIn();
+      allow list: if false;
+
+      // Self-claim: la app marca el codigo como usado en una transaccion
+      // client-side. Solo se permite si:
+      //   - el codigo aun no fue usado (resource.data.used == false),
+      //   - el update marca used = true,
+      //   - el usedBy es el propio user (no se puede acreditar a otro).
+      // Asi evitamos doble-canje aunque dos clientes lo intenten en paralelo.
+      allow update: if isSignedIn()
+        && resource.data.used == false
+        && request.resource.data.used == true
+        && request.resource.data.usedBy == request.auth.uid;
+
+      // La creacion y borrado de codigos pasa por el Admin SDK desde el CRM.
+      allow create, delete: if false;
     }
 
     match /t2t_coins_transactions/{id} {

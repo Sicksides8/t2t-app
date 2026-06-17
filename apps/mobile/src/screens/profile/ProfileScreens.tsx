@@ -41,14 +41,15 @@ import { getGamificationRepo } from '../../services/gamificationService';
 import { getPaymentById, getPaymentHistory } from '../../services/paymentService';
 import {
   getBillingProvider,
+  getCanonicalPlan,
   getCanonicalPlans,
 } from '../../services/subscriptionService';
-import { applyCouponToUser } from '../../services/couponService';
+import { applyCodeToUser } from '../../services/couponService';
 import { uploadUserAvatar } from '../../services/storageService';
 import { useAcademyStore, useAuthStore, useNotificationStore } from '../../stores';
 import { Colors, Spacing, Typography } from '../../theme';
 import { computeProfileStats } from '../../utils/profileStats';
-import { subscriptionPlanToSeedPlan } from '../../utils/subscriptionAccess';
+import { hasActivePaidPlan, subscriptionPlanToSeedPlan } from '../../utils/subscriptionAccess';
 import { generateAndShareCertificatePdf } from '../../utils/certificatePdf';
 import type {
   Achievement,
@@ -84,12 +85,6 @@ const PROFILE_MENU: ProfileMenuItem[] = [
     screen: 'Progress',
     icon: 'trending-up',
     iconColor: Colors.accentHighlight,
-  },
-  {
-    label: 'Mis planes',
-    screen: 'Subscription',
-    icon: 'map',
-    iconColor: Colors.accentPrimary,
   },
   {
     label: 'Mis T2T Coins',
@@ -191,6 +186,11 @@ export function RedeemCodeScreen({ navigation }: ProfileProps) {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const alreadyPaid = hasActivePaidPlan(user);
+  const currentPlanLabel = user?.subscriptionPlan
+    ? user.subscriptionPlan.toUpperCase()
+    : null;
+
   const submit = async () => {
     const trimmed = code.trim();
     if (!trimmed) {
@@ -201,12 +201,13 @@ export function RedeemCodeScreen({ navigation }: ProfileProps) {
     setBusy(true);
     try {
       // TODO MERCADOPAGO: cuando exista la pasarela real, la validación
-      // del cupón la hace el backend antes de generar la preference.
-      const result = await applyCouponToUser(user.id, trimmed);
+      // del código la hace el backend antes de generar la preference.
+      const result = await applyCodeToUser(user.id, trimmed);
       if (result.ok) {
         await refreshUserProfile();
         Alert.alert('¡Listo!', result.message, [
-          { text: 'OK', onPress: () => navigation.goBack() },
+          { text: 'Ver mi suscripción', onPress: () => navigation.navigate('Subscription') },
+          { text: 'OK', onPress: () => navigation.goBack(), style: 'cancel' },
         ]);
       } else {
         Alert.alert('No se pudo canjear', result.message);
@@ -218,17 +219,46 @@ export function RedeemCodeScreen({ navigation }: ProfileProps) {
     }
   };
 
+  if (alreadyPaid) {
+    return (
+      <ProfileScreenShell title="Canjear código" onBack={() => navigation.goBack()}>
+        <ProfileGiftHero />
+        <View style={styles.redeemBlockedCard}>
+          <Ionicons
+            name="shield-checkmark"
+            size={28}
+            color={Colors.accentHighlight}
+            style={styles.redeemBlockedIcon}
+          />
+          <Text style={styles.redeemBlockedTitle}>
+            Ya tenés {currentPlanLabel ?? 'tu plan'} activo
+          </Text>
+          <Text style={styles.redeemBlockedBody}>
+            Los códigos promocionales son sólo para activar tu primer plan. Como ya tenés una
+            suscripción paga vigente, no podés canjear códigos en este momento.
+          </Text>
+        </View>
+        <Button
+          title="Ver mi suscripción"
+          onPress={() => navigation.navigate('Subscription')}
+        />
+      </ProfileScreenShell>
+    );
+  }
+
   return (
     <ProfileScreenShell title="Canjear código" onBack={() => navigation.goBack()}>
       <ProfileGiftHero />
       <Text style={styles.intro}>
-        Ingresá el código que recibiste por email o promoción para activar tu plan o beneficios.
+        Ingresá el código para activar tu plan con descuento. Sólo para usuarios que aún no
+        tienen un plan pago.
       </Text>
       <ProfileField
         label="Código promocional"
         value={code}
-        onChangeText={setCode}
+        onChangeText={(t) => setCode(t.toUpperCase())}
         placeholder="Ej. T2T-LAUNCH-30D"
+        autoCapitalize="characters"
       />
       <Button title="Canjear" loading={busy} onPress={() => void submit()} />
     </ProfileScreenShell>
@@ -317,8 +347,18 @@ export function EditProfileScreen({ navigation }: ProfileProps) {
 export function SubscriptionScreen({ navigation }: ProfileProps) {
   const user = useAuthStore((state) => state.user);
   const refreshUserProfile = useAuthStore((state) => state.refreshUserProfile);
+  // Construimos el Plan que muestra la card desde el catálogo canónico
+  // (free/pro/elite) para que el nombre y el precio sean los reales.
+  // El seed legacy se usa sólo como fallback para features/durationDays.
   const seedPlanId = subscriptionPlanToSeedPlan(user?.subscriptionPlan);
-  const plan = plans.find((p) => p.id === seedPlanId) || plans[0];
+  const seedPlan = plans.find((p) => p.id === seedPlanId) || plans[0];
+  const canonical = getCanonicalPlan(user?.subscriptionPlan ?? 'free');
+  const plan = {
+    ...seedPlan,
+    name: canonical.name,
+    price: canonical.priceMonthly,
+    currency: canonical.currency,
+  };
   const [payments, setPayments] = useState<import('../../types').Payment[]>([]);
   const [busy, setBusy] = useState(false);
   const [changeOpen, setChangeOpen] = useState(false);
@@ -351,7 +391,8 @@ export function SubscriptionScreen({ navigation }: ProfileProps) {
               await getBillingProvider().cancel(user.id);
               await refreshUserProfile();
               Alert.alert('Listo', 'Tu plan fue cancelado. Mantenés el acceso hasta el vencimiento.');
-            } catch {
+            } catch (err) {
+              console.error('[SubscriptionScreen] cancel failed:', err);
               Alert.alert('Error', 'No se pudo cancelar. Intentá de nuevo.');
             } finally {
               setBusy(false);
@@ -374,7 +415,8 @@ export function SubscriptionScreen({ navigation }: ProfileProps) {
       const list = await getPaymentHistory(user.id);
       setPayments(list);
       Alert.alert('Plan actualizado', `Tu nuevo plan es ${newPlanId.toUpperCase()}.`);
-    } catch {
+    } catch (err) {
+      console.error('[SubscriptionScreen] changePlan failed:', err);
       Alert.alert('Error', 'No se pudo cambiar el plan. Intentá de nuevo.');
     } finally {
       setBusy(false);
@@ -1076,6 +1118,32 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
     marginBottom: Spacing.sm,
+  },
+  redeemBlockedCard: {
+    backgroundColor: 'rgba(42, 16, 82, 0.55)',
+    borderWidth: 1,
+    borderColor: '#FFFFFF1F',
+    borderRadius: 20,
+    padding: 20,
+    marginVertical: Spacing.md,
+    alignItems: 'center',
+    gap: 8,
+  },
+  redeemBlockedIcon: {
+    marginBottom: 4,
+  },
+  redeemBlockedTitle: {
+    ...Typography.body,
+    fontWeight: '800',
+    fontSize: 17,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+  },
+  redeemBlockedBody: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   muted: {
     ...Typography.body,

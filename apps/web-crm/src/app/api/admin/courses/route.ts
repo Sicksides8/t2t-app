@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '../../../../lib/authHelper';
-import { MOCK_VIDEO_URL } from '../../../../lib/courseConstants';
 import {
   computeCourseStats,
   sanitizeModuleLinks,
   sanitizeSubtitles,
   syncCourseCurriculum,
 } from '../../../../lib/courseAdminServer';
+import { isMockVideoUrl } from '../../../../lib/courseConstants';
 import { adminDb } from '../../../../lib/firebase-admin';
 import { FS_COL } from '../../../../lib/firestoreCollections';
 import { withoutUndefined } from '../../../../lib/firestoreDoc';
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       const subtitles = sanitizeSubtitles(lesson.subtitles);
       return {
         title: String(lesson.title || `Modulo ${index + 1}`).trim(),
-        videoUrl: String(lesson.videoUrl || MOCK_VIDEO_URL).trim(),
+        videoUrl: String(lesson.videoUrl || '').trim(),
         ...(pdfUrl ? { pdfUrl } : {}),
         ...(links.length > 0 ? { links } : {}),
         ...(subtitles.length > 0 ? { subtitles } : {}),
@@ -63,6 +63,17 @@ export async function POST(request: NextRequest) {
         isFree: Boolean(lesson.isFree ?? index === 0),
       };
     });
+
+    if (
+      lessonsInput.some(
+        (l) => !l.title || !l.videoUrl || isMockVideoUrl(l.videoUrl),
+      )
+    ) {
+      return NextResponse.json(
+        { success: false, error: { message: 'Cada modulo requiere titulo y video subido (no demo)' } },
+        { status: 400 },
+      );
+    }
 
     const stats = computeCourseStats(lessonsInput);
     const now = new Date();

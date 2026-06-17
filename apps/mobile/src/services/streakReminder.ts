@@ -31,7 +31,10 @@ async function ensureAndroidChannel(): Promise<void> {
     await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
       name: 'Recordatorios de racha',
       importance: Notifications.AndroidImportance.HIGH,
-      sound: 'default',
+      // Omitimos `sound` a propósito: expo-notifications interpreta cualquier
+      // string (incluido 'default') como nombre de archivo en `res/raw` y
+      // loguea un error si no existe. Sin la key, el canal hereda
+      // Settings.System.DEFAULT_NOTIFICATION_URI (sonido del sistema).
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#FF7A1A',
     });

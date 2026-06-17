@@ -16,6 +16,8 @@ type MediaUploaderProps = {
   compact?: boolean;
   /** Llamado cuando ya hay value y el usuario lo reemplaza/quita. Útil para limpiar el orphan de R2. */
   onPrevReplaced?: (prevUrl: string) => void;
+  /** true al iniciar subida, false al terminar (éxito o error). */
+  onBusyChange?: (busy: boolean) => void;
 };
 
 type PresignResponse = {
@@ -129,6 +131,7 @@ export function MediaUploader({
   disabled,
   compact = false,
   onPrevReplaced,
+  onBusyChange,
 }: MediaUploaderProps) {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -138,10 +141,22 @@ export function MediaUploader({
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const previousUrlRef = useRef<string | undefined>(value);
+  const busyRef = useRef(false);
 
   useEffect(() => {
     previousUrlRef.current = value;
   }, [value]);
+
+  useEffect(() => {
+    busyRef.current = busy;
+    onBusyChange?.(busy);
+  }, [busy, onBusyChange]);
+
+  useEffect(() => {
+    return () => {
+      if (busyRef.current) onBusyChange?.(false);
+    };
+  }, [onBusyChange]);
 
   useEffect(() => {
     return () => {

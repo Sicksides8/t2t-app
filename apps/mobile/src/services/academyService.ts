@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { FS_COL } from '../constants/firestoreCollections';
 import { db } from './firebase';
 import { plans as staticPlans, skills as staticSkills } from '../data/academy';
@@ -124,13 +124,5 @@ export async function saveDiagnostic(userId: string, result: DiagnosticResult): 
     ...result,
     userId,
     completedAt: serverTimestamp(),
-  });
-}
-
-export async function redeemCode(userId: string, code: string): Promise<void> {
-  await addDoc(collection(db, FS_COL.subscriptionRedemptions), {
-    userId,
-    code: code.trim().toUpperCase(),
-    createdAt: serverTimestamp(),
   });
 }

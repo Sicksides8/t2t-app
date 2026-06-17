@@ -1,7 +1,7 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { FieldValue } from 'firebase-admin/firestore';
 import { FS_COL } from './firestoreCollections';
-import { DEFAULT_MODULE_TITLE } from './courseConstants';
+import { DEFAULT_MODULE_TITLE, MOCK_VIDEO_URL } from './courseConstants';
 import type { Course, CourseModule, Lesson, ModuleLink, SubtitleTrack } from '../types';
 
 export type LessonInput = {
@@ -105,6 +105,12 @@ export async function syncCourseCurriculum(
 
   const existingLessons = await db.collection(FS_COL.lessons).where('courseId', '==', courseId).get();
   const incomingIds = new Set(lessonsInput.filter((l) => l.id).map((l) => l.id as string));
+  const existingVideoById = new Map<string, string>();
+  for (const doc of existingLessons.docs) {
+    const raw = doc.data().videoUrl;
+    const url = typeof raw === 'string' ? raw.trim() : '';
+    if (url) existingVideoById.set(doc.id, url);
+  }
 
   const batch = db.batch();
 
@@ -123,12 +129,22 @@ export async function syncCourseCurriculum(
       const pdfUrl = item.pdfUrl ? String(item.pdfUrl).trim() : '';
       const links = sanitizeModuleLinks(item.links);
       const subtitles = sanitizeSubtitles(item.subtitles);
+      let videoUrl = item.videoUrl.trim();
+      const existingUrl = existingVideoById.get(id);
+      if (
+        existingUrl &&
+        existingUrl !== MOCK_VIDEO_URL &&
+        existingUrl.startsWith('http') &&
+        (!videoUrl || videoUrl === MOCK_VIDEO_URL)
+      ) {
+        videoUrl = existingUrl;
+      }
       return {
         id,
         courseId,
         moduleId: modId,
         title: item.title.trim(),
-        videoUrl: item.videoUrl.trim(),
+        videoUrl,
         ...(pdfUrl ? { pdfUrl } : {}),
         ...(links.length > 0 ? { links } : {}),
         ...(subtitles.length > 0 ? { subtitles } : {}),

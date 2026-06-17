@@ -4,20 +4,21 @@
  * Capa pública del dominio de suscripciones. Expone:
  *   - fetchPlans()           : catálogo legacy de planes (mantiene compat con perfil)
  *   - getCanonicalPlans()    : catálogo canónico free|pro|elite usado por billing
- *   - redeemSubscriptionCode : compatibilidad con API HTTP histórica
  *   - getBillingProvider()   : selector Strategy Pattern del proveedor de billing
  *
- * Strategy Pattern (clave para migrar a MercadoPago / IAP):
- *   Hoy `getBillingProvider()` retorna SIEMPRE `mockBillingProvider` (Fase 1).
+ * Strategy Pattern:
+ *   - DEFAULT  -> mockBillingProvider en todas las plataformas. Simula trial,
+ *     cobro, cancelación y renovaciones contra Firestore sin tocar pasarelas
+ *     reales. Es el modo seguro para Expo Go, dev builds y demos al cliente.
+ *   - OPT-IN   -> setear EXPO_PUBLIC_USE_GOOGLE_BILLING=1 activa
+ *     googlePlayBillingProvider en Android (requiere EAS Build con plugin
+ *     expo-iap + SKUs creados en Play Console + service account en backend).
+ *   - TODO     -> appleIAPProvider (StoreKit2) y mercadoPagoProvider.
  *
- *   TODO MERCADOPAGO: cuando esté la pasarela real, este selector decide
- *   en runtime qué provider devolver. Sugerencia:
- *     - iOS  -> appleIAPProvider
- *     - Android -> googleIAPProvider (Play Billing)
- *     - Otros / Web -> mercadoPagoProvider
  *   La firma de los providers (IBillingProvider) NO cambia, así el resto
- *   de la app (hooks flow, perfil, gating, cupones) sigue funcionando sin tocar.
+ *   de la app (hooks flow, perfil, gating, códigos) sigue funcionando sin tocar.
  */
+import { Platform } from 'react-native';
 import type {
   BillingCycle,
   Plan,
@@ -28,9 +29,9 @@ import type {
 import { plans as seedPlans } from '../data/academy';
 import { apiFetch, hasApiBaseUrl } from './api';
 import { mockBillingProvider } from './mockBillingProvider';
+import { googlePlayBillingProvider } from './billing/googlePlayBillingProvider';
 
 type PlansResponse = { success: boolean; data: Plan[] };
-type RedeemResponse = { success: boolean; data?: { subscriptionId: string } };
 
 export interface CanonicalPlan {
   id: SubscriptionPlanId;
@@ -102,24 +103,6 @@ export async function fetchPlans(): Promise<Plan[]> {
 }
 
 /**
- * Compatibilidad con la API HTTP histórica de redención de códigos.
- * Si EXPO_PUBLIC_API_BASE_URL no está configurada devuelve null y el
- * caller debe usar couponService.applyCouponToUser() como fuente de verdad.
- */
-export async function redeemSubscriptionCode(code: string): Promise<string | null> {
-  if (!hasApiBaseUrl()) return null;
-  try {
-    const response = await apiFetch<RedeemResponse>('/api/subscriptions/redeem', {
-      method: 'POST',
-      body: JSON.stringify({ code }),
-    });
-    return response.data?.subscriptionId || null;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Provider de billing.
  *
  * Cualquier flujo de la app que necesite iniciar trial, cobrar, cancelar
@@ -136,7 +119,15 @@ export interface IBillingProvider {
     planId: SubscriptionPlanId,
     cycle: BillingCycle,
     source: SubscriptionSource,
-    options?: { couponCode?: string; discountPercent?: number },
+    options?: {
+      couponCode?: string;
+      discountPercent?: number;
+      /**
+       * Override de los días de cobertura. Útil cuando el código del CRM
+       * define `durationDays` distintos al ciclo standard (30 monthly / 365 yearly).
+       */
+      durationDaysOverride?: number;
+    },
   ): Promise<Subscription>;
   /** Marca cancelada. El acceso se mantiene hasta endDate/subscriptionRenewsAt. */
   cancel(userId: string): Promise<Subscription>;
@@ -149,15 +140,23 @@ export interface IBillingProvider {
 }
 
 /**
- * TODO MERCADOPAGO: reemplazar este return por la lógica real cuando se
- * conecte la pasarela. Hoy retorna siempre el mock en cualquier plataforma.
+ * Selector del provider activo (opt-in, default seguro).
  *
- * Ejemplo futuro:
- *   import { Platform } from 'react-native';
- *   if (Platform.OS === 'ios')     return appleIAPProvider;
- *   if (Platform.OS === 'android') return googleIAPProvider;
- *   return mercadoPagoProvider;
+ *   - Default: mockBillingProvider en TODAS las plataformas. Mientras no
+ *     haya credenciales reales de Play Console / Apple / MercadoPago, el
+ *     mock cubre el flujo end-to-end (trial, cobro, cancel, renew) contra
+ *     Firestore y deja la UI / CRM totalmente funcionales.
+ *   - Opt-in Google Play: setear EXPO_PUBLIC_USE_GOOGLE_BILLING=1 y correr
+ *     en Android con EAS Build. Requiere ademas:
+ *       * SKUs creados en Play Console (ver googlePlaySkus.ts).
+ *       * Service account + RTDN configurados en web-crm (ver .env.local.example).
+ *
+ * No cambiar este selector si no se cumplen TODAS las precondiciones — la
+ * app se rompe en Android (fetchProducts devuelve vacío, requestPurchase
+ * tira NotPrepared).
  */
 export function getBillingProvider(): IBillingProvider {
+  const useGoogle = process.env.EXPO_PUBLIC_USE_GOOGLE_BILLING === '1';
+  if (useGoogle && Platform.OS === 'android') return googlePlayBillingProvider;
   return mockBillingProvider;
 }

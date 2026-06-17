@@ -151,6 +151,70 @@
   font-weight: 600;
 }
 
+.footerBlockers {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #ffb8c4;
+  font-size: 13px;
+  line-height: 1.45;
+  max-width: min(480px, 58vw);
+}
+
+.footerBlockers strong {
+  color: #ff8fa3;
+  font-weight: 600;
+}
+
+.footerBlockers ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.footerBlockers li {
+  margin: 0;
+}
+
+.sectionIssueHint {
+  color: #ff8fa3;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.lessonsValidationBanner {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 92, 122, 0.45);
+  background: rgba(255, 92, 122, 0.08);
+  color: #ffb8c4;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.lessonsValidationBanner strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #ff8fa3;
+}
+
+.lessonsValidationBanner ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.lessonsValidationBanner li {
+  margin: 0;
+}
+
+.lessonRowError {
+  margin: 0;
+  padding: 0 12px 10px 52px;
+  font-size: 12px;
+  color: var(--error);
+  line-height: 1.4;
+}
+
 .section {
   border: 1px solid var(--divider);
   border-radius: 18px;
@@ -500,6 +564,10 @@
   cursor: not-allowed;
 }
 
+.primaryBtnInactive {
+  opacity: 0.72;
+}
+
 .secondaryBtn {
   border: 1px solid var(--divider);
   color: var(--text-primary);
@@ -632,6 +700,12 @@
   background: rgba(76, 195, 91, 0.18);
   border-color: rgba(76, 195, 91, 0.45);
   color: #b9efbe;
+}
+
+.lessonBadgeMock {
+  background: rgba(255, 193, 7, 0.15);
+  border-color: rgba(255, 193, 7, 0.45);
+  color: #ffd666;
 }
 
 .lessonRowActions {

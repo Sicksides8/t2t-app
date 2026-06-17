@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { AppShell } from './layout/AppShell';
@@ -16,7 +16,11 @@ export function WelcomeVideoView() {
   const [currentUrl, setCurrentUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const persistSeqRef = useRef(0);
+
+  const busy = saving || uploading;
 
   const load = useCallback(async () => {
     try {
@@ -37,22 +41,27 @@ export function WelcomeVideoView() {
 
   const persist = useCallback(
     async (videoUrl: string | null, options?: { onSuccessMessage?: string }) => {
+      const seq = ++persistSeqRef.current;
       setSaving(true);
       try {
         const data = await apiFetch<ConfigResponse>('/api/admin/welcome-video', {
           method: 'PUT',
           body: JSON.stringify({ videoUrl }),
         });
+        if (seq !== persistSeqRef.current) return;
         setCurrentUrl(data.welcomeVideoUrl);
         toast.show({
           tone: 'success',
           message: options?.onSuccessMessage ?? 'Configuracion actualizada',
         });
       } catch (err) {
+        if (seq !== persistSeqRef.current) return;
         const message = err instanceof Error ? err.message : 'No se pudo guardar';
         toast.show({ tone: 'error', message });
       } finally {
-        setSaving(false);
+        if (seq === persistSeqRef.current) {
+          setSaving(false);
+        }
       }
     },
     [toast],
@@ -89,7 +98,11 @@ export function WelcomeVideoView() {
         ) : (
           <>
             <div className={styles.statusRow}>
-              {currentUrl ? (
+              {uploading ? (
+                <span className={styles.badge}>Subiendo video...</span>
+              ) : saving ? (
+                <span className={styles.badge}>Guardando...</span>
+              ) : currentUrl ? (
                 <span className={`${styles.badge} ${styles.badgeCustom}`}>
                   Video custom activo
                 </span>
@@ -106,7 +119,8 @@ export function WelcomeVideoView() {
                 scope="welcome"
                 value={currentUrl ?? undefined}
                 onChange={(url) => handleUpload(url)}
-                disabled={saving}
+                onBusyChange={setUploading}
+                disabled={busy}
               />
             </div>
 
@@ -115,7 +129,7 @@ export function WelcomeVideoView() {
                 <button
                   type="button"
                   className={styles.dangerBtn}
-                  disabled={saving}
+                  disabled={busy}
                   onClick={() => setConfirmRemove(true)}
                 >
                   <Trash2 size={14} /> Quitar y usar fallback demo
@@ -132,7 +146,7 @@ export function WelcomeVideoView() {
           confirmLabel="Quitar"
           cancelLabel="Cancelar"
           tone="danger"
-          loading={saving}
+          loading={busy}
           onConfirm={handleRemove}
           onCancel={() => setConfirmRemove(false)}
         />

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
@@ -32,6 +32,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { LessonDraft, ModuleLink } from '../../types';
+import { isMockVideoUrl } from '../../lib/courseConstants';
 import { MediaUploader } from './MediaUploader';
 import { SubtitlesEditor } from './SubtitlesEditor';
 import {
@@ -45,13 +46,20 @@ import {
 } from './lessonUtils';
 import styles from './CourseModal.module.css';
 
+export type LessonsChangeHandler = (
+  lessons: LessonDraft[] | ((prev: LessonDraft[]) => LessonDraft[]),
+) => void;
+
 type LessonListEditorProps = {
   lessons: LessonDraft[];
-  onChange: (lessons: LessonDraft[]) => void;
+  onChange: LessonsChangeHandler;
   onAssetReplaced?: (url: string) => void;
+  onUploadsBusyChange?: (busy: boolean) => void;
   scope?: string;
   /** Si true, marcamos como inválida cualquier lección sin título o sin URL de video. */
   validateMedia?: boolean;
+  /** Muestra mensajes y bordes de error (p. ej. tras intentar guardar). */
+  showFieldHints?: boolean;
   disabled?: boolean;
 };
 
@@ -59,12 +67,20 @@ export function LessonListEditor({
   lessons,
   onChange,
   onAssetReplaced,
+  onUploadsBusyChange,
   scope = 'new',
   validateMedia = false,
+  showFieldHints = false,
   disabled,
 }: LessonListEditorProps) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
+  const uploadsBusyRef = useRef(0);
+
+  const trackUploadBusy = (busy: boolean) => {
+    uploadsBusyRef.current = Math.max(0, uploadsBusyRef.current + (busy ? 1 : -1));
+    onUploadsBusyChange?.(uploadsBusyRef.current > 0);
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -72,12 +88,14 @@ export function LessonListEditor({
   );
 
   function update(clientId: string, patch: Partial<LessonDraft>) {
-    onChange(lessons.map((item) => (item.clientId === clientId ? { ...item, ...patch } : item)));
+    onChange((prev) =>
+      prev.map((item) => (item.clientId === clientId ? { ...item, ...patch } : item)),
+    );
   }
 
   function remove(clientId: string) {
-    onChange(
-      lessons.filter((item) => item.clientId !== clientId).map((item, index) => ({ ...item, order: index + 1 })),
+    onChange((prev) =>
+      prev.filter((item) => item.clientId !== clientId).map((item, index) => ({ ...item, order: index + 1 })),
     );
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -87,14 +105,19 @@ export function LessonListEditor({
   }
 
   function add() {
-    const fresh = newLessonDraft(lessons.length + 1);
-    onChange([...lessons, fresh]);
-    setExpanded((prev) => new Set(prev).add(fresh.clientId));
+    let newClientId = '';
+    onChange((prev) => {
+      const fresh = newLessonDraft(prev.length + 1);
+      newClientId = fresh.clientId;
+      return [...prev, fresh];
+    });
+    if (newClientId) {
+      setExpanded((exp) => new Set(exp).add(newClientId));
+    }
   }
 
   function duplicate(clientId: string) {
-    const next = duplicateDraft(lessons, clientId);
-    onChange(next);
+    onChange((prev) => duplicateDraft(prev, clientId));
   }
 
   function toggleExpanded(clientId: string) {
@@ -109,17 +132,42 @@ export function LessonListEditor({
   function onDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const from = lessons.findIndex((l) => l.clientId === active.id);
-    const to = lessons.findIndex((l) => l.clientId === over.id);
-    if (from < 0 || to < 0) return;
-    const next = arrayMove(lessons, from, to).map(lessonFromDraft);
-    onChange(next);
+    onChange((prev) => {
+      const from = prev.findIndex((l) => l.clientId === active.id);
+      const to = prev.findIndex((l) => l.clientId === over.id);
+      if (from < 0 || to < 0) return prev;
+      return arrayMove(prev, from, to).map(lessonFromDraft);
+    });
   }
 
   const ids = useMemo(() => lessons.map((l) => l.clientId), [lessons]);
 
+  const validationSummary = useMemo(() => {
+    if (!validateMedia || !showFieldHints) return [];
+    const issues: string[] = [];
+    lessons.forEach((lesson, index) => {
+      const missing: string[] = [];
+      if (!lesson.title.trim()) missing.push('título');
+      if (!lesson.videoUrl?.trim() || isMockVideoUrl(lesson.videoUrl)) missing.push('video');
+      if (missing.length) {
+        issues.push(`Módulo ${index + 1}: falta ${missing.join(' y ')}`);
+      }
+    });
+    return issues;
+  }, [lessons, validateMedia, showFieldHints]);
+
   return (
     <div className={styles.lessonList}>
+      {validationSummary.length > 0 ? (
+        <div className={styles.lessonsValidationBanner} role="status">
+          <strong>Completá cada módulo antes de guardar:</strong>
+          <ul>
+            {validationSummary.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {lessons.length === 0 ? (
         <p className={styles.hint}>Aún no hay módulos. Agregá el primero para empezar.</p>
       ) : null}
@@ -133,14 +181,16 @@ export function LessonListEditor({
               total={lessons.length}
               expanded={expanded.has(lesson.clientId)}
               validateMedia={validateMedia}
+              showFieldHints={showFieldHints}
               disabled={disabled}
               scope={scope}
               onToggle={() => toggleExpanded(lesson.clientId)}
               onUpdate={(patch) => update(lesson.clientId, patch)}
               onRemove={() => remove(lesson.clientId)}
               onDuplicate={() => duplicate(lesson.clientId)}
-              onMove={(dir) => onChange(moveDraft(lessons, lesson.clientId, dir))}
+              onMove={(dir) => onChange((prev) => moveDraft(prev, lesson.clientId, dir))}
               onAssetReplaced={onAssetReplaced}
+              onUploadBusyChange={trackUploadBusy}
             />
           ))}
         </SortableContext>
@@ -159,8 +209,10 @@ export function LessonListEditor({
         <BulkPasteModal
           onCancel={() => setBulkOpen(false)}
           onConfirm={(titles) => {
-            const generated = draftsFromTitles(titles, lessons.length + 1);
-            onChange([...lessons, ...generated].map(lessonFromDraft));
+            onChange((prev) => {
+              const generated = draftsFromTitles(titles, prev.length + 1);
+              return [...prev, ...generated].map(lessonFromDraft);
+            });
             setBulkOpen(false);
           }}
         />
@@ -175,6 +227,7 @@ type SortableLessonRowProps = {
   total: number;
   expanded: boolean;
   validateMedia: boolean;
+  showFieldHints: boolean;
   disabled?: boolean;
   scope: string;
   onToggle: () => void;
@@ -183,6 +236,7 @@ type SortableLessonRowProps = {
   onDuplicate: () => void;
   onMove: (direction: -1 | 1) => void;
   onAssetReplaced?: (url: string) => void;
+  onUploadBusyChange?: (busy: boolean) => void;
 };
 
 function SortableLessonRow({
@@ -191,6 +245,7 @@ function SortableLessonRow({
   total,
   expanded,
   validateMedia,
+  showFieldHints,
   disabled,
   scope,
   onToggle,
@@ -199,6 +254,7 @@ function SortableLessonRow({
   onDuplicate,
   onMove,
   onAssetReplaced,
+  onUploadBusyChange,
 }: SortableLessonRowProps) {
   const sortable = useSortable({ id: lesson.clientId, disabled });
   const style: React.CSSProperties = {
@@ -207,14 +263,15 @@ function SortableLessonRow({
   };
 
   const titleMissing = !lesson.title.trim();
-  const videoMissing = validateMedia && !lesson.videoUrl?.trim();
+  const videoMissing = validateMedia && (!lesson.videoUrl?.trim() || isMockVideoUrl(lesson.videoUrl));
   const isInvalid = titleMissing || videoMissing;
+  const showHints = showFieldHints && validateMedia;
 
   return (
     <div
       ref={sortable.setNodeRef}
       style={style}
-      className={`${styles.lessonCard} ${isInvalid ? styles.lessonRowInvalid : ''} ${
+      className={`${styles.lessonCard} ${showHints && isInvalid ? styles.lessonRowInvalid : ''} ${
         sortable.isDragging ? styles.lessonRowDragging : ''
       }`}
     >
@@ -230,11 +287,14 @@ function SortableLessonRow({
         </button>
         <span className={styles.lessonNumber}>{index + 1}</span>
         <input
-          className={styles.lessonTitleInput}
+          className={`${styles.lessonTitleInput} ${
+            showHints && titleMissing ? styles.inputInvalid : ''
+          }`}
           value={lesson.title}
           onChange={(e) => onUpdate({ title: e.target.value })}
           placeholder={`Título del módulo ${index + 1}`}
           disabled={disabled}
+          aria-invalid={showHints && titleMissing ? true : undefined}
         />
         <div className={styles.lessonBadges}>
           <span className={styles.lessonBadge}>{formatDurationMMSS(lesson.durationSec)}</span>
@@ -289,14 +349,25 @@ function SortableLessonRow({
           </button>
         </div>
       </div>
+      {showHints && isInvalid ? (
+        <p className={styles.lessonRowError}>
+          {titleMissing ? 'Falta el título.' : null}
+          {titleMissing && videoMissing ? ' ' : null}
+          {videoMissing ? 'Subí un video (expandí el módulo).' : null}
+        </p>
+      ) : null}
       {expanded ? (
         <div className={styles.lessonExpanded}>
           <div className={styles.lessonExpandedLabel}>Video del módulo</div>
+          {showHints && videoMissing ? (
+            <span className={styles.errorText}>Subí un archivo de video para este módulo.</span>
+          ) : null}
           <MediaUploader
             kind="video"
             value={lesson.videoUrl || undefined}
             scope={scope}
             disabled={disabled}
+            onBusyChange={onUploadBusyChange}
             onPrevReplaced={(url) => onAssetReplaced?.(url)}
             onChange={(url, meta) => {
               const patch: Partial<LessonDraft> = { videoUrl: url || '' };
@@ -313,6 +384,7 @@ function SortableLessonRow({
             value={lesson.pdfUrl || undefined}
             scope={scope}
             disabled={disabled}
+            onBusyChange={onUploadBusyChange}
             onPrevReplaced={(url) => onAssetReplaced?.(url)}
             onChange={(url) => onUpdate({ pdfUrl: url || '' })}
           />
@@ -522,8 +594,7 @@ function BulkPasteModal({
       >
         <h3 style={{ margin: 0, fontSize: 18 }}>Pegar lista de títulos</h3>
         <p className={styles.hint}>
-          Un módulo por línea. Te creamos {titles.length || 'N'} módulos nuevos con título y un video por
-          defecto que podrás reemplazar después.
+          Un módulo por línea. Te creamos {titles.length || 'N'} módulos nuevos con título; subí el video de cada uno después.
         </p>
         <textarea
           className={styles.textarea}

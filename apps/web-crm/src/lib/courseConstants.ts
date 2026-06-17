@@ -4,6 +4,11 @@ import type { CourseAccessTier, CourseLevel } from '../types';
 export const MOCK_VIDEO_URL =
   'https://pub-cbb826460242448e83ebe8b4ed4e375e.r2.dev/t2t-video-mock.mp4';
 
+export function isMockVideoUrl(url?: string | null): boolean {
+  const trimmed = (url || '').trim();
+  return !trimmed || trimmed === MOCK_VIDEO_URL || trimmed.includes('t2t-video-mock.mp4');
+}
+
 /**
  * Sugerencias para el campo libre de habilidad/categoría.
  * El creador puede escribir cualquier valor, estas son solo atajos rápidos.

@@ -18,6 +18,7 @@ import {
   LEVEL_OPTIONS,
   MOCK_VIDEO_URL,
   SKILL_SUGGESTIONS,
+  isMockVideoUrl,
 } from '../../lib/courseConstants';
 import type {
   Course,
@@ -128,15 +129,73 @@ function computeCoverSection(snapshot: CourseFormSnapshot): SectionState {
   return 'partial';
 }
 
-function computeLessonsSection(snapshot: CourseFormSnapshot, mode: Mode): SectionState {
+function computeLessonsSection(snapshot: CourseFormSnapshot): SectionState {
   if (snapshot.lessons.length === 0) return 'invalid';
   const hasInvalidTitle = snapshot.lessons.some((l) => !l.title.trim());
   if (hasInvalidTitle) return 'invalid';
-  if (mode === 'edit') {
-    const hasInvalidVideo = snapshot.lessons.some((l) => !l.videoUrl?.trim());
-    if (hasInvalidVideo) return 'invalid';
-  }
+  const hasInvalidVideo = snapshot.lessons.some(
+    (l) => !l.videoUrl?.trim() || isMockVideoUrl(l.videoUrl),
+  );
+  if (hasInvalidVideo) return 'invalid';
   return 'complete';
+}
+
+function collectSubmitBlockers(snapshot: CourseFormSnapshot, uploadsBusy: boolean): string[] {
+  const blockers: string[] = [];
+  if (uploadsBusy) {
+    blockers.push('Esperá a que terminen las subidas de archivos.');
+  }
+  if (!snapshot.title.trim()) blockers.push('Completá el título del curso.');
+  if (!snapshot.skillId.trim()) blockers.push('Completá la habilidad / categoría.');
+  if (!snapshot.description.trim()) blockers.push('Completá la descripción del curso.');
+  if (snapshot.lessons.length === 0) {
+    blockers.push('Agregá al menos un módulo.');
+    return blockers;
+  }
+  const noTitle = snapshot.lessons
+    .map((l, i) => (!l.title.trim() ? i + 1 : null))
+    .filter((n): n is number => n !== null);
+  if (noTitle.length) {
+    blockers.push(
+      noTitle.length === 1
+        ? `Falta el título del módulo ${noTitle[0]}.`
+        : `Faltan títulos en los módulos: ${noTitle.join(', ')}.`,
+    );
+  }
+  const noVideo = snapshot.lessons
+    .map((l, i) => (!l.videoUrl?.trim() || isMockVideoUrl(l.videoUrl) ? i + 1 : null))
+    .filter((n): n is number => n !== null);
+  if (noVideo.length) {
+    blockers.push(
+      noVideo.length === 1
+        ? `Subí el video del módulo ${noVideo[0]} (expandí el módulo).`
+        : `Faltan videos en los módulos: ${noVideo.join(', ')} (expandí cada uno y subí el archivo).`,
+    );
+  }
+  return blockers;
+}
+
+function courseIssueHint(snapshot: CourseFormSnapshot, state: SectionState): string | undefined {
+  if (state === 'complete') return undefined;
+  const missing: string[] = [];
+  if (!snapshot.title.trim()) missing.push('título');
+  if (!snapshot.skillId.trim()) missing.push('habilidad');
+  if (!snapshot.description.trim()) missing.push('descripción');
+  if (missing.length === 0) return undefined;
+  return `Falta: ${missing.join(', ')}.`;
+}
+
+function lessonsIssueHint(snapshot: CourseFormSnapshot, state: SectionState): string | undefined {
+  if (state === 'complete') return undefined;
+  if (snapshot.lessons.length === 0) return 'Agregá al menos un módulo.';
+  const parts: string[] = [];
+  const noTitle = snapshot.lessons.filter((l) => !l.title.trim()).length;
+  const noVideo = snapshot.lessons.filter(
+    (l) => !l.videoUrl?.trim() || isMockVideoUrl(l.videoUrl),
+  ).length;
+  if (noTitle) parts.push(`${noTitle} sin título`);
+  if (noVideo) parts.push(`${noVideo} sin video`);
+  return parts.length ? parts.join(' · ') : undefined;
 }
 
 function totalDurationMin(lessons: LessonDraft[]): number {
@@ -237,8 +296,18 @@ export function CourseFormModal({
   const [nowTick, setNowTick] = useState(Date.now());
   const [pendingDraft, setPendingDraft] = useState<{ savedAt: number } | null>(null);
   const [orphanUrls, setOrphanUrls] = useState<string[]>([]);
+  const [uploadsBusy, setUploadsBusy] = useState(false);
+  const [showValidation, setShowValidation] = useState(false);
 
   const loadSeqRef = useRef(0);
+  const uploadsBusyRef = useRef(0);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const hasScrolledBodyRef = useRef(false);
+
+  const trackUploadBusy = useCallback((busy: boolean) => {
+    uploadsBusyRef.current = Math.max(0, uploadsBusyRef.current + (busy ? 1 : -1));
+    setUploadsBusy(uploadsBusyRef.current > 0);
+  }, []);
 
   const dirty = useMemo(() => !snapshotsEqual(snapshot, initialSnapshot), [snapshot, initialSnapshot]);
 
@@ -247,6 +316,10 @@ export function CourseFormModal({
     if (!open) return;
     setError(null);
     setOrphanUrls([]);
+    setUploadsBusy(false);
+    uploadsBusyRef.current = 0;
+    setShowValidation(false);
+    hasScrolledBodyRef.current = false;
     loadSeqRef.current += 1;
     const seq = loadSeqRef.current;
 
@@ -330,7 +403,7 @@ export function CourseFormModal({
 
   const courseState = useMemo(() => computeCourseSection(snapshot), [snapshot]);
   const coverState = useMemo(() => computeCoverSection(snapshot), [snapshot]);
-  const lessonsState = useMemo(() => computeLessonsSection(snapshot, mode), [snapshot, mode]);
+  const lessonsState = useMemo(() => computeLessonsSection(snapshot), [snapshot]);
   const publishState: SectionState = 'complete';
 
   const completionPct = useMemo(() => {
@@ -353,7 +426,53 @@ export function CourseFormModal({
     return Math.round((score / max) * 100);
   }, [courseState, coverState, lessonsState]);
 
-  const canSubmit = courseState === 'complete' && lessonsState === 'complete' && !saving && !loading;
+  const formValid = courseState === 'complete' && lessonsState === 'complete';
+
+  const canSubmit = formValid && !saving && !loading && !uploadsBusy;
+
+  const submitBlockers = useMemo(
+    () => collectSubmitBlockers(snapshot, uploadsBusy),
+    [snapshot, uploadsBusy],
+  );
+
+  const courseHint = useMemo(
+    () => (showValidation ? courseIssueHint(snapshot, courseState) : undefined),
+    [showValidation, snapshot, courseState],
+  );
+
+  const lessonsHint = useMemo(
+    () => (showValidation ? lessonsIssueHint(snapshot, lessonsState) : undefined),
+    [showValidation, snapshot, lessonsState],
+  );
+
+  const revealValidation = useCallback(() => {
+    if (courseState === 'complete' && lessonsState === 'complete') return;
+    setShowValidation(true);
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (courseState !== 'complete') next.add('course');
+      if (lessonsState !== 'complete') next.add('lessons');
+      return next;
+    });
+  }, [courseState, lessonsState]);
+
+  const handleBodyScroll = useCallback(() => {
+    const el = bodyRef.current;
+    if (!el || loading || showValidation || formValid) return;
+    if (el.scrollTop > 8) hasScrolledBodyRef.current = true;
+    if (!hasScrolledBodyRef.current) return;
+    const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 72;
+    if (nearBottom) revealValidation();
+  }, [loading, showValidation, formValid, revealValidation]);
+
+  function handlePrimaryAction() {
+    if (!formValid) {
+      revealValidation();
+      return;
+    }
+    if (!canSubmit) return;
+    void submit();
+  }
 
   function update<K extends keyof CourseFormSnapshot>(key: K, value: CourseFormSnapshot[K]) {
     setSnapshot((prev) => ({ ...prev, [key]: value }));
@@ -448,7 +567,7 @@ export function CourseFormModal({
       isPremium: isPremiumDerived,
       lessons: snapshot.lessons.map((lesson) => ({
         title: lesson.title.trim(),
-        videoUrl: lesson.videoUrl.trim() || MOCK_VIDEO_URL,
+        videoUrl: lesson.videoUrl.trim(),
         pdfUrl: lesson.pdfUrl?.trim() || undefined,
         links: lesson.links && lesson.links.length > 0 ? lesson.links : undefined,
         subtitles: cleanSubtitlesPayload(lesson.subtitles),
@@ -502,7 +621,7 @@ export function CourseFormModal({
         lessons: snapshot.lessons.map((lesson, index) => ({
           id: lesson.id,
           title: lesson.title.trim(),
-          videoUrl: lesson.videoUrl.trim() || MOCK_VIDEO_URL,
+          videoUrl: lesson.videoUrl.trim(),
           pdfUrl: lesson.pdfUrl?.trim() || undefined,
           links: lesson.links && lesson.links.length > 0 ? lesson.links : undefined,
           subtitles: cleanSubtitlesPayload(lesson.subtitles),
@@ -593,7 +712,7 @@ export function CourseFormModal({
           ) : null}
         </header>
 
-        <div className={styles.body}>
+        <div className={styles.body} ref={bodyRef} onScroll={handleBodyScroll}>
           {loading ? <p className={styles.hint}>Cargando curso...</p> : null}
 
           <Section
@@ -602,6 +721,8 @@ export function CourseFormModal({
             title="Información del curso"
             subtitle="Cómo se llama y qué van a aprender"
             state={courseState}
+            issueHint={courseHint}
+            emphasizeValidation={showValidation}
             open={openSections.has('course')}
             onToggle={() => toggleSection('course')}
             headerExtra={
@@ -625,13 +746,18 @@ export function CourseFormModal({
                   Título <span className={styles.required}>*</span>
                 </span>
                 <input
-                  className={`${styles.input} ${courseState !== 'empty' && !snapshot.title.trim() ? styles.inputInvalid : ''}`}
+                  className={`${styles.input} ${
+                    showValidation && !snapshot.title.trim() ? styles.inputInvalid : ''
+                  }`}
                   value={snapshot.title}
                   onChange={(e) => update('title', e.target.value)}
                   placeholder="Ej: Liderazgo humano para equipos modernos"
                   maxLength={120}
                   required
                 />
+                {showValidation && !snapshot.title.trim() ? (
+                  <span className={styles.errorText}>El título es obligatorio.</span>
+                ) : null}
                 <span className={styles.hint}>Lo que se ve grande en la card del catálogo (máx. 120).</span>
               </label>
 
@@ -641,7 +767,7 @@ export function CourseFormModal({
                 </span>
                 <input
                   className={`${styles.input} ${
-                    courseState !== 'empty' && !snapshot.skillId.trim() ? styles.inputInvalid : ''
+                    showValidation && !snapshot.skillId.trim() ? styles.inputInvalid : ''
                   }`}
                   value={snapshot.skillId}
                   onChange={(e) => update('skillId', e.target.value)}
@@ -654,6 +780,9 @@ export function CourseFormModal({
                     <option key={opt.value} value={opt.label} />
                   ))}
                 </datalist>
+                {showValidation && !snapshot.skillId.trim() ? (
+                  <span className={styles.errorText}>La habilidad / categoría es obligatoria.</span>
+                ) : null}
                 <span className={styles.hint}>
                   Texto libre. Aparece como categoría en la app móvil.
                 </span>
@@ -699,12 +828,17 @@ export function CourseFormModal({
                   Descripción <span className={styles.required}>*</span>
                 </span>
                 <textarea
-                  className={`${styles.textarea} ${courseState !== 'empty' && !snapshot.description.trim() ? styles.inputInvalid : ''}`}
+                  className={`${styles.textarea} ${
+                    showValidation && !snapshot.description.trim() ? styles.inputInvalid : ''
+                  }`}
                   value={snapshot.description}
                   onChange={(e) => update('description', e.target.value)}
                   placeholder="Qué va a aprender el alumno y por qué le sirve. 2-3 oraciones."
                   maxLength={500}
                 />
+                {showValidation && !snapshot.description.trim() ? (
+                  <span className={styles.errorText}>La descripción es obligatoria.</span>
+                ) : null}
                 <span className={styles.hint}>{snapshot.description.length}/500 caracteres.</span>
               </label>
             </div>
@@ -723,6 +857,7 @@ export function CourseFormModal({
               kind="thumbnail"
               value={snapshot.thumbnail || undefined}
               scope={scope}
+              onBusyChange={trackUploadBusy}
               onPrevReplaced={trackOrphan}
               onChange={(url) => update('thumbnail', url || '')}
             />
@@ -745,6 +880,7 @@ export function CourseFormModal({
               kind="pdf"
               value={snapshot.pdfUrl || undefined}
               scope={scope}
+              onBusyChange={trackUploadBusy}
               onPrevReplaced={trackOrphan}
               onChange={(url) => update('pdfUrl', url || '')}
             />
@@ -763,15 +899,24 @@ export function CourseFormModal({
                 : 'Agregá al menos un módulo para publicar'
             }
             state={lessonsState}
+            issueHint={lessonsHint}
+            emphasizeValidation={showValidation}
             open={openSections.has('lessons')}
             onToggle={() => toggleSection('lessons')}
           >
             <LessonListEditor
               lessons={snapshot.lessons}
-              onChange={(lessons) => update('lessons', lessons)}
+              onChange={(next) =>
+                setSnapshot((prev) => ({
+                  ...prev,
+                  lessons: typeof next === 'function' ? next(prev.lessons) : next,
+                }))
+              }
               onAssetReplaced={trackOrphan}
+              onUploadsBusyChange={trackUploadBusy}
               scope={scope}
-              validateMedia={mode === 'edit'}
+              validateMedia
+              showFieldHints={showValidation}
               disabled={saving}
             />
           </Section>
@@ -828,7 +973,22 @@ export function CourseFormModal({
 
         <footer className={styles.footer}>
           <span className={styles.footerStatus}>
-            {saving ? <strong>Guardando...</strong> : draftSavedLabel ? <span>{draftSavedLabel}</span> : null}
+            {uploadsBusy ? (
+              <strong>Esperá a que terminen las subidas...</strong>
+            ) : saving ? (
+              <strong>Guardando...</strong>
+            ) : showValidation && !formValid && submitBlockers.length > 0 ? (
+              <div className={styles.footerBlockers} role="status">
+                <strong>Para {mode === 'create' ? 'crear' : 'guardar'} el curso:</strong>
+                <ul>
+                  {submitBlockers.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : draftSavedLabel ? (
+              <span>{draftSavedLabel}</span>
+            ) : null}
           </span>
           <div className={styles.rowActions}>
             <button
@@ -841,13 +1001,15 @@ export function CourseFormModal({
             </button>
             <button
               type="button"
-              className={styles.primaryBtn}
-              onClick={() => void submit()}
-              disabled={!canSubmit}
+              className={`${styles.primaryBtn} ${!formValid && !saving && !loading && !uploadsBusy ? styles.primaryBtnInactive : ''}`}
+              onClick={handlePrimaryAction}
+              disabled={saving || loading || uploadsBusy}
               title={
-                canSubmit
+                formValid
                   ? undefined
-                  : 'Completá título, descripción y al menos una lección con título.'
+                  : showValidation
+                    ? submitBlockers[0] ?? 'Completá los campos obligatorios.'
+                    : 'Completá los campos obligatorios para continuar.'
               }
             >
               {saving
@@ -871,6 +1033,8 @@ type SectionProps = {
   title: string;
   subtitle: string;
   state: SectionState;
+  issueHint?: string;
+  emphasizeValidation?: boolean;
   open: boolean;
   onToggle: () => void;
   headerExtra?: React.ReactNode;
@@ -882,6 +1046,8 @@ function Section({
   title,
   subtitle,
   state,
+  issueHint,
+  emphasizeValidation = false,
   open,
   onToggle,
   headerExtra,
@@ -890,13 +1056,13 @@ function Section({
   const sectionClass =
     state === 'complete'
       ? styles.sectionDone
-      : state === 'invalid'
+      : emphasizeValidation && state === 'invalid'
         ? styles.sectionInvalid
         : '';
   const statusClass =
     state === 'complete'
       ? styles.sectionStatusDone
-      : state === 'invalid'
+      : emphasizeValidation && state === 'invalid'
         ? styles.sectionStatusError
         : '';
 
@@ -931,6 +1097,7 @@ function Section({
         <div data-section-toggle className={styles.sectionTitle}>
           <strong>{title}</strong>
           <span>{subtitle}</span>
+          {issueHint ? <span className={styles.sectionIssueHint}>{issueHint}</span> : null}
         </div>
         {headerExtra}
         <button

@@ -16,7 +16,8 @@
     "waitlist:dev": "npm --workspace apps/waitlist-web run dev",
     "waitlist:build": "npm --workspace apps/waitlist-web run build",
     "typecheck": "npm --workspace apps/mobile run typecheck && npm --workspace apps/web-crm run typecheck && npm --workspace apps/waitlist-web run typecheck",
-    "seed:firestore": "node firebase/scripts/seed-t2t.mjs"
+    "seed:firestore": "node firebase/scripts/seed-t2t.mjs",
+    "audit:lesson-videos": "node firebase/scripts/audit-lesson-videos.mjs"
   },
   "devDependencies": {
     "firebase-admin": "^13.7.0"

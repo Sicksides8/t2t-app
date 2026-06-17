@@ -41,6 +41,30 @@ export function hasPremiumAccess(user?: User | null): boolean {
   return false;
 }
 
+/**
+ * True si el usuario ya posee un plan PAGO vigente.
+ *
+ * Reglas:
+ *  - 'active' con plan != 'free'           -> bloquea canje.
+ *  - 'cancelled' dentro del periodo pagado -> bloquea canje (sigue accediendo).
+ *  - 'trialing'                            -> NO bloquea (todavia no pago).
+ *  - 'free' / 'expired' / sin sub          -> NO bloquea.
+ *
+ * Se usa para gatear el canje de codigos promocionales: los codigos son
+ * SOLO para usuarios que aun no tienen plan pago.
+ */
+export function hasActivePaidPlan(user?: User | null): boolean {
+  if (!user) return false;
+  const plan = user.subscriptionPlan;
+  if (!plan || plan === 'free') return false;
+  const status = user.subscriptionStatus;
+  if (status === 'active') return true;
+  if (status === 'cancelled' && user.subscriptionRenewsAt) {
+    return user.subscriptionRenewsAt.getTime() > Date.now();
+  }
+  return false;
+}
+
 /** Ranking interno usado para comparar planes (elite > pro > free). */
 const PLAN_RANK: Record<SubscriptionPlanId, number> = { free: 0, pro: 1, elite: 2 };
 

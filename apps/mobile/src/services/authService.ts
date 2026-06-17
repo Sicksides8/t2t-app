@@ -177,6 +177,11 @@ function fromFirestore(id: string, data: any): User {
     onboardingCompleted: Boolean(data.onboardingCompleted),
     diagnosticCompleted: Boolean(data.diagnosticCompleted),
     hookSelections: data.hookSelections && typeof data.hookSelections === 'object' ? data.hookSelections : undefined,
+    planHorizonDays:
+      data.planHorizonDays === 30 || data.planHorizonDays === 60 || data.planHorizonDays === 90
+        ? data.planHorizonDays
+        : undefined,
+    planStartedAt: data.planStartedAt?.toDate?.() || undefined,
     selectedPlan: data.selectedPlan,
     subscriptionPlan: isPlanId(data.subscriptionPlan) ? data.subscriptionPlan : undefined,
     subscriptionStatus: isStatus(data.subscriptionStatus) ? data.subscriptionStatus : undefined,
@@ -217,6 +222,8 @@ export async function updateUserFields(
       | 'diagnosticCompleted'
       | 'subscriptionId'
       | 'hookSelections'
+      | 'planHorizonDays'
+      | 'planStartedAt'
       | 'selectedPlan'
       | 'subscriptionPlan'
       | 'subscriptionStatus'
