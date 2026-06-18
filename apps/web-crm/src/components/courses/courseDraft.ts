@@ -1,4 +1,4 @@
-import type { CourseAccessTier, CourseLevel, LessonDraft } from '../../types';
+import type { CourseAccessTier, CourseLevel, CourseRequiredPlan, LessonDraft } from '../../types';
 
 export type CourseFormSnapshot = {
   title: string;
@@ -8,6 +8,7 @@ export type CourseFormSnapshot = {
   pdfUrl: string;
   level: CourseLevel;
   accessTier: CourseAccessTier;
+  requiredPlan: CourseRequiredPlan;
   isActive: boolean;
   isPremium: boolean;
   lessons: LessonDraft[];

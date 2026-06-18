@@ -22,6 +22,7 @@ import { FS_COL } from '../constants/firestoreCollections';
 import { db } from './firebase';
 import { updateUserFields } from './authService';
 import { getCanonicalPlan } from './subscriptionService';
+import { getPlanDisplayName } from '../utils/planDisplay';
 import type {
   BillingCycle,
   Payment,
@@ -41,7 +42,7 @@ function addDays(base: Date, days: number): Date {
 }
 
 function planLabel(planId: SubscriptionPlanId, cycle: BillingCycle): string {
-  const name = planId.toUpperCase();
+  const name = getPlanDisplayName(planId);
   const cycleLabel = cycle === 'yearly' ? 'anual' : 'mensual';
   return `${name} · ${cycleLabel}`;
 }

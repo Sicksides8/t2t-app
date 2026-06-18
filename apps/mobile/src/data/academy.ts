@@ -21,7 +21,7 @@ export const lessons: Lesson[] = [];
 export const plans: Plan[] = [
   {
     id: 'starter',
-    name: 'Starter',
+    name: 'Open',
     price: 0,
     currency: 'ARS',
     durationDays: 14,
@@ -39,7 +39,7 @@ export const plans: Plan[] = [
   },
   {
     id: 'enterprise',
-    name: 'Enterprise',
+    name: 'Black',
     price: 0,
     currency: 'ARS',
     durationDays: 365,

@@ -91,8 +91,18 @@ export async function POST(request: NextRequest) {
     const pdfUrl = body.pdfUrl?.trim();
     const accessTier =
       body.accessTier && ['free', 'lite', 'premium'].includes(body.accessTier) ? body.accessTier : undefined;
+    const requiredPlan =
+      body.requiredPlan && ['free', 'pro', 'elite'].includes(body.requiredPlan)
+        ? body.requiredPlan
+        : undefined;
     const isPremium =
-      typeof body.isPremium === 'boolean' ? body.isPremium : accessTier ? accessTier !== 'free' : false;
+      typeof body.isPremium === 'boolean'
+        ? body.isPremium
+        : requiredPlan
+          ? requiredPlan !== 'free'
+          : accessTier
+            ? accessTier !== 'free'
+            : false;
     const courseData = withoutUndefined({
       title,
       skillId,
@@ -101,6 +111,7 @@ export async function POST(request: NextRequest) {
       ...(pdfUrl ? { pdfUrl } : {}),
       level: body.level || 'beginner',
       ...(accessTier ? { accessTier } : {}),
+      ...(requiredPlan ? { requiredPlan } : {}),
       isActive: body.isActive !== false,
       isPremium,
       order,

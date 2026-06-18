@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { Plan, SubscriptionStatus } from '../../types';
+import { getPlanDisplayName } from '../../utils/planDisplay';
 
 type Props = {
   plan: Plan;
@@ -29,7 +30,7 @@ function badgeLabel(status: SubscriptionStatus, renewsAt?: Date): string {
   if (status === 'cancelled') return `CANCELADO · VENCE ${fmtDate(renewsAt).toUpperCase()}`;
   if (status === 'expired') return 'PLAN VENCIDO';
   if (status === 'active') return 'PLAN ACTIVO';
-  return 'PLAN FREE';
+  return `PLAN ${getPlanDisplayName('free').toUpperCase()}`;
 }
 
 function renewLabel(status: SubscriptionStatus, renewsAt?: Date): string {
@@ -56,7 +57,7 @@ export function ProfilePlanCard({ plan, status, renewsAt, renewDate }: Props) {
         style={styles.card}
       >
         <Text style={styles.badge}>{badgeLabel(effectiveStatus, renewsAt)}</Text>
-        <Text style={styles.name}>{plan.name.toUpperCase()}</Text>
+        <Text style={styles.name}>{plan.name}</Text>
         <View style={styles.row}>
           <Text style={styles.price}>{priceLabel}</Text>
           {renewText ? <Text style={styles.renew}>{renewText}</Text> : null}

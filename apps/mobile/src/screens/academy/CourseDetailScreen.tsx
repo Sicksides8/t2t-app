@@ -23,6 +23,7 @@ import { Colors, Radius, Spacing, Typography } from '../../theme';
 import type { Course, CourseModule, Lesson, ModuleLink, RootStackParamList } from '../../types';
 import { openExternalLink } from '../../utils/openExternalLink';
 import { canAccessCourse, canAccessLesson, getRequiredPlan } from '../../utils/subscriptionAccess';
+import { getPlanDisplayName } from '../../utils/planDisplay';
 
 function formatDurationMin(seconds: number): string {
   const min = Math.max(1, Math.round(seconds / 60));
@@ -119,7 +120,7 @@ export function CourseDetailScreen({ route, navigation }: NativeStackScreenProps
   const moduleCount = sortedModules.length || 1;
   const coursePdfUrl = course.pdfUrl ?? courseLessons.find((l) => l.pdfUrl)?.pdfUrl;
   const requiredPlan = getRequiredPlan(course);
-  const planBadgeLabel = requiredPlan === 'elite' ? 'ELITE' : requiredPlan === 'pro' ? 'PRO' : null;
+  const planBadgeLabel = requiredPlan === 'free' ? null : getPlanDisplayName(requiredPlan);
 
   const nextLesson = courseLessons.find((lesson) => !completedSet.has(lesson.id)) ?? courseLessons[0];
   const nextModuleIndex = (() => {
@@ -212,7 +213,7 @@ export function CourseDetailScreen({ route, navigation }: NativeStackScreenProps
                 const freeLessonInMod = modLessons.find((l) => l.isFree === true);
                 const hasFreeFallback = lockedFirst && Boolean(freeLessonInMod);
                 const metaPlanLabel =
-                  lockedFirst && !hasFreeFallback ? ` · ${planBadgeLabel ?? 'PRO'}` : '';
+                  lockedFirst && !hasFreeFallback ? ` · ${planBadgeLabel ?? 'Pro'}` : '';
 
                 const dedupedLinks: ModuleLink[] = [];
                 const seen = new Set<string>();
@@ -345,7 +346,7 @@ export function CourseDetailScreen({ route, navigation }: NativeStackScreenProps
       <PaywallModal
         visible={paywallVisible}
         planId={requiredPlan === 'free' ? 'pro' : requiredPlan}
-        title={requiredPlan === 'elite' ? 'Contenido ELITE' : 'Contenido PRO'}
+        title={`Contenido ${getPlanDisplayName(requiredPlan === 'free' ? 'pro' : requiredPlan)}`}
         userId={user?.id}
         onClose={() => setPaywallVisible(false)}
         onSuccess={() => {

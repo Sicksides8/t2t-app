@@ -141,7 +141,7 @@ export type BillingCycle = 'monthly' | 'yearly';
 
 const PLAY_SKUS: Record<Exclude<CanonicalPlanId, 'free'>, Record<BillingCycle, string>> = {
   pro: { monthly: 't2t_pro_monthly', yearly: 't2t_pro_yearly' },
-  elite: { monthly: 't2t_elite_monthly', yearly: 't2t_elite_yearly' },
+  elite: { monthly: 't2t_black_monthly', yearly: 't2t_black_yearly' },
 };
 
 /** Resuelve productId -> {planId, cycle}. Devuelve null si el SKU no es nuestro. */

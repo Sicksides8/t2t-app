@@ -1,4 +1,5 @@
-import type { CourseAccessTier, CourseLevel } from '../types';
+import type { CourseAccessTier, CourseLevel, CourseRequiredPlan } from '../types';
+import { getPlanDisplayName } from './planDisplay';
 
 /** Mismo mock que apps/mobile y firebase/scripts/seed-t2t.mjs */
 export const MOCK_VIDEO_URL =
@@ -45,19 +46,17 @@ export const LEGACY_LEVEL_LABEL: Record<CourseLevel, string> = {
 };
 
 /**
- * Tipo de acceso del curso. Determina qué suscripción permite verlo en la app.
- * - free: visible para cualquier alumno (incluso plan Open).
- * - lite: requiere plan Pro o superior.
- * - premium: requiere plan Black.
+ * Tipo de curso (clasificación del contenido en el catálogo).
+ * No define por sí solo qué suscripción puede verlo — eso va en `requiredPlan`.
  */
 export const ACCESS_TIER_OPTIONS: ReadonlyArray<{
   value: CourseAccessTier;
   label: string;
   hint: string;
 }> = [
-  { value: 'free', label: 'Free', hint: 'Visible para todos los alumnos.' },
-  { value: 'lite', label: 'Lite', hint: 'Requiere plan Pro o superior.' },
-  { value: 'premium', label: 'Premium', hint: 'Solo para plan Black.' },
+  { value: 'free', label: 'Free', hint: 'Curso base del catálogo.' },
+  { value: 'lite', label: 'Lite', hint: 'Contenido intermedio.' },
+  { value: 'premium', label: 'Premium', hint: 'Contenido exclusivo de alta gama.' },
 ];
 
 export const ACCESS_TIER_LABEL: Record<CourseAccessTier, string> = {
@@ -65,5 +64,49 @@ export const ACCESS_TIER_LABEL: Record<CourseAccessTier, string> = {
   lite: 'Lite',
   premium: 'Premium',
 };
+
+/**
+ * Suscripción mínima para acceder al curso en la app.
+ * IDs internos free | pro | elite — UI: Open | Pro | Black.
+ */
+export const REQUIRED_PLAN_OPTIONS: ReadonlyArray<{
+  value: CourseRequiredPlan;
+  label: string;
+  hint: string;
+}> = [
+  { value: 'free', label: getPlanDisplayName('free'), hint: 'Visible para usuarios Open (y superiores).' },
+  { value: 'pro', label: getPlanDisplayName('pro'), hint: 'Requiere suscripción Pro o Black.' },
+  { value: 'elite', label: getPlanDisplayName('elite'), hint: 'Solo para suscripción Black.' },
+];
+
+export const REQUIRED_PLAN_LABEL: Record<CourseRequiredPlan, string> = {
+  free: getPlanDisplayName('free'),
+  pro: getPlanDisplayName('pro'),
+  elite: getPlanDisplayName('elite'),
+};
+
+/** Fallback para cursos legacy sin `requiredPlan` persistido. */
+export function requiredPlanFromCourse(course: {
+  requiredPlan?: CourseRequiredPlan;
+  accessTier?: CourseAccessTier;
+  isPremium?: boolean;
+}): CourseRequiredPlan {
+  if (course.requiredPlan && ['free', 'pro', 'elite'].includes(course.requiredPlan)) {
+    return course.requiredPlan;
+  }
+  const tier = course.accessTier ?? (course.isPremium ? 'lite' : 'free');
+  if (tier === 'premium') return 'elite';
+  if (tier === 'lite') return 'pro';
+  return 'free';
+}
+
+/** Fallback para cursos legacy sin `accessTier` persistido. */
+export function accessTierFromCourse(course: {
+  accessTier?: CourseAccessTier;
+  isPremium?: boolean;
+}): CourseAccessTier {
+  if (course.accessTier) return course.accessTier;
+  return course.isPremium ? 'lite' : 'free';
+}
 
 export const DEFAULT_MODULE_TITLE = 'Modulo 1: contenido del curso';

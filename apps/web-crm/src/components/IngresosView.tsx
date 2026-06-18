@@ -20,6 +20,7 @@ import {
   formatDateTime,
   formatNumber,
 } from '../lib/format';
+import { getPlanDisplayName } from '../lib/planDisplay';
 import type { PaymentRow, RevenueKpis } from '../types';
 import styles from '../app/dashboard.module.css';
 
@@ -41,9 +42,9 @@ const DEFAULT_FILTERS: Filters = {
 
 const PLAN_OPTIONS = [
   { value: '', label: 'Todos los planes' },
-  { value: 'free', label: 'Free' },
+  { value: 'free', label: 'Open' },
   { value: 'pro', label: 'Pro' },
-  { value: 'elite', label: 'Elite' },
+  { value: 'elite', label: 'Black' },
 ];
 
 const METHOD_OPTIONS = [
@@ -303,7 +304,7 @@ export function IngresosView() {
               <tbody>
                 {kpis.byPlan.map((p) => (
                   <tr key={p.plan}>
-                    <td>{p.plan.toUpperCase()}</td>
+                    <td>{getPlanDisplayName(p.plan)}</td>
                     <td>{formatNumber(p.count)}</td>
                     <td>{formatCurrency(p.revenue, currency)}</td>
                   </tr>
@@ -368,7 +369,7 @@ export function IngresosView() {
                   <td>{formatDateTime(p.paidAt)}</td>
                   <td><code>{p.txId}</code></td>
                   <td><code>{p.userId.slice(0, 8)}</code></td>
-                  <td>{p.planLabel || p.plan.toUpperCase()}</td>
+                  <td>{p.planLabel || getPlanDisplayName(p.plan)}</td>
                   <td>{p.cycle ?? '—'}</td>
                   <td>{p.method}</td>
                   <td>{formatCurrency(p.amount, p.currency)}</td>

@@ -17,12 +17,14 @@ import {
   ACCESS_TIER_OPTIONS,
   LEVEL_OPTIONS,
   MOCK_VIDEO_URL,
+  REQUIRED_PLAN_OPTIONS,
   SKILL_SUGGESTIONS,
+  accessTierFromCourse,
   isMockVideoUrl,
+  requiredPlanFromCourse,
 } from '../../lib/courseConstants';
 import type {
   Course,
-  CourseAccessTier,
   CourseDetailPayload,
   CreateCourseBody,
   LessonDraft,
@@ -68,6 +70,7 @@ const DEMO_SNAPSHOT: CourseFormSnapshot = {
   pdfUrl: '',
   level: 'beginner',
   accessTier: 'free',
+  requiredPlan: 'free',
   isActive: true,
   isPremium: false,
   lessons: [
@@ -107,6 +110,7 @@ function emptySnapshot(): CourseFormSnapshot {
     pdfUrl: '',
     level: 'beginner',
     accessTier: 'free',
+    requiredPlan: 'free',
     isActive: true,
     isPremium: false,
     lessons: [newLessonDraft(1), newLessonDraft(2)],
@@ -211,6 +215,7 @@ function snapshotsEqual(a: CourseFormSnapshot, b: CourseFormSnapshot): boolean {
     a.pdfUrl !== b.pdfUrl ||
     a.level !== b.level ||
     a.accessTier !== b.accessTier ||
+    a.requiredPlan !== b.requiredPlan ||
     a.isActive !== b.isActive ||
     a.isPremium !== b.isPremium ||
     a.lessons.length !== b.lessons.length
@@ -328,11 +333,6 @@ export function CourseFormModal({
       apiFetch<CourseDetailPayload>(`/api/admin/courses/${courseId}`)
         .then((data) => {
           if (loadSeqRef.current !== seq) return;
-          const fallbackTier: CourseAccessTier = data.course.accessTier
-            ? data.course.accessTier
-            : data.course.isPremium
-              ? 'lite'
-              : 'free';
           const initial: CourseFormSnapshot = {
             title: data.course.title || '',
             skillId: data.course.skillId || '',
@@ -340,7 +340,8 @@ export function CourseFormModal({
             thumbnail: data.course.thumbnail || '',
             pdfUrl: data.course.pdfUrl || '',
             level: data.course.level || 'beginner',
-            accessTier: fallbackTier,
+            accessTier: accessTierFromCourse(data.course),
+            requiredPlan: requiredPlanFromCourse(data.course),
             isActive: data.course.isActive !== false,
             isPremium: Boolean(data.course.isPremium),
             lessons: draftsFromLessons(data.lessons),
@@ -537,7 +538,14 @@ export function CourseFormModal({
       setPendingDraft(null);
       return;
     }
-    setSnapshot({ ...stored.data, lessons: stored.data.lessons.map(lessonFromDraft) });
+    const data = stored.data;
+    setSnapshot({
+      ...data,
+      requiredPlan:
+        data.requiredPlan ??
+        requiredPlanFromCourse({ accessTier: data.accessTier, isPremium: data.isPremium }),
+      lessons: data.lessons.map(lessonFromDraft),
+    });
     setPendingDraft(null);
     setOpenSections(new Set(['course', 'lessons']));
   }
@@ -553,7 +561,7 @@ export function CourseFormModal({
   async function submitCreate() {
     setSaving(true);
     setError(null);
-    const isPremiumDerived = snapshot.accessTier !== 'free';
+    const isPremiumDerived = snapshot.requiredPlan !== 'free';
     const body: CreateCourseBody = {
       title: snapshot.title.trim(),
       skillId: snapshot.skillId.trim(),
@@ -562,6 +570,7 @@ export function CourseFormModal({
       pdfUrl: snapshot.pdfUrl.trim() || undefined,
       level: snapshot.level,
       accessTier: snapshot.accessTier,
+      requiredPlan: snapshot.requiredPlan,
       order: typeof nextOrder === 'number' ? nextOrder : undefined,
       isActive: snapshot.isActive,
       isPremium: isPremiumDerived,
@@ -601,7 +610,7 @@ export function CourseFormModal({
     setSaving(true);
     setError(null);
     try {
-      const isPremiumDerived = snapshot.accessTier !== 'free';
+      const isPremiumDerived = snapshot.requiredPlan !== 'free';
       await apiFetch<Course>(`/api/admin/courses/${courseId}`, {
         method: 'PATCH',
         body: JSON.stringify({
@@ -612,6 +621,7 @@ export function CourseFormModal({
           pdfUrl: snapshot.pdfUrl.trim() || null,
           level: snapshot.level,
           accessTier: snapshot.accessTier,
+          requiredPlan: snapshot.requiredPlan,
           isActive: snapshot.isActive,
           isPremium: isPremiumDerived,
         }),
@@ -945,10 +955,10 @@ export function CourseFormModal({
 
             <div style={{ marginTop: 14 }}>
               <span style={{ fontSize: 14, fontWeight: 600 }}>
-                Tipo de acceso <span className={styles.required}>*</span>
+                Tipo de curso <span className={styles.required}>*</span>
               </span>
               <p className={styles.hint} style={{ marginTop: 4 }}>
-                Define qué suscripción necesita el alumno para ver este curso.
+                Clasificación del contenido en el catálogo (Free, Lite o Premium).
               </p>
               <div className={styles.tierGrid}>
                 {ACCESS_TIER_OPTIONS.map((opt) => (
@@ -959,6 +969,30 @@ export function CourseFormModal({
                       snapshot.accessTier === opt.value ? styles.tierCardActive : ''
                     }`}
                     onClick={() => update('accessTier', opt.value)}
+                  >
+                    <span className={styles.tierCardLabel}>{opt.label}</span>
+                    <span className={styles.tierCardHint}>{opt.hint}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginTop: 18 }}>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>
+                Membresía requerida <span className={styles.required}>*</span>
+              </span>
+              <p className={styles.hint} style={{ marginTop: 4 }}>
+                Qué suscripción necesita el alumno para ver este curso en la app.
+              </p>
+              <div className={styles.tierGrid}>
+                {REQUIRED_PLAN_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={`${styles.tierCard} ${
+                      snapshot.requiredPlan === opt.value ? styles.tierCardActive : ''
+                    }`}
+                    onClick={() => update('requiredPlan', opt.value)}
                   >
                     <span className={styles.tierCardLabel}>{opt.label}</span>
                     <span className={styles.tierCardHint}>{opt.hint}</span>

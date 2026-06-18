@@ -33,7 +33,7 @@ type Props = {
 export function PaywallModal({
   visible,
   planId = 'pro',
-  title = 'Contenido PRO',
+  title = 'Contenido Pro',
   description = 'Desbloqueá todos los cursos con 7 días gratis. Sin tarjeta, cancelás cuando quieras.',
   userId,
   onClose,

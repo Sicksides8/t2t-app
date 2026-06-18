@@ -98,12 +98,16 @@ export interface Skill {
 
 /**
  * Tier de acceso del curso (escrito por el CRM en t2t_courses.accessTier).
- *  - 'free'    -> abierto a cualquier usuario.
- *  - 'lite'    -> requiere plan PRO o superior.
- *  - 'premium' -> requiere plan ELITE.
- * Si está ausente, se respeta el flag legacy isPremium (true ≡ lite).
+ *  - 'free'    -> clasificación base del catálogo.
+ *  - 'lite'    -> contenido intermedio.
+ *  - 'premium' -> contenido exclusivo.
+ * La membresía requerida para verlo va en `requiredPlan` (independiente).
+ * Si `requiredPlan` está ausente, se deriva de `accessTier` (legacy).
  */
 export type CourseAccessTier = 'free' | 'lite' | 'premium';
+
+/** Plan mínimo de suscripción para acceder al curso (free=Open, pro=Pro, elite=Black). */
+export type CourseRequiredPlan = SubscriptionPlanId;
 
 export interface Course {
   id: string;
@@ -118,10 +122,13 @@ export interface Course {
   isActive: boolean;
   isPremium?: boolean;
   /**
-   * Granularidad opcional cuando el CRM la define. Si está presente,
-   * `getRequiredPlan` la usa como fuente de verdad por sobre `isPremium`.
+   * Clasificación del curso en el catálogo (CRM).
    */
   accessTier?: CourseAccessTier;
+  /**
+   * Suscripción mínima requerida. Fuente de verdad para gating cuando está presente.
+   */
+  requiredPlan?: CourseRequiredPlan;
   order?: number;
 }
 

@@ -80,7 +80,7 @@ export function HookSpecialOffer({
             <Text style={styles.discount}>{discountLabel}</Text>
             <View style={styles.ribbon}>
               <Text style={styles.ribbonText} numberOfLines={1}>
-                T2T PRO · T2T PRO · T2T PRO · T2T PRO
+                T2T Pro · T2T Pro · T2T Pro · T2T Pro
               </Text>
             </View>
           </LinearGradient>

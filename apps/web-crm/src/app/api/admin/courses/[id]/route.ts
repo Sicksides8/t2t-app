@@ -17,6 +17,7 @@ const PATCHABLE_KEYS: (keyof PatchCourseBody)[] = [
   'pdfUrl',
   'level',
   'accessTier',
+  'requiredPlan',
   'isActive',
   'isPremium',
   'order',
@@ -82,10 +83,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         delete update.accessTier;
       } else {
         update.accessTier = tier;
+      }
+    }
+    if (typeof update.requiredPlan === 'string') {
+      const plan = update.requiredPlan.trim();
+      if (!['free', 'pro', 'elite'].includes(plan)) {
+        delete update.requiredPlan;
+      } else {
+        update.requiredPlan = plan;
         if (typeof update.isPremium !== 'boolean') {
-          update.isPremium = tier !== 'free';
+          update.isPremium = plan !== 'free';
         }
       }
+    } else if (typeof update.accessTier === 'string' && typeof update.isPremium !== 'boolean') {
+      update.isPremium = update.accessTier !== 'free';
     }
 
     await ref.update(update);

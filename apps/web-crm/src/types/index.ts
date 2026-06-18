@@ -16,6 +16,8 @@ export interface User {
 
 export type CourseLevel = 'beginner' | 'intermediate' | 'advanced' | 'master' | 'expert';
 export type CourseAccessTier = 'free' | 'lite' | 'premium';
+/** Plan mínimo de suscripción para ver el curso (IDs internos: free=Open, pro=Pro, elite=Black). */
+export type CourseRequiredPlan = 'free' | 'pro' | 'elite';
 
 export interface Course {
   id: string;
@@ -27,7 +29,10 @@ export interface Course {
   totalLessons: number;
   durationMin: number;
   level: CourseLevel;
+  /** Clasificación del curso: free / lite / premium. */
   accessTier?: CourseAccessTier;
+  /** Suscripción mínima requerida para acceder (independiente del tipo de curso). */
+  requiredPlan?: CourseRequiredPlan;
   isActive: boolean;
   isPremium?: boolean;
   order?: number;
@@ -88,6 +93,7 @@ export type CreateCourseBody = {
   pdfUrl?: string;
   level: CourseLevel;
   accessTier?: CourseAccessTier;
+  requiredPlan?: CourseRequiredPlan;
   isActive?: boolean;
   isPremium?: boolean;
   order?: number;
@@ -113,6 +119,7 @@ export type PatchCourseBody = Partial<
     | 'pdfUrl'
     | 'level'
     | 'accessTier'
+    | 'requiredPlan'
     | 'isActive'
     | 'isPremium'
     | 'order'

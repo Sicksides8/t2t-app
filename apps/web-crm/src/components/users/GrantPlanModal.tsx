@@ -5,6 +5,7 @@ import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/Toast';
 import type { GrantPlanBody } from '../../types';
 import styles from './UsersExtras.module.css';
+import { getPlanDisplayName } from '../../lib/planDisplay';
 
 type Props = {
   open: boolean;
@@ -16,8 +17,8 @@ type Props = {
 const DURATION_PRESETS = [7, 30, 90, 365];
 
 const PLAN_OPTIONS: Array<{ value: GrantPlanBody['planId']; label: string }> = [
-  { value: 'pro', label: 'PRO' },
-  { value: 'elite', label: 'ELITE' },
+  { value: 'pro', label: getPlanDisplayName('pro') },
+  { value: 'elite', label: getPlanDisplayName('elite') },
 ];
 
 const CYCLE_OPTIONS: Array<{ value: GrantPlanBody['cycle']; label: string }> = [
@@ -166,7 +167,7 @@ export function GrantPlanModal({ open, userName, onClose, onSubmit }: Props) {
       </div>
 
       <div className={styles.summary}>
-        Vas a activar <strong>{planId.toUpperCase()} {cycle === 'yearly' ? 'anual' : 'mensual'}</strong> hasta el{' '}
+        Vas a activar <strong>{getPlanDisplayName(planId)} {cycle === 'yearly' ? 'anual' : 'mensual'}</strong> hasta el{' '}
         <strong>{endDatePreview}</strong>.
       </div>
     </Modal>

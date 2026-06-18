@@ -13,6 +13,9 @@ import {
   ACCESS_TIER_OPTIONS,
   LEGACY_LEVEL_LABEL,
   LEVEL_OPTIONS,
+  REQUIRED_PLAN_LABEL,
+  accessTierFromCourse,
+  requiredPlanFromCourse,
 } from '../lib/courseConstants';
 import { humanizeSkillId } from '../lib/skillId';
 import type { Course, CourseAccessTier } from '../types';
@@ -24,9 +27,8 @@ type DurationFilter = 'all' | 'short' | 'medium' | 'long';
 type StatusFilter = 'all' | 'active' | 'inactive';
 type TierFilter = 'all' | CourseAccessTier;
 
-function tierFromCourse(course: Course): CourseAccessTier {
-  if (course.accessTier) return course.accessTier;
-  return course.isPremium ? 'lite' : 'free';
+function tierFromCourse(course: Course) {
+  return accessTierFromCourse(course);
 }
 
 function skillLabel(skillId: string): string {
@@ -265,12 +267,24 @@ export function CoursesView() {
     },
     {
       key: 'accessTier',
-      label: 'Acceso',
+      label: 'Tipo',
       render: (row) => {
         const tier = tierFromCourse(row);
         return (
           <span className={`${filterStyles.tierPill} ${filterStyles[`tierPill_${tier}`]}`}>
             {ACCESS_TIER_LABEL[tier]}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'requiredPlan',
+      label: 'Membresía',
+      render: (row) => {
+        const plan = requiredPlanFromCourse(row);
+        return (
+          <span className={`${filterStyles.tierPill} ${filterStyles[`planPill_${plan}`]}`}>
+            {REQUIRED_PLAN_LABEL[plan]}
           </span>
         );
       },
@@ -367,9 +381,9 @@ export function CoursesView() {
         className={filterStyles.select}
         value={tierFilter}
         onChange={(e) => setTierFilter(e.target.value as TierFilter)}
-        aria-label="Filtrar por tipo de acceso"
+        aria-label="Filtrar por tipo de curso"
       >
-        <option value="all">Cualquier acceso</option>
+        <option value="all">Cualquier tipo</option>
         {ACCESS_TIER_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}

@@ -12,6 +12,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { apiFetch } from '../lib/api';
 import { csvFilename, exportCsv } from '../lib/csv';
 import { formatCurrency, formatDate, formatNumber } from '../lib/format';
+import { getPlanDisplayName } from '../lib/planDisplay';
 import type { AdminUserRow, GrantPlanBody } from '../types';
 import styles from '../app/dashboard.module.css';
 import filterStyles from './CoursesFilters.module.css';
@@ -32,9 +33,9 @@ type DialogKind =
 
 const PLAN_KEYS: Array<{ value: PlanFilter; label: string }> = [
   { value: 'all', label: 'Todos los planes' },
-  { value: 'free', label: 'FREE' },
-  { value: 'pro', label: 'PRO' },
-  { value: 'elite', label: 'ELITE' },
+  { value: 'free', label: 'Open' },
+  { value: 'pro', label: 'Pro' },
+  { value: 'elite', label: 'Black' },
 ];
 
 const STATUS_KEYS: Array<{ value: StatusFilter; label: string }> = [
@@ -200,7 +201,7 @@ export function UsersView() {
       toast.show({
         tone: 'success',
         title: 'Plan otorgado',
-        message: `${target.displayName} ahora tiene ${body.planId.toUpperCase()} por ${body.durationDays} dias.`,
+        message: `${target.displayName} ahora tiene ${getPlanDisplayName(body.planId)} por ${body.durationDays} dias.`,
       });
       await load();
     });
@@ -349,7 +350,7 @@ export function UsersView() {
         const status = effectiveStatus(row);
         return (
           <div className={userStyles.pillRow}>
-            <span className={`${userStyles.pill} ${planClass(plan)}`}>{plan.toUpperCase()}</span>
+            <span className={`${userStyles.pill} ${planClass(plan)}`}>{getPlanDisplayName(plan)}</span>
             {status ? (
               <span className={`${userStyles.pill} ${statusClass(status)}`}>{status}</span>
             ) : (

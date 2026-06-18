@@ -428,7 +428,7 @@ export const hooksFlowSteps: HookStep[] = [
     plans: [
       {
         id: 'pro',
-        name: 'PRO',
+        name: 'Pro',
         pitch: 'Catálogo completo',
         priceMonthly: 9.9,
         priceYearly: 95.0,
@@ -438,7 +438,7 @@ export const hooksFlowSteps: HookStep[] = [
       },
       {
         id: 'free',
-        name: 'FREE',
+        name: 'Open',
         pitch: '3 módulos por habilidad',
         priceMonthly: 0,
         priceYearly: 0,
@@ -447,8 +447,8 @@ export const hooksFlowSteps: HookStep[] = [
       },
       {
         id: 'elite',
-        name: 'ELITE',
-        pitch: 'PRO + sesiones 1:1',
+        name: 'Black',
+        pitch: 'Pro + sesiones 1:1',
         priceMonthly: 24.9,
         priceYearly: 239.0,
         currency: 'USD',
@@ -490,7 +490,7 @@ export const hooksFlowSteps: HookStep[] = [
     kind: 'confirmPlan',
     counted: true,
     title: 'Confirmar plan',
-    planLabel: 'PLAN PRO',
+    planLabel: 'Plan Pro',
     trialDays: 7,
     trialCaption: 'gratis · sin cargo',
     afterPricing: 'Después: USD 9.90 / mes. Cancelás cuando quieras.',
@@ -509,7 +509,7 @@ export const hooksFlowSteps: HookStep[] = [
     subtitle: 'Activá tu beneficio en segundos',
     placeholder: 'XXXX - XXXX',
     infoBody:
-      'Activa ELITE 2 meses. Te pediremos tarjeta como respaldo, sin cobros durante ese período.',
+      'Activa Black 2 meses. Te pediremos tarjeta como respaldo, sin cobros durante ese período.',
     ctaLabel: 'Canjear y activar',
   },
 
@@ -521,7 +521,7 @@ export const hooksFlowSteps: HookStep[] = [
     counted: false,
     content: {
       scriptLine: '¡Bienvenido!',
-      headline: 'Tu plan ELITE está activo',
+      headline: 'Tu plan Black está activo',
       caption: 'Hasta el 22 de junio · sin cobros',
       ribbonLabel: 'Código aplicado',
     },

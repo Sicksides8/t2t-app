@@ -82,7 +82,60 @@ En Google Play Console del cliente:
 
 ---
 
-## 5. EAS / expo.dev
+## 5. Suscripciones Google Play (billing)
+
+Fuente de verdad en código:
+
+- App móvil: [`src/services/billing/googlePlaySkus.ts`](./src/services/billing/googlePlaySkus.ts)
+- Backend (verificación / RTDN): [`apps/web-crm/src/lib/googlePlay.ts`](../web-crm/src/lib/googlePlay.ts)
+
+Los IDs internos en Firestore y la app siguen siendo `free` | `pro` | `elite`. En Play Console y en la UI del producto usamos **Open / Pro / Black**; solo **Pro** y **Black** tienen SKU (Open es gratuito).
+
+### Product IDs a crear
+
+En Play Console → **Monetization → Products → Subscriptions**, crear exactamente estos cuatro productos:
+
+| Plan interno | Nombre UI | Product ID | Precio referencia (USD) |
+|--------------|-----------|------------|------------------------|
+| `pro` | Pro | `t2t_pro_monthly` | 9.90 / mes |
+| `pro` | Pro | `t2t_pro_yearly` | 95.00 / año |
+| `elite` | Black | `t2t_black_monthly` | 24.90 / mes |
+| `elite` | Black | `t2t_black_yearly` | 239.00 / año |
+
+> **No crear** SKUs para Open (`free`). Ese plan no pasa por Google Play Billing.
+
+### Base plans y trial
+
+Para **cada** product ID de la tabla:
+
+1. Crear un **base plan** (mensual o anual según corresponda) con el precio listado arriba. Google Play localiza moneda y monto según el país del usuario.
+2. Crear un **offer** de prueba gratuita con `offerId` = **`trial-7d`** (exactamente ese string — lo usa la app para detectar el trial).
+3. Publicar la suscripción cuando esté completa.
+
+El tag del trial está definido en código como `PLAY_TRIAL_OFFER_TAG = 'trial-7d'` en `googlePlaySkus.ts`.
+
+### Backend y activación en la app
+
+Antes de probar compras reales:
+
+1. En **web-crm** (`.env` / variables del deploy):
+   - `GOOGLE_PLAY_SERVICE_ACCOUNT_B64` — service account con acceso a Android Publisher API.
+   - `GOOGLE_PLAY_RTDN_VERIFY_TOKEN` — token para el endpoint RTDN (`/api/billing/google/rtdn`).
+2. En la app (`apps/mobile/.env` o EAS env vars):
+   - `EXPO_PUBLIC_API_BASE_URL` → URL del web-crm desplegado.
+   - `EXPO_PUBLIC_USE_GOOGLE_BILLING=1` → activa `googlePlayBillingProvider` en Android (sin esto sigue el mock).
+
+Checklist rápido:
+
+- [ ] Los 4 product IDs existen en Play Console con nombres exactos (`t2t_pro_*`, `t2t_black_*`).
+- [ ] Cada uno tiene base plan + offer `trial-7d`.
+- [ ] Service account del backend configurado y RTDN apuntando al CRM.
+- [ ] Build EAS (no Expo Go) con plugin `expo-iap` y `EXPO_PUBLIC_USE_GOOGLE_BILLING=1`.
+- [ ] Compra de prueba con cuenta **License tester** en Play Console.
+
+---
+
+## 6. EAS / expo.dev
 
 Hoy `app.json` apunta a:
 
@@ -109,9 +162,10 @@ npx eas-cli@latest submit --platform android --profile production --latest
 
 ---
 
-## 6. Smoke test antes de submit (cuenta cliente)
+## 7. Smoke test antes de submit (cuenta cliente)
 
 - Login email/contraseña → Firestore lee/escribe.
 - Google Sign-In en dispositivo físico con el AAB firmado por el nuevo keystore.
 - Push notifications (FCM): el `mobilesdk_app_id` nuevo debería estar en el `google-services.json` actualizado.
 - Deep links / OAuth callbacks usando `scheme: t2tacademy` (no cambió).
+- Suscripción Pro o Black: trial de 7 días, verificación en backend y estado reflejado en perfil (`subscriptionPlan` / `subscriptionStatus`).

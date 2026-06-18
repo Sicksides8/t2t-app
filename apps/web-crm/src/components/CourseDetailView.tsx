@@ -12,16 +12,18 @@ import { apiFetch } from '../lib/api';
 import {
   ACCESS_TIER_LABEL,
   LEGACY_LEVEL_LABEL,
+  REQUIRED_PLAN_LABEL,
+  accessTierFromCourse,
+  requiredPlanFromCourse,
 } from '../lib/courseConstants';
 import { humanizeSkillId } from '../lib/skillId';
-import type { Course, CourseAccessTier, CourseDetailPayload } from '../types';
+import type { Course, CourseDetailPayload } from '../types';
 import styles from '../app/dashboard.module.css';
 import filterStyles from './CoursesFilters.module.css';
 import modalStyles from './courses/CourseModal.module.css';
 
-function tierFromCourse(course: Course): CourseAccessTier {
-  if (course.accessTier) return course.accessTier;
-  return course.isPremium ? 'lite' : 'free';
+function tierFromCourse(course: Course) {
+  return accessTierFromCourse(course);
 }
 
 function skillLabel(skillId: string): string {
@@ -161,7 +163,7 @@ export function CourseDetailView({ courseId }: { courseId: string }) {
                 <dd>{LEGACY_LEVEL_LABEL[course.level] || course.level}</dd>
               </div>
               <div>
-                <dt>Tipo de acceso</dt>
+                <dt>Tipo de curso</dt>
                 <dd>
                   <span
                     className={`${filterStyles.tierPill} ${
@@ -169,6 +171,18 @@ export function CourseDetailView({ courseId }: { courseId: string }) {
                     }`}
                   >
                     {ACCESS_TIER_LABEL[tierFromCourse(course)]}
+                  </span>
+                </dd>
+              </div>
+              <div>
+                <dt>Membresía requerida</dt>
+                <dd>
+                  <span
+                    className={`${filterStyles.tierPill} ${
+                      filterStyles[`planPill_${requiredPlanFromCourse(course)}`]
+                    }`}
+                  >
+                    {REQUIRED_PLAN_LABEL[requiredPlanFromCourse(course)]}
                   </span>
                 </dd>
               </div>

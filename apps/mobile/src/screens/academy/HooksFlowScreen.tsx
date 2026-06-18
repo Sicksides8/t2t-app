@@ -36,6 +36,7 @@ import { applyCodeToUser } from '../../services/couponService';
 import { useAuthStore } from '../../stores';
 import { Colors, Spacing } from '../../theme';
 import type { PlanHorizonDays, SubscriptionPlanId, SubscriptionSource } from '../../types';
+import { getPlanDisplayName } from '../../utils/planDisplay';
 
 const HORIZON_STEP_ID = '46b_Hook_Horizonte';
 
@@ -113,7 +114,7 @@ export function HooksFlowScreen() {
       // beneficio real del código y no el texto hardcoded del seed.
       if (base.kind === 'codeApplied' && appliedCodeResult) {
         const { targetPlan, durationDays, discountPercent } = appliedCodeResult;
-        const planName = targetPlan.toUpperCase();
+        const planName = getPlanDisplayName(targetPlan);
         const ribbon = discountPercent === 100
           ? 'Código aplicado · gratis'
           : `Código aplicado · ${discountPercent}% off`;

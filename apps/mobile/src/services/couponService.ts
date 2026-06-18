@@ -37,6 +37,7 @@ import { db } from './firebase';
 import { getUserProfile, updateUserFields } from './authService';
 import { getBillingProvider } from './subscriptionService';
 import { hasActivePaidPlan } from '../utils/subscriptionAccess';
+import { getPlanDisplayName } from '../utils/planDisplay';
 import type {
   Subscription,
   SubscriptionCode,
@@ -144,7 +145,7 @@ function resolveTargetPlan(
 }
 
 function planLabel(plan: SubscriptionPlanId): string {
-  return plan.toUpperCase();
+  return getPlanDisplayName(plan);
 }
 
 function buildSuccessMessage(

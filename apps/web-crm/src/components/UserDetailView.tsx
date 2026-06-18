@@ -15,6 +15,7 @@ import {
   formatDateTime,
   formatNumber,
 } from '../lib/format';
+import { getPlanDisplayName } from '../lib/planDisplay';
 import type { CoinTxRow, PaymentRow, UserDetail } from '../types';
 import styles from '../app/dashboard.module.css';
 
@@ -122,7 +123,7 @@ export function UserDetailView({ uid }: Props) {
               </div>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                 <span className={styles.badge}>
-                  {(detail.subscription?.planId || detail.user.subscriptionPlan || 'free').toUpperCase()}
+                  {getPlanDisplayName(detail.subscription?.planId || detail.user.subscriptionPlan || 'free')}
                 </span>
                 {detail.subscription?.status ? (
                   <span className={styles.muted}>{detail.subscription.status}</span>
@@ -254,7 +255,7 @@ function SubscriptionTab({ detail }: { detail: UserDetail }) {
   return (
     <section className={styles.panel}>
       <dl className={styles.detailList}>
-        <div><dt>Plan</dt><dd>{s.planId.toUpperCase()}</dd></div>
+        <div><dt>Plan</dt><dd>{getPlanDisplayName(s.planId)}</dd></div>
         <div><dt>Status</dt><dd>{s.status}</dd></div>
         <div><dt>Origen</dt><dd>{s.source}</dd></div>
         <div><dt>Ciclo</dt><dd>{s.cycle}</dd></div>
@@ -297,7 +298,7 @@ function PaymentsTab({ detail }: { detail: UserDetail }) {
             <tr key={p.id}>
               <td>{formatDateTime(p.paidAt)}</td>
               <td><code>{p.txId}</code></td>
-              <td>{p.planLabel || p.plan.toUpperCase()}</td>
+              <td>{p.planLabel || getPlanDisplayName(p.plan)}</td>
               <td>{p.method}</td>
               <td>{formatCurrency(p.amount, p.currency)}</td>
               <td><span className={styles.badge}>{p.status}</span></td>

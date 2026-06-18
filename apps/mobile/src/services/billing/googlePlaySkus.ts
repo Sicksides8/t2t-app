@@ -7,7 +7,8 @@
  *   - un offer "trial-7d": 7 dias gratis para usuarios elegibles. Debe llamarse
  *     EXACTAMENTE PLAY_TRIAL_OFFER_TAG para que el provider lo levante.
  *
- * Para PRO se cobra mensual USD 9.90 / anual USD 95. Google Play traduce
+ * Para Pro se cobra mensual USD 9.90 / anual USD 95; para Black USD 24.90 / 239.
+ * Google Play traduce automaticamente a moneda local segun el storefront del usuario; la app
  * automaticamente a moneda local segun el storefront del usuario; la app
  * NO debe mostrar el precio canonico en flujos de compra: hay que leerlo
  * de Product.priceAmount + Product.currency que devuelve fetchProducts().
@@ -20,8 +21,8 @@ export const PLAY_SKUS: Record<Exclude<SubscriptionPlanId, 'free'>, Record<Billi
     yearly: 't2t_pro_yearly',
   },
   elite: {
-    monthly: 't2t_elite_monthly',
-    yearly: 't2t_elite_yearly',
+    monthly: 't2t_black_monthly',
+    yearly: 't2t_black_yearly',
   },
 };
 

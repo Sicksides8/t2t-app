@@ -2,6 +2,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import type { androidpublisher_v3 } from 'googleapis';
 import type { PaymentRow, PaymentStatus, PaymentMethod, PaymentCycle } from '../types';
 import { getCanonicalPlan, monthlyPriceFor } from './plans';
+import { getPlanDisplayName } from './planDisplay';
 import { hasTrialOffer, parsePlayProductId } from './googlePlay';
 
 export function toIso(value: unknown): string | null {
@@ -107,7 +108,7 @@ export function mapPlayPurchaseToPayment(params: {
         : canonical.priceMonthly
       : monthlyPriceFor(planId, cycle);
   const currency = canonical?.currency || 'USD';
-  const planName = canonical?.name || planId.toUpperCase();
+  const planName = canonical?.name || getPlanDisplayName(planId);
   const cycleLabel = cycle === 'yearly' ? 'anual' : 'mensual';
 
   const startMs = sub.startTime ? Date.parse(sub.startTime) : Date.now();

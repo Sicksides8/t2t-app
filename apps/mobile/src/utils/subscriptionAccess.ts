@@ -69,14 +69,13 @@ export function hasActivePaidPlan(user?: User | null): boolean {
 const PLAN_RANK: Record<SubscriptionPlanId, number> = { free: 0, pro: 1, elite: 2 };
 
 /**
- * Plan mínimo necesario para acceder al curso. Combina `accessTier` (nuevo,
- * granular) con el flag legacy `isPremium`:
- *   accessTier='premium' -> 'elite'
- *   accessTier='lite'    -> 'pro'
- *   accessTier='free'    -> 'free'
- *   sin accessTier       -> isPremium ? 'pro' : 'free'
+ * Plan mínimo necesario para acceder al curso.
+ *   requiredPlan (nuevo)     -> fuente de verdad cuando el CRM lo define.
+ *   accessTier (legacy)      -> premium->elite, lite->pro, free->free
+ *   sin accessTier           -> isPremium ? 'pro' : 'free'
  */
 export function getRequiredPlan(course: Course): SubscriptionPlanId {
+  if (course.requiredPlan) return course.requiredPlan;
   const tier: CourseAccessTier | undefined = course.accessTier;
   if (tier === 'premium') return 'elite';
   if (tier === 'lite') return 'pro';

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/Toast';
+import { getPlanDisplayName } from '../../lib/planDisplay';
 import type { CodeAppliesTo, CreateCodeBody, SubscriptionCodeRow } from '../../types';
 import styles from './CodesExtras.module.css';
 
@@ -26,9 +27,9 @@ function randomCode(length = 8): string {
 }
 
 const APPLIES_OPTIONS: Array<{ value: CodeAppliesTo; label: string }> = [
-  { value: 'pro', label: 'PRO' },
-  { value: 'elite', label: 'ELITE' },
-  { value: 'any_paid', label: 'Cualquier plan pago (PRO + ELITE)' },
+  { value: 'pro', label: getPlanDisplayName('pro') },
+  { value: 'elite', label: getPlanDisplayName('elite') },
+  { value: 'any_paid', label: 'Cualquier plan pago (Pro + Black)' },
 ];
 
 export function CreateCodeModal({ open, onClose, onSubmit }: Props) {
@@ -150,7 +151,7 @@ export function CreateCodeModal({ open, onClose, onSubmit }: Props) {
     <Modal
       open={open}
       title="Crear codigo de descuento"
-      description="Generá un cupón promocional para PRO o ELITE."
+      description="Generá un cupón promocional para Pro o Black."
       onClose={onClose}
       busy={busy}
       maxWidth={560}

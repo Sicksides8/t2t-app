@@ -6,6 +6,7 @@ import { AdminPage, type AdminColumn } from './AdminPage';
 import { CreateCodeModal } from './codes/CreateCodeModal';
 import { apiFetch } from '../lib/api';
 import { formatDate } from '../lib/format';
+import { getPlanDisplayName } from '../lib/planDisplay';
 import type {
   CodeAppliesTo,
   CreateCodeBody,
@@ -24,10 +25,10 @@ function computeStatus(row: SubscriptionCodeRow): CodeStatus {
 }
 
 function appliesLabel(appliesTo: CodeAppliesTo | undefined, fallbackPlan: string): string {
-  if (appliesTo === 'any_paid') return 'Pago (PRO + ELITE)';
-  if (appliesTo === 'pro') return 'PRO';
-  if (appliesTo === 'elite') return 'ELITE';
-  return fallbackPlan ? fallbackPlan.toUpperCase() : '—';
+  if (appliesTo === 'any_paid') return 'Pago (Pro + Black)';
+  if (appliesTo === 'pro') return getPlanDisplayName('pro');
+  if (appliesTo === 'elite') return getPlanDisplayName('elite');
+  return fallbackPlan ? getPlanDisplayName(fallbackPlan) : '—';
 }
 
 function appliesPillClass(appliesTo: CodeAppliesTo | undefined, fallbackPlan: string): string {

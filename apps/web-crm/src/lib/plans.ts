@@ -1,3 +1,5 @@
+import { PLAN_DISPLAY_NAME } from './planDisplay';
+
 /**
  * Catalogo canonico de planes T2T.
  *
@@ -28,7 +30,7 @@ export interface CanonicalPlan {
 export const CANONICAL_PLANS: CanonicalPlan[] = [
   {
     id: 'free',
-    name: 'FREE',
+    name: PLAN_DISPLAY_NAME.free,
     priceMonthly: 0,
     priceYearly: 0,
     currency: 'USD',
@@ -37,7 +39,7 @@ export const CANONICAL_PLANS: CanonicalPlan[] = [
   },
   {
     id: 'pro',
-    name: 'PRO',
+    name: PLAN_DISPLAY_NAME.pro,
     priceMonthly: 9.9,
     priceYearly: 95.0,
     currency: 'USD',
@@ -46,7 +48,7 @@ export const CANONICAL_PLANS: CanonicalPlan[] = [
   },
   {
     id: 'elite',
-    name: 'ELITE',
+    name: PLAN_DISPLAY_NAME.elite,
     priceMonthly: 24.9,
     priceYearly: 239.0,
     currency: 'USD',

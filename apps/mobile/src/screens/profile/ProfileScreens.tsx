@@ -50,6 +50,7 @@ import { useAcademyStore, useAuthStore, useNotificationStore } from '../../store
 import { Colors, Spacing, Typography } from '../../theme';
 import { computeProfileStats } from '../../utils/profileStats';
 import { hasActivePaidPlan, subscriptionPlanToSeedPlan } from '../../utils/subscriptionAccess';
+import { getPlanDisplayName } from '../../utils/planDisplay';
 import { generateAndShareCertificatePdf } from '../../utils/certificatePdf';
 import type {
   Achievement,
@@ -127,8 +128,8 @@ export function ProfileMainScreen({ navigation }: ProfileProps) {
   const progressMap = useAcademyStore((state) => state.progress);
   // Preferimos el plan canónico (free|pro|elite); fallback al legacy selectedPlan.
   const planName = (() => {
-    if (user?.subscriptionPlan) return user.subscriptionPlan.toUpperCase();
-    return plans.find((p) => p.id === user?.selectedPlan)?.name || 'Starter';
+    if (user?.subscriptionPlan) return getPlanDisplayName(user.subscriptionPlan);
+    return plans.find((p) => p.id === user?.selectedPlan)?.name || 'Open';
   })();
 
   const stats = useMemo(() => computeProfileStats(progressMap, user), [progressMap, user]);
@@ -188,7 +189,7 @@ export function RedeemCodeScreen({ navigation }: ProfileProps) {
 
   const alreadyPaid = hasActivePaidPlan(user);
   const currentPlanLabel = user?.subscriptionPlan
-    ? user.subscriptionPlan.toUpperCase()
+    ? getPlanDisplayName(user.subscriptionPlan)
     : null;
 
   const submit = async () => {
@@ -414,7 +415,7 @@ export function SubscriptionScreen({ navigation }: ProfileProps) {
       await refreshUserProfile();
       const list = await getPaymentHistory(user.id);
       setPayments(list);
-      Alert.alert('Plan actualizado', `Tu nuevo plan es ${newPlanId.toUpperCase()}.`);
+      Alert.alert('Plan actualizado', `Tu nuevo plan es ${getPlanDisplayName(newPlanId)}.`);
     } catch (err) {
       console.error('[SubscriptionScreen] changePlan failed:', err);
       Alert.alert('Error', 'No se pudo cambiar el plan. Intentá de nuevo.');
@@ -448,7 +449,7 @@ export function SubscriptionScreen({ navigation }: ProfileProps) {
         </View>
       ) : (
         <Button
-          title="Activar plan PRO"
+          title="Activar plan Pro"
           onPress={() => setChangeOpen(true)}
           disabled={busy}
         />

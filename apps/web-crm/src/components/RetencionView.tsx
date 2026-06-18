@@ -18,6 +18,7 @@ import {
   formatNumber,
   formatPercent,
 } from '../lib/format';
+import { getPlanDisplayName } from '../lib/planDisplay';
 import type { CohortBucket, RetentionKpis } from '../types';
 import styles from '../app/dashboard.module.css';
 
@@ -220,7 +221,7 @@ export function RetencionView() {
               <tbody>
                 {kpis.ltvByPlan.map((p) => (
                   <tr key={p.plan}>
-                    <td>{p.plan.toUpperCase()}</td>
+                    <td>{getPlanDisplayName(p.plan)}</td>
                     <td>{formatNumber(p.payers)}</td>
                     <td>{formatCurrency(p.arpu)}</td>
                     <td>{formatCurrency(p.ltv)}</td>

@@ -28,9 +28,9 @@ const DURATIONS: { id: CourseDurationBucket; label: string }[] = [
 ];
 
 const PLANS: { id: CoursePlanFilter; label: string }[] = [
-  { id: 'FREE', label: 'FREE' },
-  { id: 'PRO', label: 'PRO' },
-  { id: 'ELITE', label: 'ELITE' },
+  { id: 'FREE', label: 'Open' },
+  { id: 'PRO', label: 'Pro' },
+  { id: 'ELITE', label: 'Black' },
 ];
 
 export function CourseFiltersSheet({ visible, filters, resultCount, onApply, onClose }: Props) {
