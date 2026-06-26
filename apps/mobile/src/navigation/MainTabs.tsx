@@ -1,6 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ExploreScreen } from '../screens/academy/ExploreScreen';
@@ -22,28 +23,39 @@ const ICONS: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Ionico
   ProfileTab: ['person-outline', 'person'],
 };
 
+/** Rutas del stack Perfil donde el tab bar tapa el footer fijo. */
+const PROFILE_ROUTES_HIDE_TAB_BAR = new Set(['DiagnosticRetake', 'WeeklyChallenge']);
+
+function buildTabBarStyle(bottomPad: number, tabBarHeight: number, hidden = false) {
+  if (hidden) {
+    return { display: 'none' as const };
+  }
+  return {
+    position: 'absolute' as const,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+    borderTopColor: '#FFFFFF1A',
+    borderTopWidth: 1,
+    paddingTop: 8,
+    paddingBottom: bottomPad,
+    minHeight: tabBarHeight,
+    elevation: 0,
+  };
+}
+
 export default function MainTabs() {
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, Spacing.sm);
   const tabBarHeight = TAB_BAR_CONTENT_MIN + bottomPad;
+  const defaultTabBarStyle = buildTabBarStyle(bottomPad, tabBarHeight);
 
   return (
     <Tabs.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarStyle: {
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'transparent',
-          borderTopColor: '#FFFFFF1A',
-          borderTopWidth: 1,
-          paddingTop: 8,
-          paddingBottom: bottomPad,
-          minHeight: tabBarHeight,
-          elevation: 0,
-        },
+        tabBarStyle: defaultTabBarStyle,
         tabBarBackground: () => (
           <View
             style={{
@@ -68,7 +80,18 @@ export default function MainTabs() {
       <Tabs.Screen name="HomeTab" component={HomeScreen} options={{ title: 'Inicio' }} />
       <Tabs.Screen name="ExploreTab" component={ExploreScreen} options={{ title: 'Explorar' }} />
       <Tabs.Screen name="MyCoursesTab" component={MyCoursesScreen} options={{ title: 'Mis cursos' }} />
-      <Tabs.Screen name="ProfileTab" component={ProfileStack} options={{ title: 'Perfil' }} />
+      <Tabs.Screen
+        name="ProfileTab"
+        component={ProfileStack}
+        options={({ route }) => {
+          const routeName = getFocusedRouteNameFromRoute(route) ?? 'ProfileMain';
+          const hideTabBar = PROFILE_ROUTES_HIDE_TAB_BAR.has(routeName);
+          return {
+            title: 'Perfil',
+            tabBarStyle: buildTabBarStyle(bottomPad, tabBarHeight, hideTabBar),
+          };
+        }}
+      />
     </Tabs.Navigator>
   );
 }

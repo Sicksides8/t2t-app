@@ -1,9 +1,10 @@
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { FS_COL } from '../constants/firestoreCollections';
 import { auth, db } from './firebase';
 import { apiFetch, hasApiBaseUrl } from './api';
 import { tryApi } from './dataSource';
 import type { CourseProgress } from '../types';
+import { buildLessonCompleteProgress } from '../utils/courseProgress';
 
 function progressDocRef(userId: string, courseId: string) {
   return doc(db, FS_COL.progress, userId, FS_COL.progressCoursesSub, courseId);
@@ -18,8 +19,23 @@ export async function saveProgressToFirestore(userId: string, progress: CoursePr
         currentLessonId: progress.currentLessonId,
         lessonsCompleted: progress.lessonsCompleted,
         percentComplete: progress.percentComplete,
+        ...(progress.skillImpactApplied ? { skillImpactApplied: true } : {}),
         updatedAt: serverTimestamp(),
       },
+      { merge: true },
+    );
+  } catch {
+    /* offline */
+  }
+}
+
+export async function markSkillImpactApplied(courseId: string): Promise<void> {
+  const userId = auth.currentUser?.uid;
+  if (!userId) return;
+  try {
+    await setDoc(
+      progressDocRef(userId, courseId),
+      { skillImpactApplied: true, updatedAt: serverTimestamp() },
       { merge: true },
     );
   } catch {
@@ -49,17 +65,20 @@ export async function enrollInCourse(courseId: string): Promise<void> {
   const userId = auth.currentUser?.uid;
   if (userId) {
     try {
-      await setDoc(
-        progressDocRef(userId, courseId),
-        {
+      const ref = progressDocRef(userId, courseId);
+      const existing = await getDoc(ref);
+      if (existing.exists()) {
+        // Ya inscripto: no pisar lessonsCompleted ni percentComplete (merge parcial).
+        await setDoc(ref, { updatedAt: serverTimestamp() }, { merge: true });
+      } else {
+        await setDoc(ref, {
           courseId,
           lessonsCompleted: [],
           percentComplete: 0,
           enrolledAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      );
+        });
+      }
     } catch {
       /* offline */
     }
@@ -80,23 +99,5 @@ export function localProgressUpdate(
   lessonId: string,
   totalLessonsEstimate: number,
 ): CourseProgress {
-  const current = prev || {
-    courseId,
-    lessonsCompleted: [],
-    percentComplete: 0,
-    updatedAt: new Date(),
-  };
-  const lessonsCompleted = Array.from(new Set([...current.lessonsCompleted, lessonId]));
-  const percentComplete = Math.min(
-    100,
-    totalLessonsEstimate > 0 ? Math.round((lessonsCompleted.length / totalLessonsEstimate) * 100) : lessonsCompleted.length * 15,
-  );
-  return {
-    ...current,
-    courseId,
-    lessonsCompleted,
-    currentLessonId: lessonId,
-    percentComplete,
-    updatedAt: new Date(),
-  };
+  return buildLessonCompleteProgress(prev, courseId, lessonId, totalLessonsEstimate);
 }

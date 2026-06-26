@@ -5,7 +5,6 @@ import Svg, { Path } from 'react-native-svg';
 import { Button, CardGlass } from '../ui';
 import { PenpotFlowShell } from '../penpot';
 import {
-  SKILL_LABELS_SHORT,
   type DiagnosticSkillId,
 } from '../../data/diagnostic';
 import { bucketSkill, type DiagnosticBucket } from '../../utils/diagnosticBuckets';
@@ -25,7 +24,7 @@ type ZoneId = 'frontal' | 'prefrontal' | 'temporal' | 'parietal' | 'limbico' | '
 type Zone = {
   id: ZoneId;
   label: string;
-  skills: [DiagnosticSkillId, DiagnosticSkillId];
+  skills: DiagnosticSkillId[];
   /** Coordenadas relativas dentro del cerebro (0..1). */
   dot: { x: number; y: number };
 };
@@ -35,7 +34,7 @@ const BRAIN_ZONES: Zone[] = [
   { id: 'prefrontal', label: 'Prefrontal', skills: ['productividad', 'aprendizaje'],       dot: { x: 0.40, y: 0.22 } },
   { id: 'temporal',   label: 'Temporal',   skills: ['comunicacion', 'escucha'],            dot: { x: 0.28, y: 0.55 } },
   { id: 'parietal',   label: 'Parietal',   skills: ['creatividad', 'resolucion'],          dot: { x: 0.55, y: 0.32 } },
-  { id: 'limbico',    label: 'Límbico',    skills: ['gestionEmocional', 'liderazgoHumano'], dot: { x: 0.50, y: 0.50 } },
+  { id: 'limbico',    label: 'Límbico',    skills: ['gestionEmocional'],                   dot: { x: 0.50, y: 0.50 } },
   { id: 'cerebelo',   label: 'Cerebelo',   skills: ['adaptabilidad', 'equipo'],            dot: { x: 0.70, y: 0.65 } },
 ];
 
@@ -44,7 +43,7 @@ const ZONE_SUBTITLE: Record<ZoneId, string> = {
   prefrontal: 'Productividad · Aprendizaje',
   temporal: 'Comunicación · Escucha',
   parietal: 'Creatividad · Resolución',
-  limbico: 'Gest. Emoc. · Lid. Humano',
+  limbico: 'Gestión emocional',
   cerebelo: 'Adaptabilidad · Equipo',
 };
 
@@ -69,10 +68,9 @@ export function DiagnosticBrainMapScreen({
   const zones = useMemo(
     () =>
       BRAIN_ZONES.map((zone) => {
-        const [a, b] = zone.skills;
-        const sa = diagnostic.scores[a] ?? 0;
-        const sb = diagnostic.scores[b] ?? 0;
-        const avg = (sa + sb) / 2;
+        const avg =
+          zone.skills.reduce((sum, skillId) => sum + (diagnostic.scores[skillId] ?? 0), 0) /
+          zone.skills.length;
         const bucket = bucketSkill(avg);
         return { ...zone, avg, bucket };
       }),

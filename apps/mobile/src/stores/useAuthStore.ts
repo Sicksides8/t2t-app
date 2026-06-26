@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import * as authService from '../services/authService';
 import { isGoogleSignInConfigured, requestGoogleIdToken } from '../services/googleSignIn';
 import { cancelStreakReminder } from '../services/streakReminder';
-import { getBillingProvider } from '../services/subscriptionService';
+import { getBillingProvider, restorePurchases } from '../services/subscriptionService';
 import { mapAuthError } from '../utils/mapAuthError';
 import type { User } from '../types';
 
@@ -61,6 +61,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const user = await authService.login(email, password);
       set({ user, isAuthenticated: true, isLoading: false });
+      await afterAuthSession(user.id);
     } catch (error: unknown) {
       const message = mapAuthError(error);
       set({ error: message, isLoading: false });
@@ -73,6 +74,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const user = await authService.register(email, password, displayName);
       set({ user, isAuthenticated: true, isLoading: false });
+      await afterAuthSession(user.id);
     } catch (error: unknown) {
       const message = mapAuthError(error);
       set({ error: message, isLoading: false });
@@ -85,6 +87,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const user = await authService.loginWithGoogle(idToken);
       set({ user, isAuthenticated: true, isLoading: false });
+      await afterAuthSession(user.id);
     } catch (error: unknown) {
       const message = mapAuthError(error);
       set({ error: message, isLoading: false });
@@ -109,6 +112,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
       const user = await authService.loginWithGoogle(idToken);
       set({ user, isAuthenticated: true, isLoading: false });
+      await afterAuthSession(user.id);
     } catch (error: unknown) {
       if (__DEV__) {
         console.warn('[Auth] Google sign-in failed', error);
@@ -124,6 +128,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const user = await authService.signInWithAppleOAuth();
       set({ user, isAuthenticated: true, isLoading: false });
+      await afterAuthSession(user.id);
     } catch (error: unknown) {
       const code =
         typeof error === 'object' && error !== null && 'code' in error
@@ -222,3 +227,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   clearError: () => set({ error: null }),
 }));
+
+async function afterAuthSession(userId: string): Promise<void> {
+  await restorePurchases(userId).catch(() => undefined);
+}

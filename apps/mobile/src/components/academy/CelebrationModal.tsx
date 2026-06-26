@@ -23,6 +23,9 @@ type Props = {
   variant?: CelebrationVariant;
   progressPercent?: number;
   streakDelta?: number;
+  /** Módulo: botón primario tipo glass con título del próximo módulo. */
+  showNextModuleButton?: boolean;
+  nextModuleTitle?: string;
 };
 
 export function CelebrationModal({
@@ -39,6 +42,8 @@ export function CelebrationModal({
   variant = 'course',
   progressPercent = 0,
   streakDelta,
+  showNextModuleButton = false,
+  nextModuleTitle,
 }: Props) {
   const isModule = variant === 'module';
 
@@ -49,12 +54,16 @@ export function CelebrationModal({
         <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
           <View style={styles.content}>
             {isModule ? (
-              <View style={styles.polaroidWrap}>
-                <View style={styles.ribbon} />
-                <View style={styles.polaroid}>
-                  <Text style={styles.polaroidScript}>¡Módulo completado!</Text>
+              <>
+                <View style={styles.polaroidWrap}>
+                  <View style={styles.ribbon} />
+                  <View style={styles.polaroid}>
+                    <Text style={styles.polaroidScript}>¡Módulo completado!</Text>
+                  </View>
                 </View>
-              </View>
+                <Text style={styles.moduleTitle}>{title}</Text>
+                {body ? <Text style={styles.body}>{body}</Text> : null}
+              </>
             ) : (
               <LinearGradient
                 colors={[Colors.accentHighlight, Colors.accentPrimary]}
@@ -94,7 +103,32 @@ export function CelebrationModal({
           </View>
 
           <View style={styles.actions}>
-            <Button title={primaryLabel} onPress={onPrimary} />
+            {isModule && showNextModuleButton ? (
+              <Pressable
+                onPress={onPrimary}
+                style={({ pressed }) => [styles.nextModuleBtn, pressed && styles.nextModuleBtnPressed]}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  nextModuleTitle
+                    ? `Siguiente módulo: ${nextModuleTitle}`
+                    : 'Siguiente módulo'
+                }
+              >
+                <View style={styles.nextModuleTextCol}>
+                  <Text style={styles.nextModuleKicker}>Siguiente módulo</Text>
+                  {nextModuleTitle ? (
+                    <Text style={styles.nextModuleTitle} numberOfLines={2}>
+                      {nextModuleTitle}
+                    </Text>
+                  ) : null}
+                </View>
+                <View style={styles.nextModuleArrow}>
+                  <Ionicons name="arrow-forward" size={18} color={Colors.textPrimary} />
+                </View>
+              </Pressable>
+            ) : (
+              <Button title={primaryLabel} onPress={onPrimary} />
+            )}
             {secondaryLabel && onSecondary ? (
               <Pressable onPress={onSecondary} style={styles.secondaryBtn} hitSlop={10}>
                 <Text style={styles.secondaryText}>{secondaryLabel}</Text>
@@ -168,6 +202,13 @@ const styles = StyleSheet.create({
   ringWrap: {
     marginTop: 4,
   },
+  moduleTitle: {
+    ...Typography.h2,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+    fontWeight: '800',
+    paddingHorizontal: Spacing.md,
+  },
   title: {
     ...Typography.h1,
     color: Colors.textPrimary,
@@ -209,7 +250,53 @@ const styles = StyleSheet.create({
   actions: {
     width: '100%',
     paddingBottom: 8,
-    gap: 6,
+    gap: 10,
+  },
+  nextModuleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    width: '100%',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF14',
+    borderWidth: 1,
+    borderColor: '#FFFFFF2E',
+  },
+  nextModuleBtnPressed: {
+    opacity: 0.82,
+    backgroundColor: '#FFFFFF1F',
+  },
+  nextModuleTextCol: {
+    flex: 1,
+    gap: 4,
+    minWidth: 0,
+  },
+  nextModuleKicker: {
+    ...Typography.caption,
+    color: Colors.accentHighlight,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  nextModuleTitle: {
+    ...Typography.bodyMedium,
+    color: Colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  nextModuleArrow: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF18',
+    borderWidth: 1,
+    borderColor: '#FFFFFF28',
   },
   secondaryBtn: {
     alignSelf: 'center',

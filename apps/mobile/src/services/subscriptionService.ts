@@ -7,17 +7,10 @@
  *   - getBillingProvider()   : selector Strategy Pattern del proveedor de billing
  *
  * Strategy Pattern:
- *   - DEFAULT  -> mockBillingProvider en todas las plataformas. Simula trial,
- *     cobro, cancelación y renovaciones contra Firestore sin tocar pasarelas
- *     reales. Es el modo seguro para Expo Go, dev builds y demos al cliente.
- *   - OPT-IN   -> setear EXPO_PUBLIC_USE_GOOGLE_BILLING=1 activa
- *     googlePlayBillingProvider en Android (requiere EAS Build con plugin
- *     expo-iap + SKUs creados en Play Console + service account en backend).
- *   - TODO     -> appleIAPProvider (StoreKit2) y mercadoPagoProvider.
- *
- *   La firma de los providers (IBillingProvider) NO cambia, así el resto
- *   de la app (hooks flow, perfil, gating, códigos) sigue funcionando sin tocar.
+ *   - EXPO_PUBLIC_BILLING_MODE=native + build nativo -> Google Play / App Store
+ *   - mock (por defecto), Expo Go o web -> mockBillingProvider
  */
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import type {
   BillingCycle,
@@ -31,6 +24,9 @@ import { plans as seedPlans } from '../data/academy';
 import { apiFetch, hasApiBaseUrl } from './api';
 import { mockBillingProvider } from './mockBillingProvider';
 import { googlePlayBillingProvider } from './billing/googlePlayBillingProvider';
+import { appleIAPBillingProvider } from './billing/appleIAPBillingProvider';
+import { restoreApplePurchases } from './billing/appleIAPBillingProvider';
+import { restorePlayPurchases } from './billing/googlePlayBillingProvider';
 
 type PlansResponse = { success: boolean; data: Plan[] };
 
@@ -111,9 +107,18 @@ export async function fetchPlans(): Promise<Plan[]> {
  * mockBillingProvider para que la sustitución por MercadoPago/IAP sea
  * drop-in (sólo cambiar el return de getBillingProvider()).
  */
+export interface ChangePlanOptions {
+  /** Ciclo destino; si no se pasa, se mantiene el ciclo actual. */
+  cycle?: BillingCycle;
+}
+
 export interface IBillingProvider {
   /** Inicia un trial gratuito (sin cobro). Setea status='trialing'. */
-  startTrial(userId: string, planId: SubscriptionPlanId): Promise<Subscription>;
+  startTrial(
+    userId: string,
+    planId: SubscriptionPlanId,
+    cycle?: BillingCycle,
+  ): Promise<Subscription>;
   /** Cobra y activa la suscripción. status='active'. Crea Payment. */
   subscribe(
     userId: string,
@@ -128,36 +133,82 @@ export interface IBillingProvider {
        * define `durationDays` distintos al ciclo standard (30 monthly / 365 yearly).
        */
       durationDaysOverride?: number;
+      /** Override del monto cobrado (mock: simula proration en changePlan). */
+      chargeAmountOverride?: number;
     },
   ): Promise<Subscription>;
   /** Marca cancelada. El acceso se mantiene hasta endDate/subscriptionRenewsAt. */
   cancel(userId: string): Promise<Subscription>;
-  /** Cambia el plan activo. Cancela el actual y arranca uno nuevo (mock siempre acepta). */
-  changePlan(userId: string, newPlanId: SubscriptionPlanId): Promise<Subscription>;
+  /** Cambia el plan activo con proration cuando la pasarela lo soporta. */
+  changePlan(
+    userId: string,
+    newPlanId: SubscriptionPlanId,
+    options?: ChangePlanOptions,
+  ): Promise<Subscription>;
   /** Lee la suscripción vigente del user (o null si nunca tuvo). */
   getCurrent(userId: string): Promise<Subscription | null>;
   /** Extiende el trial vigente N días (usado por cupones trial_extension). */
   extendTrial(userId: string, extraDays: number): Promise<Subscription>;
 }
 
+/** Valores aceptados de EXPO_PUBLIC_BILLING_MODE. Por defecto: mock. */
+export type BillingMode = 'mock' | 'native';
+
+function resolveBillingMode(): BillingMode {
+  const raw = process.env.EXPO_PUBLIC_BILLING_MODE?.trim().toLowerCase();
+  if (raw === 'native' || raw === 'production' || raw === 'store') return 'native';
+  return 'mock';
+}
+
+/** Modo configurado por env (mock hasta activar tiendas en producción). */
+export function getBillingMode(): BillingMode {
+  return resolveBillingMode();
+}
+
 /**
- * Selector del provider activo (opt-in, default seguro).
+ * True cuando el build puede y debe usar IAP nativo (Google Play / App Store).
+ * Requiere build nativo (no Expo Go/web) y EXPO_PUBLIC_BILLING_MODE=native.
+ */
+export function usesNativeStoreBilling(): boolean {
+  if (resolveBillingMode() !== 'native') return false;
+  if (Platform.OS !== 'android' && Platform.OS !== 'ios') return false;
+  // Expo Go no expone IAP nativo de forma fiable.
+  if (Constants.appOwnership === 'expo') return false;
+  return true;
+}
+
+/** @deprecated Usar usesNativeStoreBilling() */
+export function isGoogleBillingEnabled(): boolean {
+  return usesNativeStoreBilling() && Platform.OS === 'android';
+}
+
+/** @deprecated Usar usesNativeStoreBilling() */
+export function isAppleBillingEnabled(): boolean {
+  return usesNativeStoreBilling() && Platform.OS === 'ios';
+}
+
+/**
+ * Reanuda compras de la tienda nativa tras login (Google Play o App Store).
+ */
+export async function restorePurchases(userId: string): Promise<void> {
+  if (!usesNativeStoreBilling()) return;
+  if (Platform.OS === 'android') {
+    await restorePlayPurchases(userId);
+  } else if (Platform.OS === 'ios') {
+    await restoreApplePurchases(userId);
+  }
+}
+
+/**
+ * Selector del provider activo.
  *
- *   - Default: mockBillingProvider en TODAS las plataformas. Mientras no
- *     haya credenciales reales de Play Console / Apple / MercadoPago, el
- *     mock cubre el flujo end-to-end (trial, cobro, cancel, renew) contra
- *     Firestore y deja la UI / CRM totalmente funcionales.
- *   - Opt-in Google Play: setear EXPO_PUBLIC_USE_GOOGLE_BILLING=1 y correr
- *     en Android con EAS Build. Requiere ademas:
- *       * SKUs creados en Play Console (ver googlePlaySkus.ts).
- *       * Service account + RTDN configurados en web-crm (ver .env.local.example).
- *
- * No cambiar este selector si no se cumplen TODAS las precondiciones — la
- * app se rompe en Android (fetchProducts devuelve vacío, requestPurchase
- * tira NotPrepared).
+ *   - mock (default) / Expo Go / web -> mockBillingProvider
+ *   - native + Android -> googlePlayBillingProvider
+ *   - native + iOS -> appleIAPBillingProvider
  */
 export function getBillingProvider(): IBillingProvider {
-  const useGoogle = process.env.EXPO_PUBLIC_USE_GOOGLE_BILLING === '1';
-  if (useGoogle && Platform.OS === 'android') return googlePlayBillingProvider;
+  if (!usesNativeStoreBilling()) return mockBillingProvider;
+  if (Platform.OS === 'android') return googlePlayBillingProvider;
+  if (Platform.OS === 'ios') return appleIAPBillingProvider;
   return mockBillingProvider;
 }

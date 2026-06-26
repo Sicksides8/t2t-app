@@ -155,8 +155,24 @@ export function CourseDetailView({ courseId }: { courseId: string }) {
                 <dd>{course.id}</dd>
               </div>
               <div>
-                <dt>Habilidad</dt>
+                <dt>Código</dt>
+                <dd>{course.courseCode ?? '—'}</dd>
+              </div>
+              <div>
+                <dt>Categoría principal</dt>
                 <dd>{skillLabel(course.skillId)}</dd>
+              </div>
+              {course.secondarySkillIds?.length ? (
+                <div>
+                  <dt>Tags secundarios</dt>
+                  <dd>{course.secondarySkillIds.map((id) => skillLabel(id)).join(' · ')}</dd>
+                </div>
+              ) : null}
+              <div>
+                <dt>Orden catálogo / plan Beta</dt>
+                <dd>
+                  {course.order ?? '—'} / {course.planOrder ?? '—'}
+                </dd>
               </div>
               <div>
                 <dt>Nivel</dt>
@@ -186,6 +202,22 @@ export function CourseDetailView({ courseId }: { courseId: string }) {
                   </span>
                 </dd>
               </div>
+              {course.skillImpact && Object.keys(course.skillImpact).length > 0 ? (
+                <div>
+                  <dt>Impacto en habilidades</dt>
+                  <dd>
+                    <ul style={{ margin: 0, paddingLeft: 18 }}>
+                      {Object.entries(course.skillImpact)
+                        .filter(([, g]) => g > 0)
+                        .map(([id, g]) => (
+                          <li key={id}>
+                            {skillLabel(id)}: {Math.round(g * 1000) / 10}%
+                          </li>
+                        ))}
+                    </ul>
+                  </dd>
+                </div>
+              ) : null}
               <div>
                 <dt>Módulos</dt>
                 <dd>{course.totalLessons}</dd>

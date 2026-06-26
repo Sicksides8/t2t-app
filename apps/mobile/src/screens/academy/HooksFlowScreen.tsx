@@ -35,7 +35,7 @@ import { getBillingProvider } from '../../services/subscriptionService';
 import { applyCodeToUser } from '../../services/couponService';
 import { useAuthStore } from '../../stores';
 import { Colors, Spacing } from '../../theme';
-import type { PlanHorizonDays, SubscriptionPlanId, SubscriptionSource } from '../../types';
+import type { PlanHorizonDays, SubscriptionPlanId, SubscriptionSource, BillingCycle } from '../../types';
 import { getPlanDisplayName } from '../../utils/planDisplay';
 
 const HORIZON_STEP_ID = '46b_Hook_Horizonte';
@@ -47,8 +47,8 @@ function parseHorizonDays(id: string | undefined): PlanHorizonDays | null {
   return null;
 }
 
-const PROGRESS_TICK_MS = 900;
-const SOCIAL_PROOF_AUTO_MS = 3200;
+const PROGRESS_TICK_MS = 1800;
+const SOCIAL_PROOF_AUTO_MS = 5200;
 
 /**
  * Pasarela de pago a usar al activar el trial desde "Confirmar plan".
@@ -77,6 +77,7 @@ export function HooksFlowScreen() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [hooksAnswers, setHooksAnswers] = useState<Record<string, string[]>>({});
   const [selectedPlanId, setSelectedPlanId] = useState<HookPricingPlan['id'] | null>(null);
+  const [selectedBillingCycle, setSelectedBillingCycle] = useState<BillingCycle>('monthly');
   /**
    * Resultado del canje de código (cuando aplica), usado para personalizar
    * el paso `55_Codigo_Aplicado` con plan y duración reales en vez del
@@ -305,7 +306,7 @@ export function HooksFlowScreen() {
       }
       const planId = selectedPlanId && selectedPlanId !== 'free' ? selectedPlanId : 'pro';
       try {
-        await getBillingProvider().startTrial(uid, planId);
+        await getBillingProvider().startTrial(uid, planId, selectedBillingCycle);
         await authService.updateUserFields(uid, { subscriptionSource: source });
         await refreshUserProfile();
       } catch {
@@ -314,7 +315,7 @@ export function HooksFlowScreen() {
       }
       enterFinal();
     },
-    [enterFinal, refreshUserProfile, selectedPlanId],
+    [enterFinal, refreshUserProfile, selectedPlanId, selectedBillingCycle],
   );
 
   const persistAndAdvance = useCallback(
@@ -570,6 +571,8 @@ export function HooksFlowScreen() {
         setPromoCode,
         selectedPlanId,
         setSelectedPlanId,
+        selectedBillingCycle,
+        setSelectedBillingCycle,
         onRedeemTap: () => setBranch({ kind: 'redeem' }),
         onWelcomeSkip: () => void finishHooks(),
         remoteWelcomeUrl,
@@ -613,6 +616,8 @@ type RenderCtx = {
   setPromoCode: (v: string) => void;
   selectedPlanId: HookPricingPlan['id'] | null;
   setSelectedPlanId: (v: HookPricingPlan['id']) => void;
+  selectedBillingCycle: BillingCycle;
+  setSelectedBillingCycle: (v: BillingCycle) => void;
   onRedeemTap: () => void;
   onWelcomeSkip: () => void;
   remoteWelcomeUrl: string | null;
@@ -698,6 +703,8 @@ function renderStepBody(ctx: RenderCtx) {
             defaultPeriod={step.defaultPeriod}
             selectedPlanId={ctx.selectedPlanId}
             onSelectPlan={ctx.setSelectedPlanId}
+            period={ctx.selectedBillingCycle}
+            onPeriodChange={ctx.setSelectedBillingCycle}
           />
           <Text style={styles.pricingFootnote}>{step.footnote}</Text>
         </View>

@@ -65,7 +65,7 @@ function PlanCard({ style }: { style?: ViewStyle }) {
       <View style={styles.cardHeader}>
         <Text style={styles.cardTitle}>Tu plan</Text>
         <View style={styles.chip}>
-          <Text style={styles.chipText}>12 hab</Text>
+          <Text style={styles.chipText}>11 hab</Text>
         </View>
       </View>
       <Text style={styles.cardCaption}>Esta semana</Text>

@@ -17,7 +17,7 @@ import {
 import { EmptyState, ScreenWrapper, TAB_SCREEN_EDGES } from '../../components/ui';
 import { CourseListSkeleton } from '../../components/ui/Skeleton';
 import { skills } from '../../data/academy';
-import { getLessons, getRecommendedCourses } from '../../services/academyService';
+import { getLessons, getPlanOrderedCourses, getRecommendedCourses } from '../../services/academyService';
 import { useAcademyStore, useAuthStore, useCourseStore, useNotificationStore } from '../../stores';
 import { Spacing } from '../../theme';
 import { computeProfileStats } from '../../utils/profileStats';
@@ -65,6 +65,11 @@ export function HomeScreen() {
     if (!user?.id) return;
     void getRecommendedCourses(user.id, diagnostic.topSkills).then(setRecommended);
   }, [user?.id, diagnostic.topSkills]);
+
+  const planBetaCourses = useMemo(
+    () => getPlanOrderedCourses(storeCourses),
+    [storeCourses],
+  );
 
   const displayCourses = useMemo(() => {
     if (recommended.length) return recommended;
@@ -173,6 +178,27 @@ export function HomeScreen() {
           startedAt={user.planStartedAt}
           onPress={() => navigation.navigate('ProfileTab', { screen: 'DiagnosticApp' })}
         />
+      ) : null}
+
+      {planBetaCourses.length > 0 ? (
+        <View style={[styles.section, styles.sectionSpaced]}>
+          <SectionHeader isFirst title="Tu plan de entrenamiento" />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.carousel}
+          >
+            {planBetaCourses.map((course) => (
+              <ContinueCourseCard
+                key={course.id}
+                course={course}
+                progressPercent={progressMap[course.id]?.percentComplete ?? 0}
+                locked={!canAccessCourse(course, user)}
+                onPress={() => openCourseFromCarousel(course)}
+              />
+            ))}
+          </ScrollView>
+        </View>
       ) : null}
 
       {heroCourse ? (

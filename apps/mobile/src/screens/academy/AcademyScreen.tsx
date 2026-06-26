@@ -25,10 +25,11 @@ import {
   progressLoaderFrames,
   reflectionFrames,
 } from '../../data/onboardingFlow';
+import { getFirstTrainingCourses } from '../../services/courseService';
 import { sendDiagnosticResultEmail } from '../../services/diagnosticEmailService';
 import { saveDiagnosticResult } from '../../services/diagnosticService';
 import { useAcademyStore, useAuthStore } from '../../stores';
-import type { RootStackParamList } from '../../types';
+import type { Course, RootStackParamList } from '../../types';
 
 export { HooksFlowScreen as HooksFlow } from './HooksFlowScreen';
 export { CourseDetailScreen } from './CourseDetailScreen';
@@ -59,8 +60,8 @@ type OnboardingStep =
  * 5 carouselSlide (04-08) → action (09) → opener (10) →
  * Q1..Q4 → reflection 0 (15) → loader 0 (16) →
  * Q5..Q8 → reflection 1 (21) → loader 1 (22) →
- * Q9..Q12 → reflection 2 (27) → loader 2 (28) →
- * Q13 → Q14 → loader 3 (31) → result (32) → closure
+ * Q9..Q11 → reflection 2 (27) → loader 2 (28) →
+ * Q12 → Q13 → loader 3 (31) → result (32) → closure
  *
  * Cada loader funciona como punto de "cálculo" tras la sección
  * correspondiente del diagnóstico (33% → 67% → 83% → 100%).
@@ -93,13 +94,13 @@ function buildOnboardingSteps(): OnboardingStep[] {
       ],
     ],
     [
-      11,
+      10,
       [
         { kind: 'reflection', reflectionIndex: 2 },
         { kind: 'loader', loaderIndex: 2 },
       ],
     ],
-    [13, [{ kind: 'loader', loaderIndex: 3 }]],
+    [12, [{ kind: 'loader', loaderIndex: 3 }]],
   ]);
 
   diagnosticQuestions.forEach((_, index) => {
@@ -129,6 +130,8 @@ type ResultView = 'radar' | 'brainMap' | 'email';
 export function OnboardingFlow({ navigation }: Partial<NativeStackScreenProps<RootStackParamList, 'Onboarding'>>) {
   const [stepIndex, setStepIndex] = useState(0);
   const [resultView, setResultView] = useState<ResultView>('radar');
+  const [closureCourses, setClosureCourses] = useState<Course[]>([]);
+  const [closureLoading, setClosureLoading] = useState(false);
   const resultInitialized = useRef(false);
   const setAnswer = useAcademyStore((state) => state.setAnswer);
   const completeDiagnostic = useAcademyStore((state) => state.completeDiagnostic);
@@ -178,6 +181,27 @@ export function OnboardingFlow({ navigation }: Partial<NativeStackScreenProps<Ro
       resultInitialized.current = true;
     }
   }, [step.kind, completeDiagnostic]);
+
+  useEffect(() => {
+    if (step.kind !== 'closure') return undefined;
+
+    ensureDiagnosticReady();
+    const { weakSkills, topSkills } = useAcademyStore.getState().diagnostic;
+    let cancelled = false;
+    setClosureLoading(true);
+
+    void getFirstTrainingCourses(weakSkills, topSkills)
+      .then((courses) => {
+        if (!cancelled) setClosureCourses(courses);
+      })
+      .finally(() => {
+        if (!cancelled) setClosureLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [step.kind, ensureDiagnosticReady]);
 
   if (step.kind === 'splash') {
     return <SplashPenpotScreen onComplete={goNext} />;
@@ -231,9 +255,11 @@ export function OnboardingFlow({ navigation }: Partial<NativeStackScreenProps<Ro
     const q = diagnosticQuestions[step.index];
     return (
       <DiagnosticQuestionScreen
+        key={q.id}
         question={q}
         questionIndex={step.index}
         totalQuestions={diagnosticQuestions.length}
+        savedValue={diagnostic.answers[q.id]}
         onBack={step.index > 0 ? goBack : undefined}
         onSubmit={(value) => {
           setAnswer(q.id, value);
@@ -302,6 +328,8 @@ export function OnboardingFlow({ navigation }: Partial<NativeStackScreenProps<Ro
 
   return (
     <OnboardingCierreScreen
+      courses={closureCourses}
+      loading={closureLoading}
       onStart={() => void finish()}
       onExplore={() => void finish()}
     />

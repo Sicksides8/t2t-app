@@ -10,7 +10,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { skills } from '../../data/academy';
 import { fetchCourses } from '../../services/courseService';
 import { useAcademyStore, useAuthStore } from '../../stores';
-import { sameSkillId } from '../../utils/skillId';
+import { courseMatchesSkill } from '../../utils/skillCatalog';
 import { canAccessCourse } from '../../utils/subscriptionAccess';
 import { Colors, Spacing, Typography } from '../../theme';
 import type { Course, RootStackParamList } from '../../types';
@@ -33,7 +33,7 @@ type Tab = 'all' | 'in-progress';
 
 export function SkillCatalogScreen({ route, navigation }: NativeStackScreenProps<RootStackParamList, 'SkillCatalog'>) {
   const { skillId, skillName } = route.params;
-  const skill = skills.find((s) => sameSkillId(s.id, skillId));
+  const skill = skills.find((s) => courseMatchesSkill(s.id, skillId));
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters] = useState<CourseFilters>({});
@@ -46,11 +46,10 @@ export function SkillCatalogScreen({ route, navigation }: NativeStackScreenProps
     void (async () => {
       setLoading(true);
       // Usamos fetchCourses (API → Web SDK fallback) y filtramos en memoria
-      // por skillId con sameSkillId para tolerar diferencias de capitalización
-      // o acentos en cursos viejos.
+      // Filtramos en memoria con agrupación canónica (CRM camelCase, acentos, alias).
       const all = await fetchCourses();
       if (!cancelled) {
-        setCourses(all.filter((c) => sameSkillId(c.skillId, skillId)));
+        setCourses(all.filter((c) => courseMatchesSkill(c.skillId, skillId)));
         setLoading(false);
       }
     })();

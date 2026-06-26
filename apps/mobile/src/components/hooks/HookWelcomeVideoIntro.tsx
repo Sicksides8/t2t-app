@@ -71,8 +71,13 @@ export function HookWelcomeVideoIntro({
 
   const togglePlay = () => {
     try {
-      if (player.playing) player.pause();
-      else player.play();
+      if (player.playing) {
+        player.pause();
+        setIsPlaying(false);
+      } else {
+        player.play();
+        setIsPlaying(true);
+      }
     } catch {
       /* noop */
     }
@@ -154,16 +159,18 @@ export function HookWelcomeVideoIntro({
               contentFit="cover"
               fullscreenOptions={{ enable: true }}
             />
-            <View pointerEvents="none" style={styles.centerOverlay}>
-              <View style={styles.centerPlay}>
-                <Ionicons
-                  name={isPlaying ? 'pause' : 'play'}
-                  size={28}
-                  color={Colors.textPrimary}
-                  style={isPlaying ? undefined : styles.centerPlayIcon}
-                />
+            {!isPlaying ? (
+              <View pointerEvents="none" style={styles.centerOverlay}>
+                <View style={styles.centerPlay}>
+                  <Ionicons
+                    name="play"
+                    size={28}
+                    color={Colors.textPrimary}
+                    style={styles.centerPlayIcon}
+                  />
+                </View>
               </View>
-            </View>
+            ) : null}
           </Pressable>
 
           <Pressable

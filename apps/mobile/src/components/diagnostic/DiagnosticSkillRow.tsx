@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { skills } from '../../data/academy';
+import { SKILL_LABELS } from '../../data/diagnostic';
 import { scoreToLevel } from '../../utils/diagnosticBuckets';
 import { Colors } from '../../theme';
 import type { DiagnosticBucket } from '../../utils/diagnosticBuckets';
@@ -24,7 +24,7 @@ type Props = {
 };
 
 export function DiagnosticSkillRow({ skillId, score, bucket }: Props) {
-  const name = skills.find((s) => s.id === skillId)?.name ?? skillId;
+  const name = SKILL_LABELS[skillId as keyof typeof SKILL_LABELS] ?? skillId;
   const { level, max } = scoreToLevel(score);
   const fillColor = BAR_COLORS[bucket];
   const pct = Math.max(0, Math.min(100, score));

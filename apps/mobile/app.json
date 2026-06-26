@@ -8,6 +8,7 @@
     "userInterfaceStyle": "dark",
     "scheme": "t2tacademy",
     "splash": {
+      "image": "./assets/logo-t2t.png",
       "resizeMode": "contain",
       "backgroundColor": "#1D083A"
     },
@@ -25,6 +26,7 @@
       "versionCode": 5,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/logo-t2t.png",
         "backgroundColor": "#1D083A"
       },
       "navigationBar": {

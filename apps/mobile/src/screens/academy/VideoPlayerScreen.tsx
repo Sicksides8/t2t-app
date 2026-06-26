@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,9 +10,13 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as NavigationBar from 'expo-navigation-bar';
+import { StatusBar } from 'expo-status-bar';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   CelebrationModal,
   LessonResourcesSheet,
@@ -21,12 +26,15 @@ import {
   VideoSubtitleOverlay,
   type VideoSettingsOption,
 } from '../../components/academy';
-import { AppBackground } from '../../components/penpot';
 import { ScreenWrapper } from '../../components/ui';
-import { getLessonVideoUrl } from '../../constants/media';
+import {
+  applyLessonPlayerStreaming,
+  getLessonVideoSourceUri,
+  loadLessonIntoPlayer,
+} from '../../utils/videoStreamConfig';
 import { useSubtitles } from '../../hooks/useSubtitles';
 import { auth } from '../../services/firebase';
-import { getLessons, getModules } from '../../services/academyService';
+import { getLessons } from '../../services/academyService';
 import { fetchCourseById } from '../../services/courseService';
 import {
   awardCourseAchievement,
@@ -39,10 +47,14 @@ import {
   completeLesson,
   enrollInCourse,
   localProgressUpdate,
+  markSkillImpactApplied,
   saveProgressToFirestore,
 } from '../../services/progressService';
+import { saveDiagnosticResult } from '../../services/diagnosticService';
 import { recordActivity } from '../../services/streakService';
 import { scheduleStreakReminder } from '../../services/streakReminder';
+import { applyCourseSkillImpact } from '../../utils/applyCourseSkillImpact';
+import { exportCertificatePdf } from '../../utils/exportCertificate';
 import {
   useAcademyStore,
   useAuthStore,
@@ -50,10 +62,27 @@ import {
   useProgressStore,
   VIDEO_PLAYBACK_RATES,
 } from '../../stores';
-import { isModuleJustCompleted } from '../../utils/moduleProgress';
+import { getNextLesson, resolveActiveLesson } from '../../utils/moduleProgress';
+import { buildWatchProgressUpdate, hasMeaningfulWatchTime } from '../../utils/courseProgress';
+import {
+  applyPlaybackRate,
+  clampTimelineTime,
+  isVideoTimelineComplete,
+  normalizePlaybackProgress,
+  PLAYBACK_RATE_SETTLE_MS,
+} from '../../utils/videoPlayback';
 import { canAccessLesson } from '../../utils/subscriptionAccess';
 import { Colors, Spacing } from '../../theme';
-import type { Course, CourseModule, Lesson, RootStackParamList } from '../../types';
+import type { Course, Lesson, RootStackParamList } from '../../types';
+
+type LessonCompleteState = {
+  lessonTitle: string;
+  nextLessonId?: string;
+  nextLessonTitle?: string;
+  hasNextLesson: boolean;
+  progressPercent: number;
+  streakDelta: number;
+};
 
 function formatTime(seconds: number): string {
   const s = Math.max(0, Math.floor(seconds));
@@ -69,24 +98,30 @@ function formatRate(rate: number): string {
 
 type VideoAspect = 'portrait' | 'landscape' | 'unknown';
 
+const CHROME_AUTO_HIDE_MS = 4000;
+
 export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<RootStackParamList, 'VideoPlayer'>) {
   const markLessonComplete = useAcademyStore((state) => state.markLessonComplete);
   const markCourseStarted = useAcademyStore((state) => state.markCourseStarted);
+  const updateWatchProgress = useAcademyStore((state) => state.updateWatchProgress);
   const progressMap = useAcademyStore((state) => state.progress);
   const refreshUserProfile = useAuthStore((state) => state.refreshUserProfile);
   const user = useAuthStore((state) => state.user);
   const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [modules, setModules] = useState<CourseModule[]>([]);
   const [course, setCourse] = useState<Course | null>(null);
   const [courseTitle, setCourseTitle] = useState<string>('');
   const [listOpen, setListOpen] = useState(false);
   const [resourcesOpen, setResourcesOpen] = useState(false);
   const [courseModal, setCourseModal] = useState(false);
-  const [moduleModal, setModuleModal] = useState<{ title?: string; streakDelta?: number } | null>(null);
+  const [lessonCompleteModal, setLessonCompleteModal] = useState<LessonCompleteState | null>(null);
   const [streakMilestone, setStreakMilestone] = useState<{ days: number; bonus: number } | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [playerStatus, setPlayerStatus] = useState<'idle' | 'loading' | 'readyToPlay' | 'error'>('idle');
+  const [hasMediaLoaded, setHasMediaLoaded] = useState(false);
+  const [bufferedPosition, setBufferedPosition] = useState(0);
+  const [chromeVisible, setChromeVisible] = useState(true);
   const [aspect, setAspect] = useState<VideoAspect>('unknown');
   const [speedSheetOpen, setSpeedSheetOpen] = useState(false);
   const [subsSheetOpen, setSubsSheetOpen] = useState(false);
@@ -98,7 +133,55 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
   const insets = useSafeAreaInsets();
   const busyRef = useRef(false);
   const startedRef = useRef(false);
+  const enrolledRef = useRef(false);
+  const lastSavedPercentRef = useRef(0);
+  const totalLessonsRef = useRef(1);
   const autoCompletedRef = useRef<Set<string>>(new Set());
+  const blockAutoCompleteRef = useRef(false);
+  const playbackRateRef = useRef(playbackRate);
+  const rateSettlingRef = useRef(false);
+  const rateSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lessonRef = useRef<Lesson | null>(null);
+  const courseIdRef = useRef(route.params.courseId);
+  const pendingPlayRef = useRef(false);
+  const sourceLoadGenRef = useRef(0);
+  const videoViewRef = useRef<VideoView>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS === 'android') {
+        void NavigationBar.setVisibilityAsync('hidden');
+      }
+      return () => {
+        if (Platform.OS === 'android') {
+          void NavigationBar.setVisibilityAsync('visible');
+        }
+      };
+    }, []),
+  );
+
+  useEffect(() => {
+    playbackRateRef.current = playbackRate;
+  }, [playbackRate]);
+
+  useEffect(() => {
+    courseIdRef.current = route.params.courseId;
+  }, [route.params.courseId]);
+
+  useEffect(() => {
+    autoCompletedRef.current.clear();
+    enrolledRef.current = false;
+    busyRef.current = false;
+    startedRef.current = false;
+  }, [route.params.courseId]);
+
+  useEffect(() => {
+    lastSavedPercentRef.current = progressMap[route.params.courseId]?.percentComplete ?? 0;
+  }, [route.params.courseId, progressMap]);
+
+  useEffect(() => {
+    blockAutoCompleteRef.current = lessonCompleteModal != null || courseModal;
+  }, [lessonCompleteModal, courseModal]);
 
   useEffect(() => {
     void hydratePreferences();
@@ -107,16 +190,24 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
   const activeLessonId = route.params.lessonId;
 
   useEffect(() => {
+    if (route.params.lessonId || lessons.length === 0) return;
+    const firstPending =
+      lessons.find((l) => !progressMap[route.params.courseId]?.lessonsCompleted.includes(l.id)) ??
+      lessons[0];
+    if (firstPending) {
+      navigation.setParams({ lessonId: firstPending.id });
+    }
+  }, [lessons, route.params.courseId, route.params.lessonId, progressMap, navigation]);
+
+  useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const [remoteLessons, remoteModules, remoteCourse] = await Promise.all([
+      const [remoteLessons, remoteCourse] = await Promise.all([
         getLessons(route.params.courseId),
-        getModules(route.params.courseId),
         fetchCourseById(route.params.courseId),
       ]);
       if (!cancelled) {
         setLessons([...remoteLessons].sort((a, b) => a.order - b.order));
-        setModules(remoteModules);
         setCourse(remoteCourse ?? null);
         if (remoteCourse?.title) setCourseTitle(remoteCourse.title);
       }
@@ -126,9 +217,14 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
     };
   }, [route.params.courseId]);
 
-  const lesson = useMemo(() => {
-    return lessons.find((item) => item.id === activeLessonId) || lessons[0] || null;
-  }, [lessons, activeLessonId]);
+  const lesson = useMemo(
+    () => (activeLessonId ? resolveActiveLesson(lessons, activeLessonId) : null),
+    [lessons, activeLessonId],
+  );
+
+  useEffect(() => {
+    lessonRef.current = lesson;
+  }, [lesson]);
 
   /**
    * Gating defensivo: si el user llega al VideoPlayer (deep link, error de UX,
@@ -148,22 +244,90 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
   const courseProgress = progressMap[route.params.courseId];
   const completedBefore = lesson ? courseProgress?.lessonsCompleted.includes(lesson.id) : false;
 
-  const videoSource = lesson ? getLessonVideoUrl(lesson.videoUrl) : '';
-  const player = useVideoPlayer(videoSource, (instance) => {
+  useEffect(() => {
+    totalLessonsRef.current = totalLessons;
+  }, [totalLessons]);
+
+  const videoSourceUri = lesson ? getLessonVideoSourceUri(lesson.videoUrl) : '';
+  const hasVideoSource = Boolean(videoSourceUri);
+  const player = useVideoPlayer(null, (instance) => {
     instance.loop = false;
     instance.pause();
+    try {
+      applyLessonPlayerStreaming(instance);
+      applyPlaybackRate(instance, playbackRateRef.current);
+    } catch {
+      /* noop */
+    }
   });
 
-  // Aplicamos velocidad y preservación de pitch cada vez que cambia la
-  // preferencia o la lección activa (cambia el player interno de expo-video).
+  const isInitialVideoLoading =
+    hasVideoSource &&
+    !hasMediaLoaded &&
+    (playerStatus === 'loading' || playerStatus === 'idle');
+  const isSeekBuffering = hasMediaLoaded && playerStatus === 'loading';
+  const isVideoReady = !hasVideoSource || playerStatus === 'readyToPlay';
+
   useEffect(() => {
-    try {
-      player.preservesPitch = true;
-      player.playbackRate = playbackRate;
-    } catch {
-      /* ignore */
+    if (!isPlaying || isInitialVideoLoading || playerStatus === 'error') {
+      setChromeVisible(true);
+      return undefined;
     }
-  }, [player, playbackRate, lesson?.id]);
+    const timer = setTimeout(() => setChromeVisible(false), CHROME_AUTO_HIDE_MS);
+    return () => clearTimeout(timer);
+  }, [isPlaying, isInitialVideoLoading, playerStatus, lesson?.id]);
+
+  useEffect(() => {
+    setPlayerStatus(player.status);
+    const subscription = player.addListener('statusChange', ({ status, error }) => {
+      setPlayerStatus(status);
+      if (status === 'readyToPlay') {
+        setHasMediaLoaded(true);
+      }
+      if (status === 'error' && __DEV__) {
+        console.warn('[VideoPlayer] status error:', error);
+      }
+    });
+    return () => {
+      try {
+        subscription.remove();
+      } catch {
+        /* noop */
+      }
+    };
+  }, [player]);
+
+  const applyRateWithSettle = useCallback(
+    (rate: number) => {
+      rateSettlingRef.current = true;
+      if (rateSettleTimerRef.current) {
+        clearTimeout(rateSettleTimerRef.current);
+      }
+      try {
+        applyPlaybackRate(player, rate);
+      } catch {
+        /* noop */
+      }
+      rateSettleTimerRef.current = setTimeout(() => {
+        rateSettlingRef.current = false;
+        rateSettleTimerRef.current = null;
+      }, PLAYBACK_RATE_SETTLE_MS);
+    },
+    [player],
+  );
+
+  useEffect(() => {
+    applyRateWithSettle(playbackRate);
+  }, [applyRateWithSettle, playbackRate, lesson?.id]);
+
+  useEffect(
+    () => () => {
+      if (rateSettleTimerRef.current) {
+        clearTimeout(rateSettleTimerRef.current);
+      }
+    },
+    [],
+  );
 
   // Resolución del track de subtítulo activo y carga del .vtt asociado.
   const subtitleTracks = lesson?.subtitles ?? [];
@@ -175,8 +339,75 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
   );
 
   useEffect(() => {
+    if (!lesson?.id) return;
+
+    if (lesson.id) {
+      autoCompletedRef.current.delete(lesson.id);
+    }
+    busyRef.current = false;
+    pendingPlayRef.current = false;
     setAspect('unknown');
-  }, [lesson?.id]);
+    startedRef.current = false;
+    rateSettlingRef.current = false;
+    if (rateSettleTimerRef.current) {
+      clearTimeout(rateSettleTimerRef.current);
+      rateSettleTimerRef.current = null;
+    }
+    setCurrentTime(0);
+    setDuration(0);
+    setBufferedPosition(0);
+    setHasMediaLoaded(false);
+    setChromeVisible(true);
+    setIsPlaying(false);
+    try {
+      player.pause();
+      player.currentTime = 0;
+    } catch {
+      /* noop */
+    }
+
+    if (!videoSourceUri || !lesson) {
+      setPlayerStatus('idle');
+      return;
+    }
+
+    const loadGen = sourceLoadGenRef.current + 1;
+    sourceLoadGenRef.current = loadGen;
+    setPlayerStatus('loading');
+
+    void (async () => {
+      const result = await loadLessonIntoPlayer(player, lesson.videoUrl);
+      if (sourceLoadGenRef.current !== loadGen) return;
+
+      if (result === 'failed') {
+        setPlayerStatus('error');
+        return;
+      }
+
+      try {
+        applyPlaybackRate(player, playbackRateRef.current);
+      } catch {
+        /* noop */
+      }
+    })();
+  }, [lesson?.id, lesson?.videoUrl, videoSourceUri, player]);
+
+  useEffect(() => {
+    if (playerStatus !== 'readyToPlay' || !pendingPlayRef.current) return;
+
+    pendingPlayRef.current = false;
+    try {
+      const d = player.duration > 0 ? player.duration : 0;
+      const ct = d > 0 ? clampTimelineTime(player.currentTime || 0, d) : 0;
+      if (d > 0 && isVideoTimelineComplete(ct, d)) {
+        player.currentTime = 0;
+        setCurrentTime(0);
+      }
+      player.play();
+    } catch {
+      setIsPlaying(false);
+    }
+  }, [playerStatus, player]);
 
   useEffect(() => {
     const readAspect = () => {
@@ -207,92 +438,259 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
     };
   }, [player, lesson?.id]);
 
-  // handleComplete cambia en cada render (closures sobre estado/props).
-  // Usamos un ref para que el interval llame siempre la versión más reciente.
   const handleCompleteRef = useRef<() => void>(() => {});
   const progressMapRef = useRef(progressMap);
+  const tryAutoCompleteRef = useRef<(currentTime: number, duration: number) => void>(() => {});
+
   useEffect(() => {
     progressMapRef.current = progressMap;
   }, [progressMap]);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
+  const syncWatchProgress = useCallback(
+    (currentTime: number, duration: number) => {
+      const currentLesson = lessonRef.current;
+      const courseId = courseIdRef.current;
+      if (!currentLesson || duration <= 0) return;
+
+      if (!startedRef.current) {
+        startedRef.current = true;
+        markCourseStarted(courseId, currentLesson.id);
+      }
+      if (!enrolledRef.current) {
+        enrolledRef.current = true;
+        void enrollInCourse(courseId);
+      }
+
+      if (!hasMeaningfulWatchTime(currentTime, duration)) return;
+
+      updateWatchProgress(courseId, currentLesson.id, currentTime, duration, totalLessonsRef.current);
+      const existing = progressMapRef.current[courseId];
+      const patched = buildWatchProgressUpdate(
+        existing,
+        courseId,
+        currentLesson.id,
+        totalLessonsRef.current,
+        currentTime,
+        duration,
+      );
+      if (patched && patched.percentComplete > lastSavedPercentRef.current) {
+        lastSavedPercentRef.current = patched.percentComplete;
+        useProgressStore.getState().setProgress(courseId, patched);
+        const uid = auth.currentUser?.uid;
+        if (uid) {
+          void saveProgressToFirestore(uid, patched);
+        }
+      }
+    },
+    [markCourseStarted, updateWatchProgress],
+  );
+
+  const finalizeAtEnd = useCallback(
+    (duration: number) => {
+      if (duration > 0) {
+        setCurrentTime(duration);
+        setDuration(duration);
+      }
+      setIsPlaying(false);
       try {
-        const playing = player.playing;
-        const ct = player.currentTime || 0;
-        const d = player.duration && player.duration > 0 ? player.duration : 0;
+        player.pause();
+      } catch {
+        /* noop */
+      }
+    },
+    [player],
+  );
 
-        setIsPlaying(playing);
-        setCurrentTime(ct);
-        if (d > 0) setDuration(d);
+  const tryAutoComplete = useCallback(
+    (currentTime: number, duration: number) => {
+      const currentLesson = lessonRef.current;
+      if (!currentLesson || blockAutoCompleteRef.current || rateSettlingRef.current) return;
+      if (autoCompletedRef.current.has(currentLesson.id)) return;
+      if (!isVideoTimelineComplete(currentTime, duration)) return;
 
-        if (aspect === 'unknown') {
-          const size = player.videoTrack?.size;
-          if (size && size.width > 0 && size.height > 0) {
-            setAspect(size.width >= size.height ? 'landscape' : 'portrait');
-          }
-        }
+      autoCompletedRef.current.add(currentLesson.id);
+      finalizeAtEnd(duration);
+      handleCompleteRef.current();
+    },
+    [finalizeAtEnd],
+  );
 
-        // Apenas el alumno aprieta play por primera vez en este curso,
-        // marcamos el curso como "iniciado". Suficiente para que aparezca
-        // en "Mis cursos" → tab "En curso" sin tener que esperar al final.
-        if (playing && lesson && !startedRef.current) {
-          startedRef.current = true;
-          const courseId = route.params.courseId;
-          markCourseStarted(courseId, lesson.id);
-          void enrollInCourse(courseId);
-          const existing = progressMapRef.current[courseId];
-          const seed = {
-            courseId,
-            lessonsCompleted: existing?.lessonsCompleted ?? [],
-            currentLessonId: lesson.id,
-            percentComplete: Math.max(existing?.percentComplete ?? 0, 1),
-            updatedAt: new Date(),
-          };
-          useProgressStore.getState().setProgress(courseId, seed);
-          const uid = auth.currentUser?.uid;
-          if (uid) {
-            void saveProgressToFirestore(uid, seed);
-          }
-        }
+  useEffect(() => {
+    tryAutoCompleteRef.current = tryAutoComplete;
+  }, [tryAutoComplete]);
 
-        // Auto-completar la lección cuando el video llega al 95%.
-        if (lesson && d > 0 && ct / d >= 0.95 && !autoCompletedRef.current.has(lesson.id)) {
-          autoCompletedRef.current.add(lesson.id);
-          handleCompleteRef.current();
+  useEffect(() => {
+    if (!lesson) return;
+
+    const syncBufferedPosition = () => {
+      try {
+        const buffered = player.bufferedPosition;
+        if (buffered >= 0) {
+          setBufferedPosition(buffered);
         }
       } catch {
         /* noop */
       }
-    }, 300);
-    return () => clearInterval(interval);
-  }, [player, aspect, lesson, route.params.courseId, markCourseStarted]);
+    };
 
-  const moduleIndex = useMemo(() => {
+    const syncTimelineUi = (rawCurrentTime: number) => {
+      const d = player.duration > 0 ? player.duration : 0;
+      const ct = d > 0 ? clampTimelineTime(rawCurrentTime, d) : Math.max(0, rawCurrentTime);
+      setCurrentTime(ct);
+      if (d > 0) setDuration(d);
+      setIsPlaying(player.playing);
+      syncBufferedPosition();
+      return { ct, d };
+    };
+
+    const onTimeUpdate = (payload: { currentTime: number }) => {
+      const { ct, d } = syncTimelineUi(payload.currentTime);
+      if (player.playing && d > 0) {
+        syncWatchProgress(ct, d);
+      }
+      if (!rateSettlingRef.current) {
+        tryAutoCompleteRef.current(ct, d);
+      }
+    };
+
+    const onPlayToEnd = () => {
+      rateSettlingRef.current = false;
+      const currentLesson = lessonRef.current;
+      const d = player.duration > 0 ? player.duration : 0;
+      finalizeAtEnd(d);
+
+      if (!currentLesson || blockAutoCompleteRef.current) return;
+      if (autoCompletedRef.current.has(currentLesson.id)) return;
+
+      const ct = d > 0 ? clampTimelineTime(player.currentTime || 0, d) : 0;
+      if (d > 0 && !isVideoTimelineComplete(ct, d)) return;
+
+      autoCompletedRef.current.add(currentLesson.id);
+      handleCompleteRef.current();
+    };
+
+    const onPlayingChange = (payload: { isPlaying: boolean }) => {
+      setIsPlaying(payload.isPlaying);
+      if (payload.isPlaying || rateSettlingRef.current) return;
+
+      const d = player.duration > 0 ? player.duration : 0;
+      const ct = d > 0 ? clampTimelineTime(player.currentTime || 0, d) : 0;
+      setCurrentTime(ct);
+      if (d > 0) setDuration(d);
+
+      // Fallback en velocidades bajas: algunos dispositivos pausan sin emitir playToEnd.
+      if (d > 0 && isVideoTimelineComplete(ct, d)) {
+        tryAutoCompleteRef.current(ct, d);
+      }
+    };
+
+    try {
+      applyPlaybackRate(player, playbackRateRef.current);
+    } catch {
+      /* noop */
+    }
+
+    const subscriptions = [
+      player.addListener('timeUpdate', onTimeUpdate),
+      player.addListener('playToEnd', onPlayToEnd),
+      player.addListener('playingChange', onPlayingChange),
+    ];
+
+    return () => {
+      for (const subscription of subscriptions) {
+        try {
+          subscription.remove();
+        } catch {
+          /* noop */
+        }
+      }
+    };
+  }, [player, lesson?.id, syncWatchProgress, finalizeAtEnd]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      try {
+        if (aspect !== 'unknown') return;
+        const size = player.videoTrack?.size;
+        if (size && size.width > 0 && size.height > 0) {
+          setAspect(size.width >= size.height ? 'landscape' : 'portrait');
+        }
+      } catch {
+        /* noop */
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [player, aspect, lesson?.id]);
+
+  const lessonIndex = useMemo(() => {
     if (!lesson) return 0;
-    const m = modules.find((mod) => mod.id === lesson.moduleId);
-    if (!m) return 0;
-    const sorted = [...modules].sort((a, b) => a.order - b.order);
-    return sorted.findIndex((x) => x.id === m.id) + 1;
-  }, [lesson, modules]);
-  const moduleName = useMemo(() => {
-    if (!lesson) return '';
-    return modules.find((mod) => mod.id === lesson.moduleId)?.title || '';
-  }, [lesson, modules]);
+    const idx = lessons.findIndex((l) => l.id === lesson.id);
+    return idx >= 0 ? idx + 1 : 0;
+  }, [lesson, lessons]);
 
   const togglePlay = () => {
+    if (playerStatus === 'error') return;
+
     try {
-      if (player.playing) player.pause();
-      else player.play();
+      if (player.playing) {
+        player.pause();
+        pendingPlayRef.current = false;
+        setIsPlaying(false);
+        return;
+      }
+
+      if (isInitialVideoLoading || !isVideoReady) {
+        pendingPlayRef.current = true;
+        return;
+      }
+
+      const d = player.duration > 0 ? player.duration : duration;
+      const ct = d > 0 ? clampTimelineTime(player.currentTime || currentTime, d) : 0;
+
+      if (d > 0 && isVideoTimelineComplete(ct, d)) {
+        player.currentTime = 0;
+        setCurrentTime(0);
+      }
+
+      player.play();
     } catch {
-      /* ignore */
+      pendingPlayRef.current = false;
+      setIsPlaying(false);
+    }
+  };
+
+  const handleStagePress = () => {
+    if (!chromeVisible && isPlaying) {
+      setChromeVisible(true);
+      return;
+    }
+    setChromeVisible(true);
+    togglePlay();
+  };
+
+  const enterNativeFullscreen = () => {
+    setChromeVisible(true);
+    try {
+      (player as unknown as { enterFullscreen?: () => void }).enterFullscreen?.();
+    } catch {
+      /* noop */
     }
   };
 
   const onSeek = (pct: number) => {
-    if (!duration) return;
+    if (!duration || isInitialVideoLoading) return;
     try {
-      player.currentTime = duration * pct;
+      const nextTime = clampTimelineTime(duration * pct, duration);
+      player.currentTime = nextTime;
+      setCurrentTime(nextTime);
+      try {
+        const buffered = player.bufferedPosition;
+        if (buffered >= 0) {
+          setBufferedPosition(buffered);
+        }
+      } catch {
+        /* noop */
+      }
     } catch {
       /* ignore */
     }
@@ -312,6 +710,11 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
   const handleComplete = () => {
     if (!lesson) return;
     if (busyRef.current) return;
+
+    const mediaDuration = player.duration > 0 ? player.duration : duration;
+    const mediaTime = player.currentTime > 0 ? player.currentTime : currentTime;
+    if (mediaDuration > 0 && !isVideoTimelineComplete(mediaTime, mediaDuration)) return;
+
     busyRef.current = true;
     setTimeout(() => {
       busyRef.current = false;
@@ -321,48 +724,68 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
     const previouslyCompleted = courseProgress?.lessonsCompleted ?? [];
     const wasCompleted = previouslyCompleted.includes(lesson.id);
     const updated = localProgressUpdate(courseProgress, courseId, lesson.id, totalLessons);
-
-    const moduleDone = isModuleJustCompleted(
-      modules,
-      lessons,
-      courseProgress,
-      lesson.id,
-      previouslyCompleted,
-    );
+    const nextLesson = getNextLesson(lessons, lesson.id);
     const justFinishedCourse = updated.percentComplete >= 100;
+
+    try {
+      player.pause();
+      setIsPlaying(false);
+      if (player.duration > 0) {
+        setCurrentTime(player.duration);
+        setDuration(player.duration);
+      }
+    } catch {
+      /* noop */
+    }
+
+    if (wasCompleted) return;
 
     markLessonComplete(courseId, lesson.id, totalLessons);
     useProgressStore.getState().setProgress(courseId, updated);
+    lastSavedPercentRef.current = updated.percentComplete;
 
-    if (justFinishedCourse && !wasCompleted) {
+    if (justFinishedCourse) {
       setCourseModal(true);
-    } else if (moduleDone.completed && !wasCompleted) {
-      setModuleModal({ title: moduleDone.moduleTitle });
     } else {
-      const idx = lessons.findIndex((l) => l.id === lesson.id);
-      const next = idx >= 0 && idx < lessons.length - 1 ? lessons[idx + 1] : null;
-      if (next) {
-        navigation.setParams({ lessonId: next.id });
-      } else {
-        navigation.goBack();
-      }
+      setLessonCompleteModal({
+        lessonTitle: lesson.title,
+        nextLessonId: nextLesson?.id,
+        nextLessonTitle: nextLesson?.title,
+        hasNextLesson: Boolean(nextLesson),
+        progressPercent: updated.percentComplete,
+        streakDelta: 0,
+      });
     }
 
     void (async () => {
       try {
         await completeLesson(courseId, lesson.id, updated);
-        if (!wasCompleted) {
-          await awardLessonCompletion(courseId, lesson.id);
-          if (justFinishedCourse) {
-            await awardCourseCompletion(courseId);
-            // Emite el certificado (Achievement) en Firestore de forma idempotente
-            // (un único achievement por usuario+curso, doc id `{userId}_{courseId}`).
-            await awardCourseAchievement(courseId, courseTitle || 'Curso T2T');
+        await awardLessonCompletion(courseId, lesson.id);
+        if (justFinishedCourse) {
+          await awardCourseCompletion(courseId);
+          await awardCourseAchievement(courseId, courseTitle || 'Curso T2T');
+          if (course?.skillImpact && !courseProgress?.skillImpactApplied) {
+            const diagnostic = useAcademyStore.getState().diagnostic;
+            const updatedDiag = await applyCourseSkillImpact(
+              course,
+              diagnostic,
+              saveDiagnosticResult,
+            );
+            if (updatedDiag) {
+              useAcademyStore.getState().setDiagnostic(updatedDiag);
+            }
+            await markSkillImpactApplied(courseId);
+            const flagged = { ...updated, skillImpactApplied: true };
+            useProgressStore.getState().setProgress(courseId, flagged);
+            const uid = auth.currentUser?.uid;
+            if (uid) await saveProgressToFirestore(uid, flagged);
           }
         }
         const streak = await recordActivity();
-        if (moduleDone.completed && !wasCompleted) {
-          setModuleModal((prev) => (prev ? { ...prev, streakDelta: streak.delta } : prev));
+        if (!justFinishedCourse) {
+          setLessonCompleteModal((prev) =>
+            prev ? { ...prev, streakDelta: streak.delta } : prev,
+          );
         }
         if (streak.milestoneReached) {
           const { STREAK_MILESTONE_BONUS } = await import('../../services/streakService');
@@ -372,7 +795,7 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
           });
         }
         await scheduleStreakReminder();
-        if (!wasCompleted || streak.delta > 0 || streak.milestoneReached) {
+        if (streak.delta > 0 || streak.milestoneReached) {
           await refreshUserProfile();
         }
       } catch {
@@ -387,15 +810,19 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
     handleCompleteRef.current = handleComplete;
   });
 
-  const continueAfterModule = () => {
-    setModuleModal(null);
-    const idx = lessons.findIndex((l) => l.id === lesson?.id);
-    const next = idx >= 0 && idx < lessons.length - 1 ? lessons[idx + 1] : null;
-    if (next) navigation.setParams({ lessonId: next.id });
-    else navigation.goBack();
+  const continueAfterLesson = () => {
+    const nextId = lessonCompleteModal?.nextLessonId;
+    setLessonCompleteModal(null);
+    busyRef.current = false;
+    blockAutoCompleteRef.current = false;
+    if (nextId) {
+      navigation.setParams({ lessonId: nextId });
+    } else {
+      navigation.goBack();
+    }
   };
 
-  if (!lesson) {
+  if (lessons.length === 0 || !lesson) {
     return (
       <ScreenWrapper>
         <ActivityIndicator color={Colors.accentPrimary} size="large" style={{ marginTop: Spacing.xxl }} />
@@ -403,7 +830,8 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
     );
   }
 
-  const progressPct = duration > 0 ? Math.min(1, currentTime / duration) : 0;
+  const progressPct = normalizePlaybackProgress(currentTime, duration);
+  const bufferedPct = normalizePlaybackProgress(bufferedPosition, duration);
   const lessonLinks = lesson.links ?? [];
   const hasResources = lessonLinks.length > 0 || Boolean(lesson.pdfUrl);
 
@@ -424,104 +852,158 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
 
   return (
     <View style={styles.screen}>
-      <AppBackground variant="default" />
-      <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
-        <View style={styles.topRow}>
-          <Pressable onPress={() => navigation.goBack()} style={styles.topBtn} accessibilityLabel="Cerrar">
-            <Ionicons name="close" size={20} color={Colors.textPrimary} />
-          </Pressable>
-          <View style={styles.topChip}>
-            <Text style={styles.topChipText} numberOfLines={1}>
-              Módulo {moduleIndex || 1} de {modules.length || 1}
-              {moduleName ? ` · ${moduleName}` : ''}
-            </Text>
-          </View>
-          <Pressable
-            onPress={() => setListOpen(true)}
-            style={styles.topBtn}
-            accessibilityLabel="Más opciones"
-          >
-            <Ionicons name="ellipsis-vertical" size={18} color={Colors.textPrimary} />
-          </Pressable>
-        </View>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
 
-        <View style={styles.stage}>
-          <Pressable onPress={togglePlay} style={styles.videoTouch}>
-            <VideoView
-              key={lesson.id}
-              player={player}
-              style={styles.video}
-              nativeControls={false}
-              contentFit={aspect === 'landscape' ? 'contain' : 'cover'}
-              fullscreenOptions={{ enable: true }}
-            />
-            <View pointerEvents="none" style={styles.centerOverlay}>
-              <View style={styles.playCircle}>
-                <Ionicons
-                  name={isPlaying ? 'pause' : 'play'}
-                  size={36}
-                  color={Colors.textPrimary}
-                  style={isPlaying ? undefined : styles.playIcon}
-                />
+      <View style={styles.videoLayer}>
+        <VideoView
+          ref={videoViewRef}
+          player={player}
+          style={styles.video}
+          nativeControls={false}
+          contentFit="contain"
+          fullscreenOptions={{ enable: true }}
+          onFullscreenExit={() => setChromeVisible(true)}
+        />
+        <Pressable
+          onPress={handleStagePress}
+          style={styles.videoTouch}
+          disabled={playerStatus === 'error'}
+        />
+        {isInitialVideoLoading ? (
+          <View pointerEvents="none" style={styles.centerOverlay}>
+            <ActivityIndicator size="large" color={Colors.accentPrimary} />
+            <Text style={styles.loadingText}>Cargando video…</Text>
+          </View>
+        ) : playerStatus === 'error' ? (
+          <View pointerEvents="none" style={styles.centerOverlay}>
+            <Ionicons name="alert-circle-outline" size={36} color={Colors.textPrimary} />
+            <Text style={styles.loadingText}>No se pudo cargar el video</Text>
+          </View>
+        ) : isSeekBuffering ? (
+          <View pointerEvents="none" style={styles.bufferingOverlay}>
+            <ActivityIndicator size="small" color={Colors.textPrimary} />
+            <Text style={styles.bufferingText}>Cargando tramo…</Text>
+          </View>
+        ) : !isPlaying ? (
+          <View pointerEvents="none" style={styles.centerOverlay}>
+            <View style={styles.playCircle}>
+              <Ionicons
+                name="play"
+                size={36}
+                color={Colors.textPrimary}
+                style={styles.playIcon}
+              />
+            </View>
+          </View>
+        ) : null}
+        <VideoSubtitleOverlay
+          cue={activeSubtitleCue}
+          bottomOffset={insets.bottom + (chromeVisible ? 168 : 56)}
+        />
+      </View>
+
+      <View
+        pointerEvents={chromeVisible ? 'box-none' : 'none'}
+        style={[styles.chromeTop, !chromeVisible && styles.chromeHidden]}
+      >
+        <LinearGradient colors={['#000000CC', '#00000066', 'transparent']} style={styles.chromeGradient}>
+          <View style={[styles.topRow, { paddingTop: insets.top + 8 }]}>
+            <Pressable onPress={() => navigation.goBack()} style={styles.topBtn} accessibilityLabel="Cerrar">
+              <Ionicons name="close" size={20} color={Colors.textPrimary} />
+            </Pressable>
+            <View style={styles.topChip}>
+              <Text style={styles.topChipText} numberOfLines={1}>
+                {lessonIndex || 1} · {lesson.title}
+              </Text>
+            </View>
+            <Pressable
+              onPress={enterNativeFullscreen}
+              style={styles.topBtn}
+              accessibilityLabel="Pantalla completa"
+            >
+              <Ionicons name="expand" size={18} color={Colors.textPrimary} />
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setChromeVisible(true);
+                setListOpen(true);
+              }}
+              style={styles.topBtn}
+              accessibilityLabel="Más opciones"
+            >
+              <Ionicons name="ellipsis-vertical" size={18} color={Colors.textPrimary} />
+            </Pressable>
+          </View>
+        </LinearGradient>
+      </View>
+
+      <View
+        pointerEvents={chromeVisible ? 'box-none' : 'none'}
+        style={[styles.chromeBottom, !chromeVisible && styles.chromeHidden]}
+      >
+        <LinearGradient colors={['transparent', '#00000066', '#000000DD']} style={styles.chromeGradient}>
+          <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
+            <Pressable ref={trackRef} onPress={onTrackPress} style={styles.track}>
+              <View style={styles.trackBg} />
+              <View style={[styles.trackBuffer, { width: `${bufferedPct * 100}%` }]} />
+              <View style={[styles.trackFill, { width: `${progressPct * 100}%` }]} />
+              <View style={[styles.trackDot, { left: `${progressPct * 100}%` }]} />
+            </Pressable>
+
+            <View style={styles.timesRow}>
+              <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
+              <Text style={styles.timeText}>{formatTime(duration)}</Text>
+            </View>
+
+            <View style={styles.controlsRow}>
+              <View style={styles.controlsLeft}>
+                <Pressable
+                  style={styles.flatControl}
+                  accessibilityLabel="Velocidad de reproducción"
+                  onPress={() => {
+                    setChromeVisible(true);
+                    setSpeedSheetOpen(true);
+                  }}
+                >
+                  <Text style={styles.flatControlText}>{formatRate(playbackRate)}</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.flatControl, subtitleTracks.length === 0 && styles.flatControlDisabled]}
+                  accessibilityLabel="Subtítulos"
+                  accessibilityState={{ disabled: subtitleTracks.length === 0 }}
+                  onPress={() => {
+                    if (subtitleTracks.length === 0) return;
+                    setChromeVisible(true);
+                    setSubsSheetOpen(true);
+                  }}
+                >
+                  <Ionicons
+                    name="text"
+                    size={18}
+                    color={activeSubtitleTrack ? Colors.accentHighlight : Colors.textPrimary}
+                  />
+                  {activeSubtitleTrack ? <View style={styles.resourceDot} /> : null}
+                </Pressable>
+                <Pressable
+                  style={styles.flatControl}
+                  accessibilityLabel="Recursos del módulo"
+                  onPress={() => {
+                    setChromeVisible(true);
+                    setResourcesOpen(true);
+                  }}
+                >
+                  <Ionicons name="link-outline" size={18} color={Colors.textPrimary} />
+                  {hasResources ? <View style={styles.resourceDot} /> : null}
+                </Pressable>
+              </View>
+              <View style={styles.completeBadge}>
+                <Ionicons name="sparkles" size={15} color={Colors.accentHighlight} />
+                <Text style={styles.completeBadgeText}>+{LESSON_COINS} al completar</Text>
               </View>
             </View>
-          </Pressable>
-          <VideoSubtitleOverlay cue={activeSubtitleCue} />
-        </View>
-
-        <View style={styles.bottom}>
-          <Pressable ref={trackRef} onPress={onTrackPress} style={styles.track}>
-            <View style={styles.trackBg} />
-            <View style={[styles.trackFill, { width: `${progressPct * 100}%` }]} />
-            <View style={[styles.trackDot, { left: `${progressPct * 100}%` }]} />
-          </Pressable>
-
-          <View style={styles.timesRow}>
-            <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
-            <Text style={styles.timeText}>{formatTime(duration)}</Text>
           </View>
-
-          <View style={styles.controlsRow}>
-            <View style={styles.controlsLeft}>
-              <Pressable
-                style={styles.flatControl}
-                accessibilityLabel="Velocidad de reproducción"
-                onPress={() => setSpeedSheetOpen(true)}
-              >
-                <Text style={styles.flatControlText}>{formatRate(playbackRate)}</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.flatControl, subtitleTracks.length === 0 && styles.flatControlDisabled]}
-                accessibilityLabel="Subtítulos"
-                accessibilityState={{ disabled: subtitleTracks.length === 0 }}
-                onPress={() => {
-                  if (subtitleTracks.length === 0) return;
-                  setSubsSheetOpen(true);
-                }}
-              >
-                <Ionicons
-                  name="text"
-                  size={18}
-                  color={activeSubtitleTrack ? Colors.accentHighlight : Colors.textPrimary}
-                />
-                {activeSubtitleTrack ? <View style={styles.resourceDot} /> : null}
-              </Pressable>
-              <Pressable
-                style={styles.flatControl}
-                accessibilityLabel="Recursos del módulo"
-                onPress={() => setResourcesOpen(true)}
-              >
-                <Ionicons name="link-outline" size={18} color={Colors.textPrimary} />
-                {hasResources ? <View style={styles.resourceDot} /> : null}
-              </Pressable>
-            </View>
-            <View style={styles.completeBadge}>
-              <Ionicons name="sparkles" size={15} color={Colors.accentHighlight} />
-              <Text style={styles.completeBadgeText}>+{LESSON_COINS} al completar</Text>
-            </View>
-          </View>
-        </View>
-      </SafeAreaView>
+        </LinearGradient>
+      </View>
 
       <Modal
         transparent
@@ -546,6 +1028,8 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
                     style={[styles.sheetRow, item.id === lesson.id && styles.sheetRowActive]}
                     onPress={() => {
                       setListOpen(false);
+                      busyRef.current = false;
+                      markCourseStarted(route.params.courseId, item.id);
                       navigation.setParams({ lessonId: item.id });
                     }}
                   >
@@ -573,16 +1057,22 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
       />
 
       <ModuleCompleteModal
-        visible={moduleModal != null}
-        moduleTitle={moduleModal?.title}
-        progressPercent={courseProgress?.percentComplete ?? 0}
-        streakDelta={moduleModal?.streakDelta ?? 0}
-        onContinue={continueAfterModule}
+        visible={lessonCompleteModal != null}
+        moduleTitle={lessonCompleteModal?.lessonTitle}
+        nextLessonTitle={lessonCompleteModal?.nextLessonTitle}
+        hasNextLesson={lessonCompleteModal?.hasNextLesson ?? false}
+        progressPercent={lessonCompleteModal?.progressPercent ?? courseProgress?.percentComplete ?? 0}
+        streakDelta={lessonCompleteModal?.streakDelta ?? 0}
+        onContinue={continueAfterLesson}
         onBackHome={() => {
-          setModuleModal(null);
+          setLessonCompleteModal(null);
+          busyRef.current = false;
           navigation.goBack();
         }}
-        onClose={() => setModuleModal(null)}
+        onClose={() => {
+          setLessonCompleteModal(null);
+          busyRef.current = false;
+        }}
       />
 
       <StreakMilestoneModal
@@ -599,15 +1089,18 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
         body="Desbloqueaste un hito importante en tu academia."
         coins={COURSE_COINS}
         primaryLabel="Ver mis cursos"
-        secondaryLabel="Cerrar"
+        secondaryLabel="Descargar certificado"
         icon="trophy"
         onPrimary={() => {
           setCourseModal(false);
           navigation.navigate('Main');
         }}
         onSecondary={() => {
-          setCourseModal(false);
-          navigation.goBack();
+          void exportCertificatePdf({
+            userName: user?.displayName || 'Alumno T2T',
+            courseTitle: courseTitle || 'Curso T2T',
+            certificateId: user?.id ? `${user.id}_${route.params.courseId}` : undefined,
+          });
         }}
         onClose={() => setCourseModal(false)}
       />
@@ -619,7 +1112,10 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
         selectedId={String(playbackRate)}
         onSelect={(id) => {
           const value = Number(id);
-          if (!Number.isNaN(value)) setVideoPlaybackRate(value);
+          if (!Number.isNaN(value)) {
+            setVideoPlaybackRate(value);
+            applyRateWithSettle(value);
+          }
           setSpeedSheetOpen(false);
         }}
         onClose={() => setSpeedSheetOpen(false)}
@@ -644,19 +1140,47 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: Colors.bgDeep,
+    backgroundColor: '#000000',
   },
-  safe: {
-    flex: 1,
+  videoLayer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000000',
+  },
+  video: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000000',
+  },
+  videoTouch: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+  },
+  chromeTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 2,
+  },
+  chromeBottom: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 2,
+  },
+  chromeHidden: {
+    opacity: 0,
+  },
+  chromeGradient: {
+    width: '100%',
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 10,
-    gap: 12,
+    paddingBottom: 14,
+    gap: 10,
   },
   topBtn: {
     width: 38,
@@ -673,9 +1197,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 999,
-    backgroundColor: '#1F0A40CC',
+    backgroundColor: '#00000055',
     borderWidth: 1,
-    borderColor: '#FFFFFF1F',
+    borderColor: '#FFFFFF33',
     alignItems: 'center',
   },
   topChipText: {
@@ -683,25 +1207,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 12.5,
   },
-  stage: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  videoTouch: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  video: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'transparent',
-  },
   centerOverlay: {
     ...StyleSheet.absoluteFillObject,
+    zIndex: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -718,10 +1226,36 @@ const styles = StyleSheet.create({
   playIcon: {
     marginLeft: 4,
   },
+  loadingText: {
+    marginTop: 12,
+    color: Colors.textPrimary,
+    fontSize: 13,
+    fontWeight: '600',
+    opacity: 0.9,
+  },
+  bufferingOverlay: {
+    position: 'absolute',
+    bottom: 120,
+    alignSelf: 'center',
+    zIndex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: '#00000088',
+    borderWidth: 1,
+    borderColor: '#FFFFFF22',
+  },
+  bufferingText: {
+    color: Colors.textPrimary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
   bottom: {
     paddingHorizontal: 18,
-    paddingTop: 6,
-    paddingBottom: 18,
+    paddingTop: 28,
     gap: 8,
   },
   track: {
@@ -735,6 +1269,13 @@ const styles = StyleSheet.create({
     height: 5,
     borderRadius: 999,
     backgroundColor: '#FFFFFF26',
+  },
+  trackBuffer: {
+    position: 'absolute',
+    left: 0,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF44',
   },
   trackFill: {
     position: 'absolute',

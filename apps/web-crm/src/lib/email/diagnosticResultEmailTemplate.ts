@@ -22,7 +22,6 @@ export const SKILL_ORDER = [
   'escucha',
   'productividad',
   'aprendizaje',
-  'liderazgoHumano',
   'gestionEmocional',
 ] as const;
 
@@ -33,13 +32,12 @@ export const SKILL_LABELS: Record<DiagnosticSkillId, string> = {
   influencia: 'Influencia',
   adaptabilidad: 'Adaptabilidad',
   comunicacion: 'Comunicación',
-  equipo: 'Trabajo en equipo',
-  resolucion: 'Resolución de problemas',
+  equipo: 'Equipo',
+  resolucion: 'Resolución',
   creatividad: 'Creatividad',
   escucha: 'Escucha',
   productividad: 'Productividad',
   aprendizaje: 'Aprendizaje',
-  liderazgoHumano: 'Liderazgo humano',
   gestionEmocional: 'Gestión emocional',
 };
 
@@ -171,7 +169,7 @@ export function buildDiagnosticHtml(params: DiagnosticEmailParams): string {
             <td style="padding:8px 28px 0;text-align:center;">
               <p style="margin:0 0 8px;font-size:11px;font-weight:800;letter-spacing:0.12em;color:#4cc35b;text-transform:uppercase;">Tu diagnóstico</p>
               <h1 style="margin:0 0 8px;font-size:26px;line-height:1.25;font-weight:800;">Tu perfil hoy</h1>
-              <p style="margin:0 0 20px;color:rgba(255,255,255,0.72);font-size:14px;line-height:1.55;">12 habilidades · una mirada honesta de dónde estás parado.</p>
+              <p style="margin:0 0 20px;color:rgba(255,255,255,0.72);font-size:14px;line-height:1.55;">11 habilidades · una mirada honesta de dónde estás parado.</p>
             </td>
           </tr>
           <tr>
@@ -243,7 +241,7 @@ export function buildDiagnosticText(params: DiagnosticEmailParams): string {
 
   return `T2T Academy — Tu diagnóstico
 
-Tu perfil hoy. 12 habilidades, una mirada honesta de dónde estás parado.
+Tu perfil hoy. 11 habilidades, una mirada honesta de dónde estás parado.
 
 Tu lectura: tu fuerte es ${topName}. Empezamos por entrenar ${weakName}, tu mayor oportunidad.
 

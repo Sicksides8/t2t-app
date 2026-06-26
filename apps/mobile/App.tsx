@@ -11,8 +11,10 @@ import OfflineBanner from './src/components/OfflineBanner';
 import { configureGoogleSignIn } from './src/services/googleSignIn';
 import { useAppFonts } from './src/hooks/useAppFonts';
 import { Colors } from './src/theme';
+import { ensureVideoCacheConfigured } from './src/utils/videoStreamConfig';
 
 configureGoogleSignIn();
+void ensureVideoCacheConfigured();
 
 const navigationTheme = {
   ...DefaultTheme,

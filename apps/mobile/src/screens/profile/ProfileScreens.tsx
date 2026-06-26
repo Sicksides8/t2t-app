@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, ActivityIndicator, Modal, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -8,7 +8,7 @@ import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
 import { updateProfile } from 'firebase/auth';
 import { DiagnosticRadarChart } from '../../components/diagnostic';
-import { DIAGNOSTIC_SKILLS, computeDiagnosticScores } from '../../data/diagnostic';
+import { DIAGNOSTIC_SKILLS, computeDiagnosticScores, SKILL_LABELS, SKILL_LABELS_SHORT } from '../../data/diagnostic';
 import {
   ProfileCertificateRow,
   ProfileChallengeHero,
@@ -37,7 +37,7 @@ import { plans, skills } from '../../data/academy';
 import * as authService from '../../services/authService';
 import { fetchCourseById } from '../../services/courseService';
 import { auth } from '../../services/firebase';
-import { getGamificationRepo } from '../../services/gamificationService';
+import { getGamificationRepo, loadWeeklyChallengeReflection, REFLECTION_MIN_CHARS, submitWeeklyChallengeReflection } from '../../services/gamificationService';
 import { getPaymentById, getPaymentHistory } from '../../services/paymentService';
 import {
   getBillingProvider,
@@ -51,12 +51,15 @@ import { Colors, Spacing, Typography } from '../../theme';
 import { computeProfileStats } from '../../utils/profileStats';
 import { hasActivePaidPlan, subscriptionPlanToSeedPlan } from '../../utils/subscriptionAccess';
 import { getPlanDisplayName } from '../../utils/planDisplay';
-import { generateAndShareCertificatePdf } from '../../utils/certificatePdf';
+import { exportCertificatePdf } from '../../utils/exportCertificate';
+import { estimatePlanChange } from '../../utils/subscriptionProration';
 import type {
   Achievement,
+  BillingCycle,
   CoinTransaction,
   MainTabParamList,
   ProfileStackParamList,
+  Subscription,
   SubscriptionPlanId,
 } from '../../types';
 
@@ -404,21 +407,21 @@ export function SubscriptionScreen({ navigation }: ProfileProps) {
     );
   };
 
-  const handleSelectPlan = async (newPlanId: SubscriptionPlanId) => {
+  const handleSelectPlan = async (newPlanId: SubscriptionPlanId, cycle: BillingCycle) => {
     if (!user?.id) return;
     setChangeOpen(false);
     setBusy(true);
     try {
-      // TODO MERCADOPAGO: cambiar de plan en MP requiere cancelar la
-      // preferencia anterior y crear una nueva con proration. Mock acepta directo.
-      await getBillingProvider().changePlan(user.id, newPlanId);
+      await getBillingProvider().changePlan(user.id, newPlanId, { cycle });
       await refreshUserProfile();
       const list = await getPaymentHistory(user.id);
       setPayments(list);
       Alert.alert('Plan actualizado', `Tu nuevo plan es ${getPlanDisplayName(newPlanId)}.`);
     } catch (err) {
       console.error('[SubscriptionScreen] changePlan failed:', err);
-      Alert.alert('Error', 'No se pudo cambiar el plan. Intentá de nuevo.');
+      const message =
+        err instanceof Error ? err.message : 'No se pudo cambiar el plan. Intentá de nuevo.';
+      Alert.alert('Error', message);
     } finally {
       setBusy(false);
     }
@@ -480,9 +483,10 @@ export function SubscriptionScreen({ navigation }: ProfileProps) {
 
       <ChangePlanModal
         visible={changeOpen}
+        userId={user?.id}
         currentPlan={user?.subscriptionPlan}
         onClose={() => setChangeOpen(false)}
-        onSelect={(p) => void handleSelectPlan(p)}
+        onSelect={(planId, cycle) => void handleSelectPlan(planId, cycle)}
       />
     </ProfileScreenShell>
   );
@@ -490,29 +494,95 @@ export function SubscriptionScreen({ navigation }: ProfileProps) {
 
 function ChangePlanModal({
   visible,
+  userId,
   currentPlan,
   onClose,
   onSelect,
 }: {
   visible: boolean;
+  userId?: string;
   currentPlan?: SubscriptionPlanId;
   onClose: () => void;
-  onSelect: (planId: SubscriptionPlanId) => void;
+  onSelect: (planId: SubscriptionPlanId, cycle: BillingCycle) => void;
 }) {
-  const canonical = getCanonicalPlans();
+  const canonical = getCanonicalPlans().filter((p) => p.id !== 'free');
+  const [cycle, setCycle] = useState<BillingCycle>('monthly');
+  const [currentSub, setCurrentSub] = useState<Subscription | null>(null);
+  const [previewPlanId, setPreviewPlanId] = useState<SubscriptionPlanId | null>(null);
+
+  useEffect(() => {
+    if (!visible || !userId) {
+      setCurrentSub(null);
+      setPreviewPlanId(null);
+      return;
+    }
+    void getBillingProvider()
+      .getCurrent(userId)
+      .then((sub) => {
+        setCurrentSub(sub);
+        if (sub?.cycle) setCycle(sub.cycle);
+      });
+  }, [visible, userId]);
+
+  const previewEstimate =
+    previewPlanId && previewPlanId !== currentPlan
+      ? estimatePlanChange(currentSub, previewPlanId, cycle)
+      : null;
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
         <View style={styles.modalCard}>
           <Text style={styles.modalTitle}>Cambiar de plan</Text>
-          <Text style={styles.muted}>Elegí el plan al que querés pasar.</Text>
+          <Text style={styles.muted}>Elegí el plan y el ciclo de facturación.</Text>
+
+          <View style={styles.changePlanToggle}>
+            <Pressable
+              style={[styles.changePlanToggleBtn, cycle === 'monthly' && styles.changePlanToggleBtnActive]}
+              onPress={() => setCycle('monthly')}
+            >
+              <Text
+                style={[
+                  styles.changePlanToggleText,
+                  cycle === 'monthly' && styles.changePlanToggleTextActive,
+                ]}
+              >
+                Mensual
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.changePlanToggleBtn, cycle === 'yearly' && styles.changePlanToggleBtnActive]}
+              onPress={() => setCycle('yearly')}
+            >
+              <Text
+                style={[
+                  styles.changePlanToggleText,
+                  cycle === 'yearly' && styles.changePlanToggleTextActive,
+                ]}
+              >
+                Anual
+              </Text>
+            </Pressable>
+          </View>
+
+          {previewEstimate ? (
+            <Text style={styles.prorationHint}>
+              {previewEstimate.isUpgrade
+                ? `Cargo estimado hoy: ${previewEstimate.currency} ${previewEstimate.estimatedCharge.toFixed(2)} (Google Play muestra el monto exacto al confirmar).`
+                : 'El cambio se aplicará sin cargo adicional inmediato.'}
+            </Text>
+          ) : null}
+
           <View style={{ height: 8 }} />
           {canonical.map((p) => {
             const isCurrent = currentPlan === p.id;
+            const price = cycle === 'monthly' ? p.priceMonthly : p.priceYearly;
+            const periodLabel = cycle === 'monthly' ? '/ mes' : '/ año';
             return (
               <Pressable
                 key={p.id}
-                onPress={() => onSelect(p.id)}
+                onPress={() => onSelect(p.id, cycle)}
+                onPressIn={() => setPreviewPlanId(p.id)}
                 disabled={isCurrent}
                 style={[styles.modalPlanRow, isCurrent && styles.modalPlanRowDisabled]}
               >
@@ -521,9 +591,7 @@ function ChangePlanModal({
                     {p.name} {isCurrent ? '· actual' : ''}
                   </Text>
                   <Text style={styles.modalPlanMeta}>
-                    {p.priceMonthly === 0
-                      ? 'Gratis'
-                      : `${p.currency} ${p.priceMonthly.toFixed(2)} / mes`}
+                    {price === 0 ? 'Gratis' : `${p.currency} ${price.toFixed(2)} ${periodLabel}`}
                   </Text>
                 </View>
                 <Ionicons
@@ -603,16 +671,18 @@ function formatPaymentDate(date: Date): string {
 
 type EvoAxis = { key: string; label: string; now: number; before: number };
 
-const EVOLUTION_AXES: EvoAxis[] = [
-  { key: 'comun', label: 'Comun.', now: 80, before: 60 },
-  { key: 'emoc', label: 'Emoc.', now: 70, before: 50 },
-  { key: 'prod', label: 'Prod.', now: 65, before: 50 },
-  { key: 'pens', label: 'Pens.', now: 60, before: 45 },
-  { key: 'lider', label: 'Lider.', now: 75, before: 55 },
-];
-
 export function DiagnosticAppScreen({ navigation }: ProfileProps) {
   const diagnostic = useAcademyStore((state) => state.diagnostic);
+
+  const { scores, baseScores } = useMemo(
+    () => computeDiagnosticScores(diagnostic.answers),
+    [diagnostic.answers],
+  );
+
+  const resolvedScores = useMemo(
+    () => ({ ...scores, ...(diagnostic.scores || {}) }),
+    [scores, diagnostic.scores],
+  );
 
   const daysSince = useMemo(() => {
     if (!diagnostic.completedAt) return 32;
@@ -620,35 +690,47 @@ export function DiagnosticAppScreen({ navigation }: ProfileProps) {
     return Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)));
   }, [diagnostic.completedAt]);
 
+  const evolutionAxes: EvoAxis[] = useMemo(
+    () =>
+      DIAGNOSTIC_SKILLS.map((skillId) => ({
+        key: skillId,
+        label: SKILL_LABELS_SHORT[skillId],
+        now: resolvedScores[skillId] ?? 0,
+        before: baseScores[skillId] ?? resolvedScores[skillId] ?? 0,
+      })),
+    [resolvedScores, baseScores],
+  );
+
   const radarAxes = useMemo(
     () =>
-      EVOLUTION_AXES.map((axis) => ({
+      evolutionAxes.map((axis) => ({
         key: axis.key,
         label: axis.label,
         value: axis.now,
         level: 'strong' as const,
       })),
-    [],
+    [evolutionAxes],
   );
 
   const previousScoresMap = useMemo(
     () =>
-      EVOLUTION_AXES.reduce<Record<string, number>>((acc, axis) => {
+      evolutionAxes.reduce<Record<string, number>>((acc, axis) => {
         acc[axis.key] = axis.before;
         return acc;
       }, {}),
-    [],
+    [evolutionAxes],
   );
 
   const avgDelta = useMemo(() => {
-    const deltas = EVOLUTION_AXES.map((axis) => axis.now - axis.before);
+    const deltas = evolutionAxes.map((axis) => axis.now - axis.before);
     const sum = deltas.reduce((a, b) => a + b, 0);
     return Math.round(sum / Math.max(1, deltas.length));
-  }, []);
+  }, [evolutionAxes]);
 
   const shareResult = async () => {
-    const lines = EVOLUTION_AXES.map(
-      (axis) => `• ${axis.label}: ${axis.now}% (antes ${axis.before}%)`,
+    const lines = evolutionAxes.map(
+      (axis) =>
+        `• ${SKILL_LABELS[axis.key as keyof typeof SKILL_LABELS]}: ${axis.now}% (antes ${axis.before}%)`,
     );
     await Share.share({
       message: `Mi evolución T2T Academy · ${avgDelta >= 0 ? '+' : ''}${avgDelta}%\n\n${lines.join('\n')}`,
@@ -666,6 +748,11 @@ export function DiagnosticAppScreen({ navigation }: ProfileProps) {
       footer={
         <>
           <Button title="Actualizar mi plan" onPress={viewTrainingPlan} />
+          <Button
+            title="Rehacer diagnóstico"
+            variant="ghost"
+            onPress={() => navigation.navigate('DiagnosticRetake')}
+          />
           <Pressable onPress={() => void shareResult()} hitSlop={10} style={styles.evoShareBtn}>
             <Text style={styles.evoShareText}>Compartir resultado</Text>
           </Pressable>
@@ -699,22 +786,6 @@ export function DiagnosticAppScreen({ navigation }: ProfileProps) {
       </View>
     </ProfileScreenShell>
   );
-}
-
-async function exportCertificatePdf(params: {
-  userName: string;
-  courseTitle: string;
-  earnedAt?: Date;
-  certificateId?: string;
-}): Promise<void> {
-  try {
-    await generateAndShareCertificatePdf(params);
-  } catch (err) {
-    Alert.alert(
-      'No se pudo generar el certificado',
-      err instanceof Error ? err.message : 'Intentá de nuevo en unos segundos.',
-    );
-  }
 }
 
 export function CertificatesScreen({ navigation }: ProfileProps) {
@@ -870,7 +941,7 @@ export function ProgressScreen({ navigation }: ProfileProps) {
       </View>
 
       {DIAGNOSTIC_SKILLS.map((id) => {
-        const name = skills.find((s) => s.id === id)?.name ?? id;
+        const name = SKILL_LABELS[id];
         return <SkillStrengthRow key={id} name={name} pct={skillScores[id] ?? 0} />;
       })}
     </ProfileScreenShell>
@@ -937,67 +1008,188 @@ export function CoinsHistoryScreen({ navigation }: ProfileProps) {
   );
 }
 
-const REFLECTION_MIN_CHARS = 100;
 const DEFAULT_REFLECTION_PROMPT =
   'Identificá 3 momentos en los que tu liderazgo se notó esta semana. Reflexioná sobre por qué.';
+
+function formatReflectionDate(date?: Date) {
+  if (!date) return null;
+  return date.toLocaleDateString('es-AR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
 export function WeeklyChallengeScreen({ navigation }: ProfileProps) {
   const [challenge, setChallenge] = useState<Awaited<
     ReturnType<ReturnType<typeof getGamificationRepo>['getWeeklyChallenge']>
   > | null>(null);
+  const [existingReflection, setExistingReflection] = useState<Awaited<
+    ReturnType<typeof loadWeeklyChallengeReflection>
+  > | null>(null);
+  const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [statusMessage, setStatusMessage] = useState('');
 
   useEffect(() => {
-    void getGamificationRepo().getWeeklyChallenge().then(setChallenge);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const currentChallenge = await getGamificationRepo().getWeeklyChallenge();
+        if (cancelled) return;
+        setChallenge(currentChallenge);
+        const challengeId = currentChallenge?.id ?? 'local_challenge';
+        try {
+          const saved = await loadWeeklyChallengeReflection(challengeId);
+          if (!cancelled) setExistingReflection(saved);
+        } catch {
+          /* sin sesión: mostrar formulario vacío */
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const ready = text.trim().length >= REFLECTION_MIN_CHARS;
+  const prompt = existingReflection?.prompt || DEFAULT_REFLECTION_PROMPT;
+  const charCount = text.trim().length;
+  const ready = charCount >= REFLECTION_MIN_CHARS;
+  const alreadySent = existingReflection != null;
+  const submittedAtLabel = formatReflectionDate(existingReflection?.submittedAt);
 
   const submit = async () => {
-    if (!ready) return;
+    if (!ready) {
+      const missing = REFLECTION_MIN_CHARS - charCount;
+      setStatus('error');
+      setStatusMessage(`Escribí al menos ${missing} caracteres más para enviar.`);
+      return;
+    }
     setSubmitting(true);
+    setStatus('idle');
+    setStatusMessage('');
     try {
+      const challengeId = challenge?.id ?? 'local_challenge';
+      await submitWeeklyChallengeReflection({
+        challengeId,
+        prompt,
+        text: text.trim(),
+      });
+      setExistingReflection({
+        challengeId,
+        prompt,
+        text: text.trim(),
+        submittedAt: new Date(),
+      });
+      setStatus('success');
+      setStatusMessage('¡Gracias! Tu reflexión fue guardada.');
       Alert.alert('¡Gracias!', 'Tu reflexión fue enviada.', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
+    } catch (err) {
+      const message =
+        err instanceof Error && err.message.includes('autenticado')
+          ? 'Tenés que iniciar sesión para enviar tu reflexión.'
+          : 'No pudimos guardar tu reflexión. Intentá de nuevo.';
+      setStatus('error');
+      setStatusMessage(message);
+      Alert.alert('Error', message);
     } finally {
       setSubmitting(false);
     }
   };
 
+  if (loading) {
+    return (
+      <ProfileScreenShell title="Desafío semanal" onBack={() => navigation.goBack()}>
+        <ActivityIndicator color={Colors.accentPrimary} size="large" style={{ marginTop: Spacing.xxl }} />
+      </ProfileScreenShell>
+    );
+  }
+
   return (
-    <ProfileScreenShell title="Desafío semanal" onBack={() => navigation.goBack()}>
+    <ProfileScreenShell
+      title="Desafío semanal"
+      onBack={() => navigation.goBack()}
+      footer={
+        alreadySent ? (
+          <Button title="Volver" variant="outline" onPress={() => navigation.goBack()} />
+        ) : (
+          <View style={styles.reflectionFooter}>
+            {statusMessage ? (
+              <Text
+                style={[
+                  styles.reflectionStatus,
+                  status === 'success' && styles.reflectionStatusSuccess,
+                  status === 'error' && styles.reflectionStatusError,
+                ]}
+              >
+                {statusMessage}
+              </Text>
+            ) : null}
+            <Button
+              title="Enviar mi reflexión"
+              onPress={() => void submit()}
+              loading={submitting}
+            />
+          </View>
+        )
+      }
+    >
       <ProfileChallengeHero
         label="DESAFÍO DE LA SEMANA"
         title={challenge?.title || 'Tu liderazgo en acción'}
         reward={challenge?.xpReward ?? 50}
       />
 
-      <Text style={styles.sectionH2}>Tu reflexión</Text>
-      <Text style={styles.muted}>{DEFAULT_REFLECTION_PROMPT}</Text>
+      {alreadySent ? (
+        <>
+          <View style={styles.reflectionSentBanner}>
+            <Ionicons name="checkmark-circle" size={22} color={Colors.accentHighlight} />
+            <Text style={styles.reflectionSentTitle}>Ya enviaste tu reflexión</Text>
+          </View>
+          {submittedAtLabel ? (
+            <Text style={styles.muted}>Enviada el {submittedAtLabel}</Text>
+          ) : null}
+          <Text style={styles.sectionH2}>Tu reflexión</Text>
+          <Text style={styles.muted}>{prompt}</Text>
+          <View style={styles.reflectionSentBody}>
+            <Text style={styles.reflectionSentText}>{existingReflection.text}</Text>
+          </View>
+        </>
+      ) : (
+        <>
+          <Text style={styles.sectionH2}>Tu reflexión</Text>
+          <Text style={styles.muted}>{prompt}</Text>
 
-      <View style={styles.reflectionWrap}>
-        <TextInput
-          value={text}
-          onChangeText={setText}
-          multiline
-          placeholder="Escribí tu reflexión…"
-          placeholderTextColor={Colors.textTertiary}
-          selectionColor={Colors.accentPrimary}
-          style={styles.reflectionInput}
-        />
-        <Text style={[styles.reflectionCounter, ready && styles.reflectionCounterReady]}>
-          {text.trim().length} / {REFLECTION_MIN_CHARS} caracteres mínimos
-        </Text>
-      </View>
-
-      <Button
-        title="Enviar mi reflexión"
-        onPress={() => void submit()}
-        loading={submitting}
-        disabled={!ready}
-      />
+          <View style={styles.reflectionWrap}>
+            <TextInput
+              value={text}
+              onChangeText={(value) => {
+                setText(value);
+                if (status !== 'idle') {
+                  setStatus('idle');
+                  setStatusMessage('');
+                }
+              }}
+              multiline
+              placeholder="Escribí tu reflexión…"
+              placeholderTextColor={Colors.textTertiary}
+              selectionColor={Colors.accentPrimary}
+              style={styles.reflectionInput}
+            />
+            <Text style={[styles.reflectionCounter, ready && styles.reflectionCounterReady]}>
+              {charCount} / {REFLECTION_MIN_CHARS} caracteres mínimos
+            </Text>
+          </View>
+        </>
+      )}
     </ProfileScreenShell>
   );
 }
@@ -1455,6 +1647,55 @@ const styles = StyleSheet.create({
     color: Colors.accentHighlight,
     fontWeight: '700',
   },
+  reflectionFooter: {
+    gap: 8,
+  },
+  reflectionStatus: {
+    ...Typography.caption,
+    textAlign: 'center',
+    color: Colors.textSecondary,
+  },
+  reflectionStatusSuccess: {
+    color: Colors.accentHighlight,
+    fontWeight: '700',
+  },
+  reflectionStatusError: {
+    color: Colors.accentOrangeWarm,
+    fontWeight: '700',
+  },
+  reflectionSentBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: '#4CC35B22',
+    borderWidth: 1,
+    borderColor: '#4CC35B55',
+  },
+  reflectionSentTitle: {
+    ...Typography.bodyMedium,
+    color: Colors.accentHighlight,
+    fontWeight: '800',
+    flex: 1,
+  },
+  reflectionSentBody: {
+    minHeight: 160,
+    backgroundColor: '#1F0A40CC',
+    borderWidth: 1,
+    borderColor: '#FFFFFF14',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 10,
+  },
+  reflectionSentText: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+    fontSize: 14,
+    lineHeight: 22,
+  },
   notifGroupLabel: {
     color: Colors.textTertiary,
     fontSize: 11,
@@ -1489,6 +1730,36 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontWeight: '900',
     fontSize: 20,
+  },
+  changePlanToggle: {
+    flexDirection: 'row',
+    backgroundColor: '#1F0A40',
+    borderRadius: 999,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: '#FFFFFF14',
+  },
+  changePlanToggleBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 999,
+    alignItems: 'center',
+  },
+  changePlanToggleBtnActive: {
+    backgroundColor: Colors.accentPrimary,
+  },
+  changePlanToggleText: {
+    color: Colors.textTertiary,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  changePlanToggleTextActive: {
+    color: Colors.textPrimary,
+  },
+  prorationHint: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
   },
   modalPlanRow: {
     flexDirection: 'row',

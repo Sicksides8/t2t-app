@@ -23,6 +23,7 @@ import { db } from './firebase';
 import { updateUserFields } from './authService';
 import { getCanonicalPlan } from './subscriptionService';
 import { getPlanDisplayName } from '../utils/planDisplay';
+import { estimatePlanChange } from '../utils/subscriptionProration';
 import type {
   BillingCycle,
   Payment,
@@ -86,6 +87,7 @@ function mapSubscriptionDoc(userId: string, data: any): Subscription | null {
     cancelledAt: toDate(data.cancelledAt),
     couponCode: typeof data.couponCode === 'string' ? data.couponCode : undefined,
     discountPercent: typeof data.discountPercent === 'number' ? data.discountPercent : undefined,
+    purchaseToken: typeof data.purchaseToken === 'string' ? data.purchaseToken : undefined,
   };
 }
 
@@ -151,7 +153,7 @@ async function mirrorToUser(userId: string, sub: Subscription): Promise<void> {
 // ---------- provider ----------
 
 export const mockBillingProvider: IBillingProvider = {
-  async startTrial(userId, planId) {
+  async startTrial(userId, planId, cycle = 'monthly') {
     if (planId === 'free') {
       throw new Error('No se puede iniciar trial sobre el plan FREE.');
     }
@@ -165,7 +167,7 @@ export const mockBillingProvider: IBillingProvider = {
       planId,
       status: 'trialing',
       source: 'mock',
-      cycle: 'monthly',
+      cycle,
       startDate: now,
       endDate: trialEndsAt,
       trialStartedAt: now,
@@ -197,7 +199,14 @@ export const mockBillingProvider: IBillingProvider = {
 
     const basePrice = cycle === 'yearly' ? plan.priceYearly : plan.priceMonthly;
     const discountPercent = options?.discountPercent ?? 0;
-    const finalAmount = Math.max(0, Math.round(basePrice * (1 - discountPercent / 100) * 100) / 100);
+    const priceBeforeDiscount =
+      typeof options?.chargeAmountOverride === 'number'
+        ? options.chargeAmountOverride
+        : basePrice;
+    const finalAmount = Math.max(
+      0,
+      Math.round(priceBeforeDiscount * (1 - discountPercent / 100) * 100) / 100,
+    );
 
     const sub: Subscription = {
       id: userId,
@@ -249,16 +258,20 @@ export const mockBillingProvider: IBillingProvider = {
     return sub;
   },
 
-  async changePlan(userId, newPlanId) {
+  async changePlan(userId, newPlanId, options) {
     const current = await this.getCurrent(userId);
-    // TODO MERCADOPAGO: en producción cambiar de plan implica proration con
-    // la pasarela. En el mock simplemente abrimos una nueva suscripción.
-    const cycle: BillingCycle = current?.cycle === 'yearly' ? 'yearly' : 'monthly';
+    const cycle: BillingCycle =
+      options?.cycle ?? (current?.cycle === 'yearly' ? 'yearly' : 'monthly');
     const source: SubscriptionSource = current?.source ?? 'mock';
     if (newPlanId === 'free') {
       return this.cancel(userId);
     }
-    return this.subscribe(userId, newPlanId, cycle, source);
+
+    const estimate = estimatePlanChange(current, newPlanId, cycle);
+    const chargeAmountOverride =
+      estimate && estimate.isUpgrade ? estimate.estimatedCharge : undefined;
+
+    return this.subscribe(userId, newPlanId, cycle, source, { chargeAmountOverride });
   },
 
   async getCurrent(userId) {

@@ -22,6 +22,7 @@ export const FS_COL = {
   payments: `${P}payments`,
   achievements: `${P}achievements`,
   weeklyChallenges: `${P}weekly_challenges`,
+  weeklyChallengeResponses: `${P}weekly_challenge_responses`,
   config: `${P}config`,
   waitlist: `${P}waitlist`,
   progress: `${P}progress`,

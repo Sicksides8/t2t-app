@@ -37,18 +37,27 @@ import {
 
 import { apiFetch, hasApiBaseUrl } from '../api';
 import { mockBillingProvider } from '../mockBillingProvider';
-import type { IBillingProvider } from '../subscriptionService';
+import type { IBillingProvider, ChangePlanOptions } from '../subscriptionService';
 import type {
   BillingCycle,
   Subscription,
   SubscriptionPlanId,
 } from '../../types';
+import { isSubscriptionUpgrade } from '../../utils/subscriptionProration';
 import {
   ALL_PLAY_SUBSCRIPTION_IDS,
   PLAY_TRIAL_OFFER_TAG,
   parsePlayProductId,
   resolvePlayProductId,
 } from './googlePlaySkus';
+import {
+  completePending,
+  failPending,
+  getPendingPurchase,
+  registerPending,
+  runBillingExclusive,
+  verifyPurchaseOnce,
+} from './billingPurchaseGate';
 
 // Package name de la app. Debe coincidir con android.package en app.json.
 const PACKAGE_NAME = 'com.t2tacademy.mobile';
@@ -94,42 +103,6 @@ export async function shutdownGoogleBilling(): Promise<void> {
 }
 
 // ============================================================================
-// Pending purchase resolver (puente entre listener y Promise)
-// ============================================================================
-
-type Pending = {
-  userId: string;
-  productId: string;
-  source: 'google';
-  resolve: (sub: Subscription) => void;
-  reject: (err: Error) => void;
-  timeoutId: ReturnType<typeof setTimeout>;
-};
-
-let pending: Pending | null = null;
-
-function clearPending(): void {
-  if (pending) {
-    clearTimeout(pending.timeoutId);
-    pending = null;
-  }
-}
-
-function rejectPending(err: Error): void {
-  if (!pending) return;
-  const p = pending;
-  clearPending();
-  p.reject(err);
-}
-
-function resolvePending(sub: Subscription): void {
-  if (!pending) return;
-  const p = pending;
-  clearPending();
-  p.resolve(sub);
-}
-
-// ============================================================================
 // Verificación en el backend
 // ============================================================================
 
@@ -163,7 +136,6 @@ async function verifyOnBackend(
   if (!res.success || !res.data?.subscription) {
     throw new Error(res.error?.message || 'No se pudo validar la compra en el servidor.');
   }
-  // El backend devuelve fechas como string ISO — re-hidratamos.
   const sub = res.data.subscription;
   return {
     ...sub,
@@ -182,11 +154,12 @@ async function verifyOnBackend(
 // ============================================================================
 
 async function handlePurchaseUpdate(purchase: Purchase): Promise<void> {
+  const token = (purchase as Purchase & { purchaseToken?: string }).purchaseToken;
+  const active = getPendingPurchase();
+
   try {
-    if (!pending) {
-      // Compra fuera de flujo (ej: restore tras un crash). Igual hay que
-      // acknowledge para que Play no la reembolse.
-      if (purchase.purchaseToken && purchase.productId) {
+    if (!active) {
+      if (token && purchase.productId && parsePlayProductId(purchase.productId)) {
         try {
           await finishTransaction({ purchase, isConsumable: false });
         } catch {
@@ -196,43 +169,38 @@ async function handlePurchaseUpdate(purchase: Purchase): Promise<void> {
       return;
     }
 
-    if (pending.productId && purchase.productId !== pending.productId) {
-      // No es la compra que estábamos esperando — la dejamos seguir.
-      return;
-    }
+    if (active.platform !== 'google') return;
+    if (active.productId && purchase.productId !== active.productId) return;
 
-    const token = (purchase as Purchase & { purchaseToken?: string }).purchaseToken;
     if (!token) {
-      rejectPending(new Error('La compra no incluyó purchaseToken.'));
+      failPending(new Error('La compra no incluyó purchaseToken.'));
       return;
     }
 
-    const sub = await verifyOnBackend(
-      pending.userId,
-      purchase.productId,
-      token,
-      pending.source,
+    const sub = await verifyPurchaseOnce(`google:${token}`, () =>
+      verifyOnBackend(active.userId, purchase.productId, token, 'google', {
+        couponCode: active.couponCode,
+      }),
     );
 
-    // Solo finishTransaction después de validar + grantear el entitlement.
     await finishTransaction({ purchase, isConsumable: false });
-
-    resolvePending(sub);
+    completePending(sub);
   } catch (err) {
     console.error('[googlePlay] handlePurchaseUpdate error:', err);
-    rejectPending(err instanceof Error ? err : new Error(String(err)));
+    if (getPendingPurchase()) {
+      failPending(err instanceof Error ? err : new Error(String(err)));
+    }
   }
 }
 
 function handlePurchaseError(error: ExpoPurchaseError): void {
+  if (!getPendingPurchase()) return;
   if (error.code === ErrorCode.UserCancelled) {
-    rejectPending(Object.assign(new Error('Compra cancelada por el usuario.'), { code: 'cancelled' }));
+    failPending(Object.assign(new Error('Compra cancelada por el usuario.'), { code: 'cancelled' }));
     return;
   }
   console.error('[googlePlay] purchaseError:', error);
-  rejectPending(
-    new Error(error.message || `Error de Google Play (${error.code || 'unknown'}).`),
-  );
+  failPending(new Error(error.message || `Error de Google Play (${error.code || 'unknown'}).`));
 }
 
 // ============================================================================
@@ -283,9 +251,30 @@ function pickOfferToken(sub: ProductSubscriptionLike, wantTrial: boolean): strin
   return base.offerTokenAndroid;
 }
 
-// ============================================================================
-// Flow principal: lanzar compra y esperar resolución por listener
-// ============================================================================
+// Google Play Billing replacement modes (BillingFlowParams.SubscriptionUpdateParams)
+const REPLACEMENT_WITH_TIME_PRORATION = 1;
+const REPLACEMENT_WITHOUT_PRORATION = 3;
+
+async function resolveActivePurchaseToken(
+  current: Subscription | null,
+  productId?: string,
+): Promise<string | undefined> {
+  if (current?.purchaseToken) return current.purchaseToken;
+  await ensureConnection();
+  const purchases = (await getAvailablePurchases()) as unknown as Purchase[] | undefined;
+  if (!purchases?.length) return undefined;
+  if (productId) {
+    const match = purchases.find((p) => p.productId === productId);
+    const token = (match as Purchase & { purchaseToken?: string })?.purchaseToken;
+    if (token) return token;
+  }
+  for (const p of purchases) {
+    if (!parsePlayProductId(p.productId)) continue;
+    const token = (p as Purchase & { purchaseToken?: string }).purchaseToken;
+    if (token) return token;
+  }
+  return undefined;
+}
 
 const PURCHASE_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -295,42 +284,52 @@ async function launchPurchase(params: {
   offerToken: string;
   obfuscatedAccountId: string;
   couponCode?: string;
+  purchaseTokenAndroid?: string;
+  replacementModeAndroid?: number;
 }): Promise<Subscription> {
-  await ensureConnection();
+  return runBillingExclusive(async () => {
+    await ensureConnection();
 
-  if (pending) {
-    throw new Error('Ya hay una compra en curso. Esperá a que termine.');
-  }
-
-  return new Promise<Subscription>((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      rejectPending(new Error('La compra expiró por timeout. Intentá de nuevo.'));
-    }, PURCHASE_TIMEOUT_MS);
-
-    pending = {
-      userId: params.userId,
-      productId: params.productId,
-      source: 'google',
-      resolve,
-      reject,
-      timeoutId,
+    const googleRequest: Record<string, unknown> = {
+      skus: [params.productId],
+      obfuscatedAccountId: params.obfuscatedAccountId,
+      subscriptionOffers: [{ sku: params.productId, offerToken: params.offerToken }],
     };
+    if (params.purchaseTokenAndroid) {
+      googleRequest.purchaseTokenAndroid = params.purchaseTokenAndroid;
+    }
+    if (params.replacementModeAndroid !== undefined) {
+      googleRequest.replacementModeAndroid = params.replacementModeAndroid;
+    }
 
-    requestPurchase({
-      request: {
-        google: {
-          skus: [params.productId],
-          obfuscatedAccountId: params.obfuscatedAccountId,
-          subscriptionOffers: [
-            { sku: params.productId, offerToken: params.offerToken },
-          ],
-        },
+    const purchasePromise = registerPending(
+      {
+        userId: params.userId,
+        productId: params.productId,
+        platform: 'google',
+        couponCode: params.couponCode,
       },
-      type: 'subs',
-    }).catch((err) => {
-      // requestPurchase sincronicamente puede fallar antes del listener.
-      rejectPending(err instanceof Error ? err : new Error(String(err)));
-    });
+      PURCHASE_TIMEOUT_MS,
+    );
+
+    try {
+      await requestPurchase({
+        request: {
+          google: googleRequest as {
+            skus: string[];
+            obfuscatedAccountId: string;
+            subscriptionOffers: { sku: string; offerToken: string }[];
+            purchaseTokenAndroid?: string;
+            replacementModeAndroid?: number;
+          },
+        },
+        type: 'subs',
+      });
+    } catch (err) {
+      failPending(err instanceof Error ? err : new Error(String(err)));
+    }
+
+    return purchasePromise;
   });
 }
 
@@ -339,11 +338,11 @@ async function launchPurchase(params: {
 // ============================================================================
 
 export const googlePlayBillingProvider: IBillingProvider = {
-  async startTrial(userId, planId) {
+  async startTrial(userId, planId, cycle = 'monthly') {
     if (planId === 'free') {
       throw new Error('No se puede iniciar trial sobre el plan FREE.');
     }
-    const productId = resolvePlayProductId(planId, 'monthly');
+    const productId = resolvePlayProductId(planId, cycle);
     await ensureConnection();
     const sub = await fetchPlaySubscription(productId);
     const offerToken = pickOfferToken(sub, true);
@@ -415,24 +414,69 @@ export const googlePlayBillingProvider: IBillingProvider = {
     return current;
   },
 
-  async changePlan(userId, newPlanId) {
+  async changePlan(userId, newPlanId, options?: ChangePlanOptions) {
     const current = await this.getCurrent(userId);
-    const cycle: BillingCycle = current?.cycle === 'yearly' ? 'yearly' : 'monthly';
+    const cycle: BillingCycle =
+      options?.cycle ?? (current?.cycle === 'yearly' ? 'yearly' : 'monthly');
     if (newPlanId === 'free') {
       return this.cancel(userId);
     }
-    // Limitación de Fase 1: expo-iap aún no propaga replacementMode +
-    // oldPurchaseTokenAndroid al nativo en todas las versiones. Lanzamos
-    // la nueva compra; si el user ya tiene una sub activa Play va a
-    // tirar AlreadyOwned y caemos al flujo de "manejá tu sub en Play Store".
+
+    const productId = resolvePlayProductId(newPlanId, cycle);
+    await ensureConnection();
+    const playSub = await fetchPlaySubscription(productId);
+    const offerToken = pickOfferToken(playSub, false);
+
+    const hasActiveGoogleSub =
+      current &&
+      current.source === 'google' &&
+      current.planId !== 'free' &&
+      (current.status === 'active' || current.status === 'trialing');
+
+    if (hasActiveGoogleSub && current) {
+      const currentProductId = resolvePlayProductId(current.planId, current.cycle);
+      const purchaseToken = await resolveActivePurchaseToken(current, currentProductId);
+      const isUpgrade = isSubscriptionUpgrade(
+        current.planId,
+        current.cycle,
+        newPlanId,
+        cycle,
+      );
+      const replacementModeAndroid = isUpgrade
+        ? REPLACEMENT_WITH_TIME_PRORATION
+        : REPLACEMENT_WITHOUT_PRORATION;
+
+      if (purchaseToken && currentProductId !== productId) {
+        try {
+          return await launchPurchase({
+            userId,
+            productId,
+            offerToken,
+            obfuscatedAccountId: userId,
+            purchaseTokenAndroid: purchaseToken,
+            replacementModeAndroid,
+          });
+        } catch (err) {
+          if (err instanceof Error && /already.*owned/i.test(err.message)) {
+            await deepLinkToSubscriptions({
+              skuAndroid: productId,
+              packageNameAndroid: PACKAGE_NAME,
+            });
+            throw new Error('Cambiá tu plan desde Google Play y volvé acá para confirmarlo.');
+          }
+          throw err;
+        }
+      }
+    }
+
     try {
       return await this.subscribe(userId, newPlanId, cycle, 'google');
     } catch (err) {
       if (err instanceof Error && /already.*owned/i.test(err.message)) {
-        // Deep-link a Play Store y mantenemos el plan actual hasta que
-        // el user lo cambie manualmente + RTDN nos notifique.
-        const sku = resolvePlayProductId(newPlanId, cycle);
-        await deepLinkToSubscriptions({ skuAndroid: sku, packageNameAndroid: PACKAGE_NAME });
+        await deepLinkToSubscriptions({
+          skuAndroid: productId,
+          packageNameAndroid: PACKAGE_NAME,
+        });
         throw new Error('Cambiá tu plan desde Google Play y volvé acá para confirmarlo.');
       }
       throw err;
@@ -463,24 +507,29 @@ export const googlePlayBillingProvider: IBillingProvider = {
  */
 export async function restorePlayPurchases(userId: string): Promise<void> {
   if (Platform.OS !== 'android') return;
-  try {
-    await ensureConnection();
-    const purchases = (await getAvailablePurchases()) as unknown as Purchase[] | undefined;
-    if (!purchases || purchases.length === 0) return;
-    for (const p of purchases) {
-      const token = (p as Purchase & { purchaseToken?: string }).purchaseToken;
-      if (!token) continue;
-      if (!parsePlayProductId(p.productId)) continue;
-      try {
-        await verifyOnBackend(userId, p.productId, token, 'google');
-        await finishTransaction({ purchase: p, isConsumable: false });
-      } catch (err) {
-        console.warn('[googlePlay] restore failed for', p.productId, err);
+  await runBillingExclusive(async () => {
+    if (getPendingPurchase()) return;
+    try {
+      await ensureConnection();
+      const purchases = (await getAvailablePurchases()) as unknown as Purchase[] | undefined;
+      if (!purchases?.length) return;
+      for (const p of purchases) {
+        const token = (p as Purchase & { purchaseToken?: string }).purchaseToken;
+        if (!token) continue;
+        if (!parsePlayProductId(p.productId)) continue;
+        try {
+          await verifyPurchaseOnce(`google:${token}`, () =>
+            verifyOnBackend(userId, p.productId, token, 'google'),
+          );
+          await finishTransaction({ purchase: p, isConsumable: false });
+        } catch (err) {
+          console.warn('[googlePlay] restore failed for', p.productId, err);
+        }
       }
+    } catch (err) {
+      console.warn('[googlePlay] restorePlayPurchases error:', err);
     }
-  } catch (err) {
-    console.warn('[googlePlay] restorePlayPurchases error:', err);
-  }
+  });
 }
 
 /** Lista de SKUs precargada para pre-fetch en pantallas de pricing. */

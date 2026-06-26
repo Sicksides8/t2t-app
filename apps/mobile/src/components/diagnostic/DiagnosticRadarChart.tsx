@@ -186,12 +186,13 @@ export function DiagnosticRadarChart({
         ))}
       </Svg>
       {resolvedAxes.map((axis, i) => {
-        const offset = axisCount > 8 ? 18 : 22;
+        const dense = axisCount > 8;
+        const offset = dense ? 24 : 22;
         const pos = labelPosition(axisCount, size, maxRadius, i, offset);
-        const color = colorForLevel(axis.level);
-        const labelWidth = axisCount > 8 ? 60 : 72;
-        const fontSize = axisCount > 8 ? 8 : 9;
-        const maxChars = axisCount > 8 ? 10 : 12;
+        const labelWidth = dense ? 92 : 80;
+        const fontSize = dense ? 12 : 11;
+        const lineHeight = fontSize + 4;
+        const maxChars = dense ? 14 : 12;
         const label =
           axis.label.length > maxChars ? `${axis.label.slice(0, maxChars - 1)}…` : axis.label;
         return (
@@ -201,10 +202,11 @@ export function DiagnosticRadarChart({
               styles.label,
               {
                 left: pos.x - labelWidth / 2,
-                top: pos.y - 8,
+                top: pos.y - lineHeight / 2,
                 width: labelWidth,
-                color,
+                color: Colors.textPrimary,
                 fontSize,
+                lineHeight,
               },
             ]}
             numberOfLines={1}
@@ -226,6 +228,7 @@ const styles = StyleSheet.create({
   },
   label: {
     position: 'absolute',
+    fontFamily: 'Poppins-SemiBold',
     fontWeight: '600',
     textAlign: 'center',
   },

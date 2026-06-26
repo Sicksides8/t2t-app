@@ -10,6 +10,9 @@ type Props = {
   defaultPeriod: 'monthly' | 'yearly';
   selectedPlanId: HookPricingPlan['id'] | null;
   onSelectPlan: (id: HookPricingPlan['id']) => void;
+  /** Periodo controlado desde el padre (onboarding → startTrial). */
+  period?: 'monthly' | 'yearly';
+  onPeriodChange?: (period: 'monthly' | 'yearly') => void;
 };
 
 export function HookPricingScreen({
@@ -18,8 +21,16 @@ export function HookPricingScreen({
   defaultPeriod,
   selectedPlanId,
   onSelectPlan,
+  period: controlledPeriod,
+  onPeriodChange,
 }: Props) {
-  const [period, setPeriod] = useState<'monthly' | 'yearly'>(defaultPeriod);
+  const [internalPeriod, setInternalPeriod] = useState<'monthly' | 'yearly'>(defaultPeriod);
+  const period = controlledPeriod ?? internalPeriod;
+
+  const setPeriod = (next: 'monthly' | 'yearly') => {
+    if (onPeriodChange) onPeriodChange(next);
+    else setInternalPeriod(next);
+  };
 
   return (
     <View style={styles.wrap}>

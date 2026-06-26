@@ -1,7 +1,9 @@
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { Colors, Typography } from '../../theme';
 import type { HookTestimonial } from '../../data/hooksFlow';
+
+const BAR_ANIMATION_MS = 2200;
 
 type Props = {
   title: string;
@@ -10,22 +12,49 @@ type Props = {
   testimonial: HookTestimonial;
 };
 
+function TaskBarRow({ label, delayMs }: { label: string; delayMs: number }) {
+  const fillAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.sequence([
+      Animated.delay(delayMs),
+      Animated.timing(fillAnim, {
+        toValue: 1,
+        duration: BAR_ANIMATION_MS,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }),
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [delayMs, fillAnim]);
+
+  const barWidth = fillAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
+
+  return (
+    <View style={styles.taskRow}>
+      <View style={styles.taskHead}>
+        <Text style={styles.taskLabel}>{label}</Text>
+        <Text style={styles.taskPct}>100%</Text>
+      </View>
+      <View style={styles.track}>
+        <Animated.View style={[styles.fill, { width: barWidth }]} />
+      </View>
+    </View>
+  );
+}
+
 export function HookSocialProof({ title, tasks, statHeadline, testimonial }: Props) {
   return (
     <View style={styles.wrap}>
       <Text style={styles.title}>{title}</Text>
 
       <View style={styles.tasks}>
-        {tasks.map((task) => (
-          <View key={task} style={styles.taskRow}>
-            <View style={styles.taskHead}>
-              <Text style={styles.taskLabel}>{task}</Text>
-              <Text style={styles.taskPct}>100%</Text>
-            </View>
-            <View style={styles.track}>
-              <View style={[styles.fill, { width: '100%' }]} />
-            </View>
-          </View>
+        {tasks.map((task, index) => (
+          <TaskBarRow key={task} label={task} delayMs={index * 420} />
         ))}
       </View>
 

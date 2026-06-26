@@ -11,4 +11,5 @@ export { DiagnosticResultCarousel } from './DiagnosticResultCarousel';
 export { DiagnosticSectionHeader } from './DiagnosticSectionHeader';
 export { DiagnosticSkillRow } from './DiagnosticSkillRow';
 export { DiagnosticStatTiles } from './DiagnosticStatTiles';
+export { DiagnosticQuestionsFlow } from './DiagnosticQuestionsFlow';
 export { EmailDeliveryScreen } from './EmailDeliveryScreen';

@@ -5,10 +5,17 @@ import { PenpotFlowShell } from '../penpot';
 import type { LoaderIconKey, LoaderTask, LoaderTint, ProgressLoaderFrame } from '../../data/onboardingFlow';
 import { Colors, Spacing, Typography } from '../../theme';
 
+/** Duración de la barra principal y checklist (ms). */
+export const LOADER_ANIMATION_MS = 4800;
+/** Pausa breve al llegar al % final antes de avanzar (ms). */
+export const LOADER_HOLD_MS = 900;
+
 type Props = {
   frame: ProgressLoaderFrame;
-  /** Tiempo (ms) total de la animación + auto-advance. Default 2400ms. */
+  /** Tiempo (ms) de la animación de barra + checklist. */
   durationMs?: number;
+  /** Pausa al final antes de `onComplete`. */
+  holdMs?: number;
   onComplete: () => void;
 };
 
@@ -25,16 +32,50 @@ const TINT_COLORS: Record<LoaderTint, { fill: string; ring: string; track: strin
   green: { fill: '#4CC35B', ring: '#4CC35B66', track: Colors.accentHighlight, accent: Colors.accentHighlight },
 };
 
+function checklistStateAtProgress(
+  finalState: LoaderTask['state'],
+  index: number,
+  total: number,
+  progress: number,
+): LoaderTask['state'] {
+  if (finalState === 'pending') return 'pending';
+
+  const segment = 1 / total;
+  const local = Math.max(0, Math.min(1, (progress - index * segment) / segment));
+
+  if (finalState === 'inProgress') {
+    if (local <= 0.15) {
+      return index === 0 ? 'inProgress' : 'pending';
+    }
+    if (local >= 0.82) return 'done';
+    return 'inProgress';
+  }
+
+  if (local < 0.2) return index === 0 ? 'done' : 'pending';
+  if (local < 0.75) return 'inProgress';
+  return 'done';
+}
+
+function animatedTasks(
+  tasks: [LoaderTask, LoaderTask, LoaderTask],
+  progress: number,
+): [LoaderTask, LoaderTask, LoaderTask] {
+  return tasks.map((task, index) => ({
+    ...task,
+    state: checklistStateAtProgress(task.state, index, tasks.length, progress),
+  })) as [LoaderTask, LoaderTask, LoaderTask];
+}
+
 /**
  * Penpot 16/22/28/31 — loaders intercalados con icono circular, barra animada,
  * % contando, checklist con spinner rotando + auto-advance.
- *
- * Animaciones:
- *  - `progressAnim` (0→1) impulsa el ancho de la barra y el % numérico (vía listener).
- *  - `spinAnim` (loop) rota el indicador del item `inProgress` del checklist.
- *  - `pulseAnim` (loop) escala sutilmente el icono central para reforzar la idea de "trabajando".
  */
-export function ProgressLoaderScreen({ frame, durationMs = 2400, onComplete }: Props) {
+export function ProgressLoaderScreen({
+  frame,
+  durationMs = LOADER_ANIMATION_MS,
+  holdMs = LOADER_HOLD_MS,
+  onComplete,
+}: Props) {
   const tint = TINT_COLORS[frame.tint];
   const iconName = ICON_MAP[frame.iconKey];
 
@@ -42,10 +83,18 @@ export function ProgressLoaderScreen({ frame, durationMs = 2400, onComplete }: P
   const spinAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const [displayedPct, setDisplayedPct] = useState(0);
+  const [tasks, setTasks] = useState<[LoaderTask, LoaderTask, LoaderTask]>(() =>
+    animatedTasks(frame.tasks, 0),
+  );
 
   useEffect(() => {
+    progressAnim.setValue(0);
+    setDisplayedPct(0);
+    setTasks(animatedTasks(frame.tasks, 0));
+
     const id = progressAnim.addListener(({ value }) => {
       setDisplayedPct(Math.round(value * frame.percent));
+      setTasks(animatedTasks(frame.tasks, value));
     });
 
     Animated.timing(progressAnim, {
@@ -83,7 +132,7 @@ export function ProgressLoaderScreen({ frame, durationMs = 2400, onComplete }: P
     );
     pulseLoop.start();
 
-    const t = setTimeout(onComplete, durationMs);
+    const t = setTimeout(onComplete, durationMs + holdMs);
 
     return () => {
       progressAnim.removeListener(id);
@@ -92,7 +141,7 @@ export function ProgressLoaderScreen({ frame, durationMs = 2400, onComplete }: P
       pulseLoop.stop();
       clearTimeout(t);
     };
-  }, [frame.percent, durationMs, onComplete, progressAnim, spinAnim, pulseAnim]);
+  }, [frame.id, frame.percent, frame.tasks, durationMs, holdMs, onComplete, progressAnim, spinAnim, pulseAnim]);
 
   const barWidth = progressAnim.interpolate({
     inputRange: [0, 1],
@@ -133,7 +182,7 @@ export function ProgressLoaderScreen({ frame, durationMs = 2400, onComplete }: P
         </Text>
 
         <View style={styles.checklist}>
-          {frame.tasks.map((task, i) => (
+          {tasks.map((task, i) => (
             <ChecklistRow
               key={i}
               task={task}

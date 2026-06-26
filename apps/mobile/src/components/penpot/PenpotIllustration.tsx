@@ -34,7 +34,7 @@ export function PenpotIllustration({ illustrationKey, size = 120, label }: Props
         <Image
           source={T2TLogo}
           style={{ width: size, height: size, borderRadius: size / 2 }}
-          resizeMode="cover"
+          resizeMode="contain"
         />
         {label ? <Text style={styles.label}>{label}</Text> : null}
       </View>

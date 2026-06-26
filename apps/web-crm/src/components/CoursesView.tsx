@@ -256,9 +256,30 @@ export function CoursesView() {
       ),
     },
     {
+      key: 'courseCode',
+      label: 'Código',
+      render: (row) => row.courseCode ?? '—',
+    },
+    {
+      key: 'order',
+      label: 'Orden',
+      render: (row) => {
+        const cat = row.order ?? '—';
+        const plan = row.planOrder ?? '—';
+        return `${cat} / ${plan}`;
+      },
+    },
+    {
       key: 'skillId',
-      label: 'Habilidad',
-      render: (row) => skillLabel(row.skillId),
+      label: 'Categoría',
+      render: (row) => (
+        <span>
+          {skillLabel(row.skillId)}
+          {row.secondarySkillIds?.length
+            ? ` · +${row.secondarySkillIds.length} tag${row.secondarySkillIds.length > 1 ? 's' : ''}`
+            : ''}
+        </span>
+      ),
     },
     {
       key: 'level',

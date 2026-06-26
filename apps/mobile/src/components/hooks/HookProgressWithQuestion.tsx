@@ -1,7 +1,9 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography } from '../../theme';
+
+const BAR_ANIMATION_MS = 1400;
 
 type Props = {
   title: string;
@@ -12,6 +14,50 @@ type Props = {
   onAnswer: (value: 'yes' | 'no') => void;
   showQuestion: boolean;
 };
+
+function TaskBarRow({
+  label,
+  targetFill,
+  done,
+  active,
+}: {
+  label: string;
+  targetFill: number;
+  done: boolean;
+  active: boolean;
+}) {
+  const fillAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fillAnim, {
+      toValue: targetFill,
+      duration: BAR_ANIMATION_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [targetFill, fillAnim]);
+
+  const barWidth = fillAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
+
+  return (
+    <View style={styles.taskRow}>
+      <View style={styles.taskHead}>
+        <Text style={styles.taskLabel}>{label}</Text>
+        {done ? (
+          <Ionicons name="checkmark-circle" size={22} color={Colors.accentHighlight} />
+        ) : active ? (
+          <View style={styles.spinnerDot} />
+        ) : null}
+      </View>
+      <View style={styles.track}>
+        <Animated.View style={[styles.fill, { width: barWidth }]} />
+      </View>
+    </View>
+  );
+}
 
 export function HookProgressWithQuestion({
   title,
@@ -31,21 +77,15 @@ export function HookProgressWithQuestion({
         {tasks.map((task, idx) => {
           const done = idx < activeIndex;
           const active = idx === activeIndex;
-          const fill = done ? 1 : active ? 0.55 : 0.08;
+          const targetFill = done ? 1 : active ? 0.55 : 0.08;
           return (
-            <View key={task} style={styles.taskRow}>
-              <View style={styles.taskHead}>
-                <Text style={styles.taskLabel}>{task}</Text>
-                {done ? (
-                  <Ionicons name="checkmark-circle" size={22} color={Colors.accentHighlight} />
-                ) : active ? (
-                  <View style={styles.spinnerDot} />
-                ) : null}
-              </View>
-              <View style={styles.track}>
-                <View style={[styles.fill, { width: `${fill * 100}%` }]} />
-              </View>
-            </View>
+            <TaskBarRow
+              key={task}
+              label={task}
+              targetFill={targetFill}
+              done={done}
+              active={active}
+            />
           );
         })}
       </View>

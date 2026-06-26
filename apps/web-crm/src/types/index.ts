@@ -22,7 +22,12 @@ export type CourseRequiredPlan = 'free' | 'pro' | 'elite';
 export interface Course {
   id: string;
   title: string;
+  /** Categoría principal (slug canónico de habilidad). */
   skillId: string;
+  /** Tags secundarios de clasificación (no impacto numérico). */
+  secondarySkillIds?: string[];
+  /** Código estable del catálogo (C1, C2…). */
+  courseCode?: string;
   description: string;
   thumbnail?: string;
   pdfUrl?: string;
@@ -35,7 +40,12 @@ export interface Course {
   requiredPlan?: CourseRequiredPlan;
   isActive: boolean;
   isPremium?: boolean;
+  /** Orden en catálogo / Explorar. */
   order?: number;
+  /** Orden en plan Beta de entrenamiento; null = no incluido. */
+  planOrder?: number | null;
+  /** Impacto gᵢ (0–1) por habilidad al completar el curso. */
+  skillImpact?: Record<string, number>;
 }
 
 export interface CourseModule {
@@ -88,6 +98,8 @@ export interface CourseDetailPayload {
 export type CreateCourseBody = {
   title: string;
   skillId: string;
+  secondarySkillIds?: string[];
+  courseCode?: string;
   description: string;
   thumbnail?: string;
   pdfUrl?: string;
@@ -97,6 +109,8 @@ export type CreateCourseBody = {
   isActive?: boolean;
   isPremium?: boolean;
   order?: number;
+  planOrder?: number | null;
+  skillImpact?: Record<string, number>;
   moduleTitle?: string;
   lessons: Array<{
     title: string;
@@ -114,6 +128,8 @@ export type PatchCourseBody = Partial<
     Course,
     | 'title'
     | 'skillId'
+    | 'secondarySkillIds'
+    | 'courseCode'
     | 'description'
     | 'thumbnail'
     | 'pdfUrl'
@@ -123,6 +139,8 @@ export type PatchCourseBody = Partial<
     | 'isActive'
     | 'isPremium'
     | 'order'
+    | 'planOrder'
+    | 'skillImpact'
   >
 >;
 

@@ -20,7 +20,7 @@ export function SplashPenpotScreen({ onComplete }: Props) {
       <View style={styles.center}>
         <Text style={styles.script}>Tu gimnasio{'\n'}mental</Text>
         <View style={styles.logoWrap}>
-          <Image source={T2TLogo} style={styles.logo} resizeMode="cover" />
+          <Image source={T2TLogo} style={styles.logo} resizeMode="contain" />
         </View>
         <Text style={styles.brand}>T2T Academy</Text>
       </View>

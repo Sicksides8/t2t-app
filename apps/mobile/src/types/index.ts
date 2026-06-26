@@ -112,7 +112,12 @@ export type CourseRequiredPlan = SubscriptionPlanId;
 export interface Course {
   id: string;
   title: string;
+  /** Categoría principal (slug canónico). */
   skillId: string;
+  /** Tags secundarios de clasificación. */
+  secondarySkillIds?: string[];
+  /** Código de catálogo (C1, C2…). */
+  courseCode?: string;
   description: string;
   thumbnail?: string;
   pdfUrl?: string;
@@ -129,7 +134,12 @@ export interface Course {
    * Suscripción mínima requerida. Fuente de verdad para gating cuando está presente.
    */
   requiredPlan?: CourseRequiredPlan;
+  /** Orden en catálogo. */
   order?: number;
+  /** Orden en plan Beta; null = no incluido. */
+  planOrder?: number | null;
+  /** Impacto gᵢ (0–1) por habilidad al completar el curso. */
+  skillImpact?: Record<string, number>;
 }
 
 export interface CourseModule {
@@ -182,6 +192,7 @@ export interface CourseProgress {
   currentLessonId?: string;
   lessonsCompleted: string[];
   percentComplete: number;
+  skillImpactApplied?: boolean;
   updatedAt: Date;
 }
 
@@ -205,6 +216,8 @@ export interface Subscription {
   startDate: Date;
   /** Próxima renovación (o fin del trial si status === 'trialing'). */
   endDate: Date;
+  /** Token de compra de Google Play (solo source === 'google'). */
+  purchaseToken?: string;
   trialStartedAt?: Date;
   trialEndsAt?: Date;
   cancelledAt?: Date;
@@ -253,6 +266,8 @@ export interface DiagnosticResult {
   focusAreas?: string[];
   topSkills: string[];
   weakSkills: string[];
+  /** Promedio de habilidades en escala 2–10 (visible al usuario). */
+  overallScore210?: number;
   completedAt?: Date;
 }
 
@@ -329,6 +344,7 @@ export type ProfileStackParamList = {
   Subscription: undefined;
   PaymentDetail: { paymentId: string };
   DiagnosticApp: undefined;
+  DiagnosticRetake: undefined;
   Certificates: undefined;
   CertificateDetail: { certificateId: string; courseId?: string };
   Progress: undefined;

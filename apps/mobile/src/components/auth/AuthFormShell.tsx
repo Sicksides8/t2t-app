@@ -1,6 +1,7 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { T2TLogo } from '../../assets/brand';
 import { PenpotFlowShell } from '../penpot';
 import { Button } from '../ui';
 import { Colors, Spacing, Typography } from '../../theme';
@@ -60,6 +61,8 @@ export function AuthFormShell({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        <Image source={T2TLogo} style={styles.logo} resizeMode="contain" accessibilityLabel="T2T Academy" />
+
         <View style={styles.header}>
           <Text style={styles.title}>{title}</Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
@@ -93,6 +96,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: Spacing.lg,
     paddingBottom: Spacing.xl,
+  },
+  logo: {
+    width: 72,
+    height: 72,
+    alignSelf: 'center',
+    marginBottom: Spacing.lg,
   },
   header: {
     gap: Spacing.sm,

@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View, type DimensionValue, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ProgressRing as SvgProgressRingImpl } from './ProgressRing';
 import { Colors, Radius, Spacing, Typography } from '../../theme';
 
 export function Chip({ label, active }: { label: string; active?: boolean }) {
@@ -39,22 +40,14 @@ export function ProgressBar({ value, style }: { value: number; style?: ViewStyle
 }
 
 export function ProgressRing({ value, size = 92 }: { value: number; size?: number }) {
-  const pct = Math.round(Math.max(0, Math.min(100, value)));
-  const border = Math.max(3, Math.round(size * 0.098));
+  const strokeWidth = Math.max(3, Math.round(size * 0.09));
   return (
-    <View
-      style={[
-        styles.ring,
-        {
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          borderWidth: border,
-        },
-      ]}
-    >
-      <Text style={[styles.ringValue, size < 48 && { fontSize: 9 }]}>{pct}%</Text>
-    </View>
+    <SvgProgressRingImpl
+      value={value}
+      size={size}
+      strokeWidth={strokeWidth}
+      showPercentage
+    />
   );
 }
 
@@ -120,21 +113,6 @@ const styles = StyleSheet.create({
   progressFill: {
     height: '100%',
     borderRadius: Radius.pill,
-  },
-  ring: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 9,
-    borderColor: Colors.accentSecondary,
-    backgroundColor: Colors.glass,
-  },
-  ringValue: {
-    ...Typography.bodyMedium,
-    color: Colors.textPrimary,
-    fontWeight: '800',
   },
   cardGlass: {
     padding: Spacing.lg,

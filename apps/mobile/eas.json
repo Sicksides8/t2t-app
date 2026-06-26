@@ -7,10 +7,20 @@
     "production": {
       "distribution": "store",
       "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_BILLING_MODE": "mock"
+      },
       "ios": {
         "resourceClass": "m-medium",
         "image": "latest"
+      },
+      "android": {
+        "buildType": "app-bundle"
       }
+    },
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
     }
   },
   "submit": {

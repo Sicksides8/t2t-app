@@ -1,7 +1,8 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { T2TLogo } from '../../assets/brand';
 import { PenpotFlowShell } from '../penpot';
 import { Button } from '../ui';
 import { Colors, Spacing, Typography } from '../../theme';
@@ -13,8 +14,10 @@ type Props = {
   subtitle?: string;
   onBack?: () => void;
   variant?: AuthMailVariant;
-  /** Override del ícono central (default: 'mail'). */
+  /** Override del ícono central cuando no se usa el logo de marca. */
   icon?: keyof typeof import('@expo/vector-icons/build/Icons').Ionicons.glyphMap;
+  /** Muestra el logo T2T en lugar del ícono genérico (default: true). */
+  showLogo?: boolean;
   children: React.ReactNode;
   primaryLabel: string;
   onPrimary: () => void;
@@ -29,6 +32,7 @@ export function AuthMailShell({
   onBack,
   variant = 'purple',
   icon = 'mail',
+  showLogo = true,
   children,
   primaryLabel,
   onPrimary,
@@ -59,7 +63,7 @@ export function AuthMailShell({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <MailTile variant={variant} icon={icon} />
+        <MailTile variant={variant} icon={icon} showLogo={showLogo} />
 
         <View style={styles.header}>
           <Text style={styles.title}>{title}</Text>
@@ -75,9 +79,11 @@ export function AuthMailShell({
 function MailTile({
   variant,
   icon,
+  showLogo,
 }: {
   variant: AuthMailVariant;
   icon: keyof typeof import('@expo/vector-icons/build/Icons').Ionicons.glyphMap;
+  showLogo: boolean;
 }) {
   const isTeal = variant === 'teal';
   const glowColor = isTeal ? '#34D6C2' : Colors.accentPrimary;
@@ -96,7 +102,11 @@ function MailTile({
         end={{ x: 0.9, y: 0.95 }}
         style={styles.tile}
       >
-        <Ionicons name={icon} size={48} color={Colors.textPrimary} />
+        {showLogo ? (
+          <Image source={T2TLogo} style={styles.logo} resizeMode="contain" accessibilityLabel="T2T Academy" />
+        ) : (
+          <Ionicons name={icon} size={48} color={Colors.textPrimary} />
+        )}
         {isTeal ? (
           <View style={styles.checkBadge}>
             <Ionicons name="checkmark" size={12} color={Colors.textPrimary} />
@@ -165,6 +175,10 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  logo: {
+    width: 64,
+    height: 64,
   },
   checkBadge: {
     position: 'absolute',

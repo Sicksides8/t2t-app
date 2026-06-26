@@ -11,15 +11,21 @@ export function isMockVideoUrl(url?: string | null): boolean {
 }
 
 /**
- * Sugerencias para el campo libre de habilidad/categoría.
- * El creador puede escribir cualquier valor, estas son solo atajos rápidos.
+ * Taxonomía de 11 habilidades — mismos ids que apps/mobile/src/data/academy.ts
+ * y el diagnóstico T2T. `value` es el slug canónico guardado en Firestore.
  */
 export const SKILL_SUGGESTIONS: ReadonlyArray<{ value: string; label: string }> = [
   { value: 'liderazgo', label: 'Liderazgo' },
   { value: 'influencia', label: 'Influencia' },
   { value: 'adaptabilidad', label: 'Adaptabilidad' },
-  { value: 'comunicacion', label: 'Comunicacion' },
+  { value: 'comunicacion', label: 'Comunicación' },
+  { value: 'equipo', label: 'Equipo' },
+  { value: 'resolucion', label: 'Resolución' },
+  { value: 'creatividad', label: 'Creatividad' },
+  { value: 'escucha', label: 'Escucha' },
   { value: 'productividad', label: 'Productividad' },
+  { value: 'aprendizaje', label: 'Aprendizaje' },
+  { value: 'gestionEmocional', label: 'Gestión emocional' },
 ];
 
 /** Compatibilidad con el código existente (no es un union cerrado). */

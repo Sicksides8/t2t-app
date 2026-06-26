@@ -4,17 +4,27 @@ import { FS_COL } from '../constants/firestoreCollections';
 import { db } from '../services/firebase';
 import type { CourseProgress, DiagnosticResult } from '../types';
 import { computeDiagnosticScores } from '../data/diagnostic';
+import { buildLessonCompleteProgress, buildWatchProgressUpdate } from '../utils/courseProgress';
 
 interface AcademyState {
   selectedCourseId?: string;
   diagnostic: DiagnosticResult;
   progress: Record<string, CourseProgress>;
   setAnswer: (questionId: string, value: number) => void;
+  beginDiagnosticRetake: () => void;
   completeDiagnostic: () => DiagnosticResult;
   selectCourse: (courseId: string) => void;
   markLessonComplete: (courseId: string, lessonId: string, totalLessons?: number) => void;
   markCourseStarted: (courseId: string, currentLessonId: string) => void;
+  updateWatchProgress: (
+    courseId: string,
+    lessonId: string,
+    watchedSec: number,
+    durationSec: number,
+    totalLessons: number,
+  ) => void;
   loadUserProgress: (userId: string) => Promise<void>;
+  setDiagnostic: (diagnostic: DiagnosticResult) => void;
   clearProgress: () => void;
 }
 
@@ -36,17 +46,39 @@ export const useAcademyStore = create<AcademyState>((set, get) => ({
       },
     })),
 
+  beginDiagnosticRetake: () =>
+    set((state) => {
+      const prev = state.diagnostic;
+      const baseline =
+        prev.scores && Object.keys(prev.scores).length > 0
+          ? { ...prev.scores }
+          : prev.baseScores
+            ? { ...prev.baseScores }
+            : undefined;
+      return {
+        diagnostic: {
+          ...prev,
+          answers: {},
+          baseScores: baseline ?? prev.baseScores,
+        },
+      };
+    }),
+
   completeDiagnostic: () => {
     const answers = get().diagnostic.answers;
-    const { scores, baseScores, focusAreas, topSkills, weakSkills } =
+    const prev = get().diagnostic;
+    const { scores, baseScores, focusAreas, topSkills, weakSkills, overallScore210 } =
       computeDiagnosticScores(answers);
     const diagnostic: DiagnosticResult = {
       answers,
       scores,
-      baseScores,
+      baseScores: prev.baseScores && Object.keys(prev.baseScores).length > 0
+        ? prev.baseScores
+        : baseScores,
       focusAreas,
       topSkills,
       weakSkills,
+      overallScore210,
       completedAt: new Date(),
     };
     set({ diagnostic });
@@ -58,16 +90,7 @@ export const useAcademyStore = create<AcademyState>((set, get) => ({
   markCourseStarted: (courseId, currentLessonId) =>
     set((state) => {
       const current = state.progress[courseId];
-      if (current && current.percentComplete > 0) {
-        // Ya estaba iniciado: solo refrescamos la lección actual.
-        if (current.currentLessonId === currentLessonId) return state;
-        return {
-          progress: {
-            ...state.progress,
-            [courseId]: { ...current, currentLessonId, updatedAt: new Date() },
-          },
-        };
-      }
+      if (current?.currentLessonId === currentLessonId) return state;
       return {
         progress: {
           ...state.progress,
@@ -75,41 +98,44 @@ export const useAcademyStore = create<AcademyState>((set, get) => ({
             courseId,
             lessonsCompleted: current?.lessonsCompleted ?? [],
             currentLessonId,
-            percentComplete: Math.max(current?.percentComplete ?? 0, 1),
+            percentComplete: current?.percentComplete ?? 0,
             updatedAt: new Date(),
           },
         },
       };
     }),
 
-  markLessonComplete: (courseId, lessonId, totalLessons = 5) =>
+  updateWatchProgress: (courseId, lessonId, watchedSec, durationSec, totalLessons) =>
     set((state) => {
-      const current = state.progress[courseId] || {
+      const updated = buildWatchProgressUpdate(
+        state.progress[courseId],
         courseId,
-        lessonsCompleted: [],
-        percentComplete: 0,
-        updatedAt: new Date(),
-      };
-      const lessonsCompleted = Array.from(new Set([...current.lessonsCompleted, lessonId]));
-      const percentComplete = Math.min(
-        100,
-        totalLessons > 0
-          ? Math.round((lessonsCompleted.length / totalLessons) * 100)
-          : lessonsCompleted.length * 15,
+        lessonId,
+        totalLessons,
+        watchedSec,
+        durationSec,
       );
+      if (!updated) return state;
       return {
         progress: {
           ...state.progress,
-          [courseId]: {
-            ...current,
-            lessonsCompleted,
-            currentLessonId: lessonId,
-            percentComplete,
-            updatedAt: new Date(),
-          },
+          [courseId]: updated,
         },
       };
     }),
+
+  markLessonComplete: (courseId, lessonId, totalLessons = 5) =>
+    set((state) => ({
+      progress: {
+        ...state.progress,
+        [courseId]: buildLessonCompleteProgress(
+          state.progress[courseId],
+          courseId,
+          lessonId,
+          totalLessons,
+        ),
+      },
+    })),
 
   loadUserProgress: async (userId) => {
     if (!userId) return;
@@ -121,11 +147,18 @@ export const useAcademyStore = create<AcademyState>((set, get) => ({
       snap.forEach((docSnap) => {
         const data = docSnap.data() as Partial<CourseProgress>;
         const courseId = data.courseId || docSnap.id;
+        const lessonsCompleted = Array.isArray(data.lessonsCompleted) ? data.lessonsCompleted : [];
+        let percentComplete = typeof data.percentComplete === 'number' ? data.percentComplete : 0;
+        // Legacy: 1% por haber abierto el reproductor sin ver tiempo real.
+        if (percentComplete === 1 && lessonsCompleted.length === 0) {
+          percentComplete = 0;
+        }
         next[courseId] = {
           courseId,
-          lessonsCompleted: Array.isArray(data.lessonsCompleted) ? data.lessonsCompleted : [],
+          lessonsCompleted,
           currentLessonId: data.currentLessonId,
           percentComplete: typeof data.percentComplete === 'number' ? data.percentComplete : 0,
+          skillImpactApplied: Boolean(data.skillImpactApplied),
           updatedAt: data.updatedAt ? new Date(data.updatedAt as unknown as string) : new Date(),
         };
       });
@@ -147,4 +180,6 @@ export const useAcademyStore = create<AcademyState>((set, get) => ({
   },
 
   clearProgress: () => set({ progress: {} }),
+
+  setDiagnostic: (diagnostic) => set({ diagnostic }),
 }));

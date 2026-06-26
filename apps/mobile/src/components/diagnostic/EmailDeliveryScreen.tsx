@@ -25,7 +25,7 @@ export function EmailDeliveryScreen({ onBack, onSubmit }: Props) {
   return (
     <AuthMailShell
       title="Recibe tu diagnóstico por email"
-      subtitle="Te enviamos tu radar completo y un resumen de tus 12 habilidades."
+      subtitle="Te enviamos tu radar completo y un resumen de tus 11 habilidades."
       variant="purple"
       icon="mail"
       onBack={onBack}

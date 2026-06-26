@@ -11,7 +11,12 @@ import { adminDb } from '../../../../lib/firebase-admin';
 import { FS_COL } from '../../../../lib/firestoreCollections';
 import { withoutUndefined } from '../../../../lib/firestoreDoc';
 import { handleRouteError } from '../../../../lib/routeError';
-import { slugifySkill } from '../../../../lib/skillId';
+import {
+  normalizeSecondarySkillIds,
+  normalizeSkillImpact,
+  parsePlanOrder,
+  resolveSkillId,
+} from '../../../../lib/courseFields';
 import type { Course, CreateCourseBody } from '../../../../types';
 
 export async function GET(request: NextRequest) {
@@ -39,7 +44,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as CreateCourseBody;
     const title = String(body.title || '').trim();
     const rawSkillId = String(body.skillId || '').trim();
-    const skillId = slugifySkill(rawSkillId);
+    const skillId = resolveSkillId(rawSkillId);
     const description = String(body.description || '').trim();
     if (!title || !skillId || !description) {
       return NextResponse.json(
@@ -75,6 +80,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const secondarySkillIds = normalizeSecondarySkillIds(skillId, body.secondarySkillIds);
+    const skillImpact = normalizeSkillImpact(body.skillImpact);
+    const courseCode = body.courseCode ? String(body.courseCode).trim().toUpperCase() : undefined;
+    const planOrder = parsePlanOrder(body.planOrder);
     const stats = computeCourseStats(lessonsInput);
     const now = new Date();
     let order = typeof body.order === 'number' ? body.order : 100;
@@ -107,6 +116,9 @@ export async function POST(request: NextRequest) {
       title,
       skillId,
       description,
+      ...(courseCode ? { courseCode } : {}),
+      ...(secondarySkillIds.length > 0 ? { secondarySkillIds } : {}),
+      ...(skillImpact ? { skillImpact } : {}),
       ...(thumb ? { thumbnail: thumb } : {}),
       ...(pdfUrl ? { pdfUrl } : {}),
       level: body.level || 'beginner',
@@ -115,6 +127,7 @@ export async function POST(request: NextRequest) {
       isActive: body.isActive !== false,
       isPremium,
       order,
+      ...(planOrder !== undefined ? { planOrder } : {}),
       totalLessons: stats.totalLessons,
       durationMin: stats.durationMin,
       createdAt: now,

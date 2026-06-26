@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { PenpotFlowShell } from '../penpot';
@@ -10,6 +10,8 @@ type Props = {
   question: DiagnosticQuestion;
   questionIndex: number;
   totalQuestions: number;
+  /** Respuesta ya guardada (p. ej. al volver atrás). Sin valor = ninguna opción preseleccionada. */
+  savedValue?: number;
   onBack?: () => void;
   onSubmit: (value: number) => void;
 };
@@ -22,10 +24,16 @@ export function DiagnosticQuestionScreen({
   question,
   questionIndex,
   totalQuestions,
+  savedValue,
   onBack,
   onSubmit,
 }: Props) {
-  const [selected, setSelected] = useState<number | undefined>();
+  const [selected, setSelected] = useState<number | undefined>(savedValue);
+
+  useEffect(() => {
+    setSelected(savedValue);
+  }, [question.id, savedValue]);
+
   const progressPct = ((questionIndex + 1) / totalQuestions) * 100;
   const primaryLabel = question.primaryLabel ?? 'Continuar';
 

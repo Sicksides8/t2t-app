@@ -23,6 +23,7 @@ import {
   isMockVideoUrl,
   requiredPlanFromCourse,
 } from '../../lib/courseConstants';
+import { emptySkillImpact, resolveSkillId } from '../../lib/courseFields';
 import type {
   Course,
   CourseDetailPayload,
@@ -35,6 +36,8 @@ import type {
 import { useToast } from '../ui/Toast';
 import { LessonListEditor } from './LessonListEditor';
 import { MediaUploader } from './MediaUploader';
+import { SkillImpactGrid } from './SkillImpactGrid';
+import { SkillTagsInput } from './SkillTagsInput';
 import {
   clearDraft,
   type CourseFormSnapshot,
@@ -57,13 +60,18 @@ type CourseFormModalProps = {
   nextOrder?: number;
 };
 
-type SectionId = 'course' | 'cover' | 'material' | 'lessons' | 'publish';
+type SectionId = 'course' | 'impact' | 'cover' | 'material' | 'lessons' | 'publish';
 
 type SectionState = 'empty' | 'partial' | 'complete' | 'invalid';
 
 const DEMO_SNAPSHOT: CourseFormSnapshot = {
   title: 'Liderazgo humano para equipos modernos',
-  skillId: 'Liderazgo',
+  skillId: 'liderazgo',
+  secondarySkillIds: ['comunicacion'],
+  courseCode: '',
+  order: 1,
+  planOrder: '',
+  skillImpact: emptySkillImpact(),
   description:
     'Aprende a liderar con confianza, claridad y conversaciones difíciles bien llevadas. Ideal para coordinadores y mandos medios que quieren acompañar mejor a sus equipos.',
   thumbnail: '',
@@ -101,10 +109,15 @@ const DEMO_SNAPSHOT: CourseFormSnapshot = {
   ],
 };
 
-function emptySnapshot(): CourseFormSnapshot {
+function emptySnapshot(nextOrder?: number): CourseFormSnapshot {
   return {
     title: '',
     skillId: '',
+    secondarySkillIds: [],
+    courseCode: '',
+    order: typeof nextOrder === 'number' ? nextOrder : '',
+    planOrder: '',
+    skillImpact: emptySkillImpact(),
     description: '',
     thumbnail: '',
     pdfUrl: '',
@@ -150,7 +163,7 @@ function collectSubmitBlockers(snapshot: CourseFormSnapshot, uploadsBusy: boolea
     blockers.push('Esperá a que terminen las subidas de archivos.');
   }
   if (!snapshot.title.trim()) blockers.push('Completá el título del curso.');
-  if (!snapshot.skillId.trim()) blockers.push('Completá la habilidad / categoría.');
+  if (!snapshot.skillId.trim()) blockers.push('Completá la categoría principal.');
   if (!snapshot.description.trim()) blockers.push('Completá la descripción del curso.');
   if (snapshot.lessons.length === 0) {
     blockers.push('Agregá al menos un módulo.');
@@ -183,7 +196,7 @@ function courseIssueHint(snapshot: CourseFormSnapshot, state: SectionState): str
   if (state === 'complete') return undefined;
   const missing: string[] = [];
   if (!snapshot.title.trim()) missing.push('título');
-  if (!snapshot.skillId.trim()) missing.push('habilidad');
+  if (!snapshot.skillId.trim()) missing.push('categoría principal');
   if (!snapshot.description.trim()) missing.push('descripción');
   if (missing.length === 0) return undefined;
   return `Falta: ${missing.join(', ')}.`;
@@ -210,6 +223,11 @@ function snapshotsEqual(a: CourseFormSnapshot, b: CourseFormSnapshot): boolean {
   if (
     a.title !== b.title ||
     a.skillId !== b.skillId ||
+    JSON.stringify(a.secondarySkillIds) !== JSON.stringify(b.secondarySkillIds) ||
+    a.courseCode !== b.courseCode ||
+    a.order !== b.order ||
+    a.planOrder !== b.planOrder ||
+    JSON.stringify(a.skillImpact) !== JSON.stringify(b.skillImpact) ||
     a.description !== b.description ||
     a.thumbnail !== b.thumbnail ||
     a.pdfUrl !== b.pdfUrl ||
@@ -336,6 +354,16 @@ export function CourseFormModal({
           const initial: CourseFormSnapshot = {
             title: data.course.title || '',
             skillId: data.course.skillId || '',
+            secondarySkillIds: data.course.secondarySkillIds ?? [],
+            courseCode: data.course.courseCode ?? '',
+            order: typeof data.course.order === 'number' ? data.course.order : '',
+            planOrder:
+              data.course.planOrder === null
+                ? null
+                : typeof data.course.planOrder === 'number'
+                  ? data.course.planOrder
+                  : '',
+            skillImpact: { ...emptySkillImpact(), ...(data.course.skillImpact ?? {}) },
             description: data.course.description || '',
             thumbnail: data.course.thumbnail || '',
             pdfUrl: data.course.pdfUrl || '',
@@ -359,7 +387,7 @@ export function CourseFormModal({
           if (loadSeqRef.current === seq) setLoading(false);
         });
     } else {
-      const fresh = emptySnapshot();
+      const fresh = emptySnapshot(nextOrder);
       setInitialSnapshot(fresh);
       setSnapshot(fresh);
       const stored = loadDraft(scope);
@@ -371,7 +399,7 @@ export function CourseFormModal({
       setSavedAt(null);
     }
     setOpenSections(new Set(['course']));
-  }, [open, mode, courseId, scope]);
+  }, [open, mode, courseId, scope, nextOrder]);
 
   // Autosave en localStorage (solo en create, después de cambios reales)
   useEffect(() => {
@@ -541,6 +569,11 @@ export function CourseFormModal({
     const data = stored.data;
     setSnapshot({
       ...data,
+      secondarySkillIds: data.secondarySkillIds ?? [],
+      courseCode: data.courseCode ?? '',
+      order: data.order ?? '',
+      planOrder: data.planOrder ?? '',
+      skillImpact: data.skillImpact ?? emptySkillImpact(),
       requiredPlan:
         data.requiredPlan ??
         requiredPlanFromCourse({ accessTier: data.accessTier, isPremium: data.isPremium }),
@@ -562,16 +595,31 @@ export function CourseFormModal({
     setSaving(true);
     setError(null);
     const isPremiumDerived = snapshot.requiredPlan !== 'free';
+    const orderNum =
+      typeof snapshot.order === 'number' ? snapshot.order : Number(snapshot.order) || undefined;
+    const planOrderRaw = snapshot.planOrder;
+    const planOrder =
+      planOrderRaw === null
+        ? null
+        : typeof planOrderRaw === 'number'
+          ? planOrderRaw
+          : planOrderRaw === ''
+            ? undefined
+            : Number(planOrderRaw) || undefined;
     const body: CreateCourseBody = {
       title: snapshot.title.trim(),
-      skillId: snapshot.skillId.trim(),
+      skillId: resolveSkillId(snapshot.skillId.trim()),
+      secondarySkillIds: snapshot.secondarySkillIds,
+      courseCode: snapshot.courseCode.trim() || undefined,
       description: snapshot.description.trim(),
       thumbnail: snapshot.thumbnail.trim() || undefined,
       pdfUrl: snapshot.pdfUrl.trim() || undefined,
       level: snapshot.level,
       accessTier: snapshot.accessTier,
       requiredPlan: snapshot.requiredPlan,
-      order: typeof nextOrder === 'number' ? nextOrder : undefined,
+      order: orderNum ?? (typeof nextOrder === 'number' ? nextOrder : undefined),
+      planOrder,
+      skillImpact: snapshot.skillImpact,
       isActive: snapshot.isActive,
       isPremium: isPremiumDerived,
       lessons: snapshot.lessons.map((lesson) => ({
@@ -611,11 +659,24 @@ export function CourseFormModal({
     setError(null);
     try {
       const isPremiumDerived = snapshot.requiredPlan !== 'free';
+      const orderNum =
+        typeof snapshot.order === 'number' ? snapshot.order : Number(snapshot.order) || undefined;
+      const planOrderRaw = snapshot.planOrder;
+      const planOrder =
+        planOrderRaw === null
+          ? null
+          : typeof planOrderRaw === 'number'
+            ? planOrderRaw
+            : planOrderRaw === ''
+              ? undefined
+              : Number(planOrderRaw) || undefined;
       await apiFetch<Course>(`/api/admin/courses/${courseId}`, {
         method: 'PATCH',
         body: JSON.stringify({
           title: snapshot.title.trim(),
-          skillId: snapshot.skillId.trim(),
+          skillId: resolveSkillId(snapshot.skillId.trim()),
+          secondarySkillIds: snapshot.secondarySkillIds,
+          courseCode: snapshot.courseCode.trim() || null,
           description: snapshot.description.trim(),
           thumbnail: snapshot.thumbnail.trim() || null,
           pdfUrl: snapshot.pdfUrl.trim() || null,
@@ -624,6 +685,9 @@ export function CourseFormModal({
           requiredPlan: snapshot.requiredPlan,
           isActive: snapshot.isActive,
           isPremium: isPremiumDerived,
+          order: orderNum,
+          planOrder,
+          skillImpact: snapshot.skillImpact,
         }),
       });
 
@@ -772,43 +836,89 @@ export function CourseFormModal({
               </label>
 
               <label className={styles.label}>
-                <span>
-                  Habilidad / Categoría <span className={styles.required}>*</span>
-                </span>
+                <span>Código de curso</span>
                 <input
-                  className={`${styles.input} ${
-                    showValidation && !snapshot.skillId.trim() ? styles.inputInvalid : ''
-                  }`}
-                  value={snapshot.skillId}
-                  onChange={(e) => update('skillId', e.target.value)}
-                  placeholder="Ej: Liderazgo, Comunicación, Productividad..."
-                  maxLength={60}
-                  list="skill-suggestions"
+                  className={styles.input}
+                  value={snapshot.courseCode}
+                  onChange={(e) => update('courseCode', e.target.value.toUpperCase())}
+                  placeholder="Ej: C1, C12"
+                  maxLength={8}
                 />
-                <datalist id="skill-suggestions">
-                  {SKILL_SUGGESTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.label} />
-                  ))}
-                </datalist>
-                {showValidation && !snapshot.skillId.trim() ? (
-                  <span className={styles.errorText}>La habilidad / categoría es obligatoria.</span>
-                ) : null}
-                <span className={styles.hint}>
-                  Texto libre. Aparece como categoría en la app móvil.
+                <span className={styles.hint}>Opcional. Clave estable del catálogo (matriz Excel).</span>
+              </label>
+
+              <div>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>
+                  Categoría principal <span className={styles.required}>*</span>
                 </span>
-                <div className={styles.chips} style={{ marginTop: 8 }}>
+                <p className={styles.hint} style={{ marginBottom: 8 }}>
+                  Aparece como etiqueta principal en la app móvil.
+                </p>
+                <div className={styles.chips}>
                   {SKILL_SUGGESTIONS.map((opt) => (
                     <button
                       key={opt.value}
                       type="button"
-                      className={`${styles.chip} ${styles.chipGhost}`}
-                      onClick={() => update('skillId', opt.label)}
+                      className={`${styles.chip} ${
+                        snapshot.skillId === opt.value ? styles.chipActive : styles.chipGhost
+                      }`}
+                      onClick={() => update('skillId', opt.value)}
                     >
                       {opt.label}
                     </button>
                   ))}
                 </div>
-              </label>
+                {showValidation && !snapshot.skillId.trim() ? (
+                  <span className={styles.errorText}>La categoría principal es obligatoria.</span>
+                ) : null}
+              </div>
+
+              <SkillTagsInput
+                label="Habilidades entrenadas (tag secundario)"
+                hint="Clasificación adicional. No define el impacto numérico en la araña."
+                values={snapshot.secondarySkillIds}
+                excludeIds={[snapshot.skillId].filter(Boolean)}
+                onChange={(next) => update('secondarySkillIds', next)}
+              />
+
+              <div className={styles.fieldGrid} style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+                <label className={styles.label}>
+                  <span>Orden en catálogo</span>
+                  <input
+                    type="number"
+                    min={1}
+                    className={styles.input}
+                    value={snapshot.order}
+                    onChange={(e) =>
+                      update('order', e.target.value === '' ? '' : Number(e.target.value))
+                    }
+                  />
+                </label>
+                <label className={styles.label}>
+                  <span>Orden plan Beta</span>
+                  <input
+                    type="number"
+                    min={1}
+                    className={styles.input}
+                    value={snapshot.planOrder === null ? '' : snapshot.planOrder}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      update('planOrder', v === '' ? '' : Number(v));
+                    }}
+                  />
+                  <span className={styles.hint}>Vacío = no incluido en plan fijo.</span>
+                </label>
+                <label className={styles.label}>
+                  <span>Módulos</span>
+                  <input
+                    className={styles.input}
+                    value={snapshot.lessons.length}
+                    readOnly
+                    disabled
+                  />
+                  <span className={styles.hint}>Calculado al guardar (totalLessons).</span>
+                </label>
+              </div>
 
               <div>
                 <span style={{ fontSize: 14, fontWeight: 600 }}>
@@ -852,6 +962,21 @@ export function CourseFormModal({
                 <span className={styles.hint}>{snapshot.description.length}/500 caracteres.</span>
               </label>
             </div>
+          </Section>
+
+          <Section
+            id="impact"
+            icon={<HelpCircle size={18} />}
+            title="Impacto en habilidades"
+            subtitle="Actualiza la araña al completar el curso"
+            state="partial"
+            open={openSections.has('impact')}
+            onToggle={() => toggleSection('impact')}
+          >
+            <SkillImpactGrid
+              value={snapshot.skillImpact}
+              onChange={(next) => update('skillImpact', next)}
+            />
           </Section>
 
           <Section

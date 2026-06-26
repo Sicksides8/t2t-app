@@ -20,11 +20,20 @@ import type { Achievement, CoinTransaction } from '../types';
 
 const LESSON_COINS = 10;
 const COURSE_COINS = 200;
+export const REFLECTION_MIN_CHARS = 20;
 
 export interface IGamificationRepository {
   getUserCoins(userId: string): Promise<number>;
   getCoinTransactions(userId: string, max?: number): Promise<CoinTransaction[]>;
   getWeeklyChallenge(): Promise<WeeklyChallenge | null>;
+  getWeeklyChallengeReflection(
+    userId: string,
+    challengeId: string,
+  ): Promise<WeeklyChallengeReflection | null>;
+  submitWeeklyChallengeReflection(
+    userId: string,
+    input: WeeklyChallengeReflectionInput,
+  ): Promise<void>;
   getUserAchievements(userId: string): Promise<Achievement[]>;
   awardLessonCoins(userId: string, courseId: string, lessonId: string): Promise<number>;
   awardCourseCoins(userId: string, courseId: string): Promise<number>;
@@ -43,6 +52,19 @@ export type WeeklyChallenge = {
   xpReward: number;
   skillId?: string;
   targetLessons?: number;
+};
+
+export type WeeklyChallengeReflectionInput = {
+  challengeId: string;
+  prompt: string;
+  text: string;
+};
+
+export type WeeklyChallengeReflection = {
+  challengeId: string;
+  prompt: string;
+  text: string;
+  submittedAt?: Date;
 };
 
 function uid(): string {
@@ -150,6 +172,46 @@ export const firestoreGamificationRepo: IGamificationRepository = {
         targetLessons: 3,
       };
     }
+  },
+
+  async getWeeklyChallengeReflection(userId, challengeId) {
+    try {
+      const snap = await getDoc(
+        doc(db, FS_COL.weeklyChallengeResponses, `${userId}_${challengeId}`),
+      );
+      if (!snap.exists()) return null;
+      const data = snap.data();
+      const text = typeof data.text === 'string' ? data.text.trim() : '';
+      if (!text) return null;
+      const submittedRaw = data.submittedAt as { toDate?: () => Date } | undefined;
+      return {
+        challengeId: typeof data.challengeId === 'string' ? data.challengeId : challengeId,
+        prompt: typeof data.prompt === 'string' ? data.prompt : '',
+        text,
+        submittedAt: submittedRaw?.toDate?.(),
+      };
+    } catch {
+      return null;
+    }
+  },
+
+  async submitWeeklyChallengeReflection(userId, input) {
+    const trimmed = input.text.trim();
+    if (trimmed.length < REFLECTION_MIN_CHARS) {
+      throw new Error(`La reflexión debe tener al menos ${REFLECTION_MIN_CHARS} caracteres.`);
+    }
+    const ref = doc(db, FS_COL.weeklyChallengeResponses, `${userId}_${input.challengeId}`);
+    await setDoc(
+      ref,
+      {
+        userId,
+        challengeId: input.challengeId,
+        prompt: input.prompt,
+        text: trimmed,
+        submittedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
   },
 
   async getUserAchievements(userId) {
@@ -260,6 +322,14 @@ const apiGamificationRepo: IGamificationRepository = {
     return firestoreGamificationRepo.getWeeklyChallenge();
   },
 
+  async getWeeklyChallengeReflection(userId, challengeId) {
+    return firestoreGamificationRepo.getWeeklyChallengeReflection(userId, challengeId);
+  },
+
+  async submitWeeklyChallengeReflection(userId, input) {
+    return firestoreGamificationRepo.submitWeeklyChallengeReflection(userId, input);
+  },
+
   async getUserAchievements(userId) {
     const api = await tryApi(() => apiFetch<{ items: Achievement[] }>(`/api/users/${userId}/achievements`));
     if (api?.items) return api.items;
@@ -340,6 +410,20 @@ export async function awardStreakMilestoneCoins(milestone: number, amount: numbe
 
 export async function getUserCoinsBalance(): Promise<number> {
   return getGamificationRepo().getUserCoins(uid());
+}
+
+export async function submitWeeklyChallengeReflection(
+  input: WeeklyChallengeReflectionInput,
+): Promise<void> {
+  const userId = uid();
+  return getGamificationRepo().submitWeeklyChallengeReflection(userId, input);
+}
+
+export async function loadWeeklyChallengeReflection(
+  challengeId: string,
+): Promise<WeeklyChallengeReflection | null> {
+  const userId = uid();
+  return getGamificationRepo().getWeeklyChallengeReflection(userId, challengeId);
 }
 
 export { LESSON_COINS, COURSE_COINS };

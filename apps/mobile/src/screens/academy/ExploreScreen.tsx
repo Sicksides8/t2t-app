@@ -18,7 +18,12 @@ import { getRecommendedCourses, getSkills } from '../../services/academyService'
 import { fetchCourses } from '../../services/courseService';
 import type { Skill } from '../../types';
 import { useAcademyStore, useAuthStore, useCourseStore } from '../../stores';
-import { humanizeSkillId, normalizeSkillId, sameSkillId } from '../../utils/skillId';
+import {
+  buildExploreCatalogSkills,
+  buildSkillCountMap,
+  courseMatchesSkill,
+  skillsForCategoryGrid,
+} from '../../utils/skillCatalog';
 import { canAccessCourse, getRequiredPlan } from '../../utils/subscriptionAccess';
 import { Colors, Spacing, Typography } from '../../theme';
 import type { Course, RootStackParamList } from '../../types';
@@ -26,6 +31,8 @@ import type { Course, RootStackParamList } from '../../types';
 type RootNav = NativeStackNavigationProp<RootStackParamList>;
 
 const ALL_SKILL_ID = '__all__';
+/** Categorías con ícono visibles antes de expandir. */
+const CATEGORY_PREVIEW_COUNT = 6;
 
 function chunkSkills<T>(items: T[], size: number): T[][] {
   const rows: T[][] = [];
@@ -48,6 +55,7 @@ export function ExploreScreen() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [recommended, setRecommended] = useState<Course[]>([]);
   const [allCourses, setAllCourses] = useState<Course[]>([]);
+  const [categoriesExpanded, setCategoriesExpanded] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -55,36 +63,13 @@ export function ExploreScreen() {
       // en vez de getCourses directo. Así dependemos del endpoint público
       // del CRM y no del orderBy del Web SDK que requiere índice compuesto.
       const [remoteSkills, remoteCourses] = await Promise.all([getSkills(), fetchCourses()]);
-      const baseSkills = remoteSkills.length ? remoteSkills : seedSkills;
-
-      // Sumamos al catálogo cualquier skill que aparezca en los cursos cargados
-      // pero que no esté en el catálogo estático/remoto. Así un curso creado
-      // desde el CRM con habilidad nueva (ej. "marketing") muestra su chip y
-      // su categoría aunque la skill no esté declarada.
-      const knownIds = new Set(baseSkills.map((s) => normalizeSkillId(s.id)));
-      const extras: Skill[] = [];
-      for (const course of remoteCourses) {
-        const normalized = normalizeSkillId(course.skillId);
-        if (!normalized || knownIds.has(normalized)) continue;
-        knownIds.add(normalized);
-        extras.push({
-          id: normalized,
-          name: humanizeSkillId(normalized) || normalized,
-          description: 'Habilidad disponible en el catálogo',
-          icon: 'sparkles',
-          color: '#7C7CFF',
-          order: baseSkills.length + extras.length + 1,
-        });
-      }
-      const skillsList = [...baseSkills, ...extras];
+      const skillsList = buildExploreCatalogSkills(
+        remoteSkills.length ? remoteSkills : seedSkills,
+        remoteCourses,
+      );
       setCatalogSkills(skillsList);
       setAllCourses(remoteCourses);
-
-      const next: Record<string, number> = {};
-      for (const skill of skillsList) {
-        next[skill.id] = remoteCourses.filter((c) => sameSkillId(c.skillId, skill.id)).length;
-      }
-      setCounts(next);
+      setCounts(buildSkillCountMap(skillsList, remoteCourses));
     })();
   }, []);
 
@@ -105,12 +90,15 @@ export function ExploreScreen() {
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
-  const visibleSkills = useMemo(() => {
-    let list = catalogSkills;
+  const gridSkills = useMemo(
+    () => skillsForCategoryGrid(catalogSkills, counts),
+    [catalogSkills, counts],
+  );
 
-    if (activeChip !== ALL_SKILL_ID) {
-      list = list.filter((s) => s.id === activeChip);
-    }
+  const chipSkills = gridSkills;
+
+  const visibleSkills = useMemo(() => {
+    let list = activeChip === ALL_SKILL_ID ? gridSkills : gridSkills.filter((s) => s.id === activeChip);
 
     if (normalizedQuery) {
       list = list.filter(
@@ -121,9 +109,25 @@ export function ExploreScreen() {
     }
 
     return list;
-  }, [activeChip, catalogSkills, normalizedQuery]);
+  }, [activeChip, gridSkills, normalizedQuery]);
 
-  const categoryRows = useMemo(() => chunkSkills(visibleSkills, 2), [visibleSkills]);
+  const displayedCategorySkills = useMemo(() => {
+    if (normalizedQuery || categoriesExpanded || visibleSkills.length <= CATEGORY_PREVIEW_COUNT) {
+      return visibleSkills;
+    }
+    return visibleSkills.slice(0, CATEGORY_PREVIEW_COUNT);
+  }, [visibleSkills, categoriesExpanded, normalizedQuery]);
+
+  const hiddenCategoryCount = Math.max(0, visibleSkills.length - CATEGORY_PREVIEW_COUNT);
+  const canExpandCategories =
+    !normalizedQuery && !categoriesExpanded && hiddenCategoryCount > 0;
+  const canCollapseCategories =
+    !normalizedQuery && categoriesExpanded && visibleSkills.length > CATEGORY_PREVIEW_COUNT;
+
+  const categoryRows = useMemo(
+    () => chunkSkills(displayedCategorySkills, 2),
+    [displayedCategorySkills],
+  );
 
   const skillNameById = useMemo(
     () => Object.fromEntries(catalogSkills.map((s) => [s.id, s.name])) as Record<string, string>,
@@ -135,7 +139,7 @@ export function ExploreScreen() {
   const forYouCourses = useMemo(() => {
     let base = isForYou
       ? recommended
-      : allCourses.filter((c) => sameSkillId(c.skillId, activeChip));
+      : allCourses.filter((c) => courseMatchesSkill(c.skillId, activeChip));
 
     if (normalizedQuery) {
       base = base.filter(
@@ -174,6 +178,7 @@ export function ExploreScreen() {
   }, [diagnostic.topSkills, hasDiagnostic, isForYou, skillNameById]);
 
   const openCatalog = (skillId: string, skillName: string) => {
+    if ((counts[skillId] ?? 0) <= 0) return;
     setActiveChip(skillId);
     navigation.navigate('SkillCatalog', { skillId, skillName });
   };
@@ -209,7 +214,7 @@ export function ExploreScreen() {
         style={styles.chipsScroll}
       >
         <ExploreChip label="Todos" active={activeChip === ALL_SKILL_ID} onPress={() => setActiveChip(ALL_SKILL_ID)} />
-        {catalogSkills.map((skill) => (
+        {chipSkills.map((skill) => (
           <ExploreChip
             key={skill.id}
             label={skill.name}
@@ -244,7 +249,39 @@ export function ExploreScreen() {
           </View>
         ))}
 
-        {visibleSkills.length === 0 ? (
+        {canExpandCategories ? (
+          <Pressable
+            onPress={() => setCategoriesExpanded(true)}
+            style={({ pressed }) => [styles.moreCategoriesBtn, pressed && styles.moreCategoriesBtnPressed]}
+            hitSlop={6}
+          >
+            <Text style={styles.moreCategoriesText}>
+              Ver más categorías ({hiddenCategoryCount})
+            </Text>
+            <Ionicons name="chevron-down" size={18} color={Colors.accentPrimary} />
+          </Pressable>
+        ) : null}
+
+        {canCollapseCategories ? (
+          <Pressable
+            onPress={() => setCategoriesExpanded(false)}
+            style={({ pressed }) => [styles.moreCategoriesBtn, pressed && styles.moreCategoriesBtnPressed]}
+            hitSlop={6}
+          >
+            <Text style={styles.moreCategoriesText}>Ver menos categorías</Text>
+            <Ionicons name="chevron-up" size={18} color={Colors.accentPrimary} />
+          </Pressable>
+        ) : null}
+
+        {visibleSkills.length === 0 && activeChip === ALL_SKILL_ID && !normalizedQuery ? (
+          <EmptyState
+            title="Sin categorías con cursos"
+            message="Cuando haya cursos publicados en el CRM, van a aparecer acá."
+            icon="library-outline"
+          />
+        ) : null}
+
+        {visibleSkills.length === 0 && (activeChip !== ALL_SKILL_ID || normalizedQuery) ? (
           <EmptyState
             title="Sin resultados"
             message="Probá otro término de búsqueda."
@@ -352,6 +389,22 @@ const styles = StyleSheet.create({
   catRow: {
     flexDirection: 'row',
     gap: 10,
+  },
+  moreCategoriesBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    marginTop: 2,
+  },
+  moreCategoriesBtnPressed: {
+    opacity: 0.85,
+  },
+  moreCategoriesText: {
+    color: Colors.accentPrimary,
+    fontSize: 14,
+    fontWeight: '700',
   },
   recRow: {
     gap: 10,

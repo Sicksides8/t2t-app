@@ -6,12 +6,19 @@ import { adminDb } from '../../../../../lib/firebase-admin';
 import { FS_COL } from '../../../../../lib/firestoreCollections';
 import { deleteObject, isR2Configured, keyFromPublicUrl } from '../../../../../lib/r2';
 import { handleRouteError } from '../../../../../lib/routeError';
-import { slugifySkill } from '../../../../../lib/skillId';
+import {
+  normalizeSecondarySkillIds,
+  normalizeSkillImpact,
+  parsePlanOrder,
+  resolveSkillId,
+} from '../../../../../lib/courseFields';
 import type { Course, PatchCourseBody } from '../../../../../types';
 
 const PATCHABLE_KEYS: (keyof PatchCourseBody)[] = [
   'title',
   'skillId',
+  'secondarySkillIds',
+  'courseCode',
   'description',
   'thumbnail',
   'pdfUrl',
@@ -21,6 +28,8 @@ const PATCHABLE_KEYS: (keyof PatchCourseBody)[] = [
   'isActive',
   'isPremium',
   'order',
+  'planOrder',
+  'skillImpact',
 ];
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -57,11 +66,34 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (typeof update.title === 'string') update.title = update.title.trim();
     if (typeof update.skillId === 'string') {
-      const slug = slugifySkill(update.skillId);
+      const slug = resolveSkillId(update.skillId);
       if (!slug) {
         delete update.skillId;
       } else {
         update.skillId = slug;
+      }
+    }
+    if (body.secondarySkillIds !== undefined) {
+      const primary =
+        typeof update.skillId === 'string'
+          ? update.skillId
+          : String((snap.data() as Course).skillId || '');
+      update.secondarySkillIds = normalizeSecondarySkillIds(primary, body.secondarySkillIds);
+    }
+    if (body.skillImpact !== undefined) {
+      const normalized = normalizeSkillImpact(body.skillImpact);
+      update.skillImpact = normalized ?? FieldValue.delete();
+    }
+    if (body.courseCode !== undefined) {
+      const code = String(body.courseCode || '').trim().toUpperCase();
+      update.courseCode = code || FieldValue.delete();
+    }
+    if (body.planOrder !== undefined) {
+      const po = parsePlanOrder(body.planOrder);
+      if (po === null) {
+        update.planOrder = null;
+      } else if (po !== undefined) {
+        update.planOrder = po;
       }
     }
     if (typeof update.description === 'string') update.description = update.description.trim();

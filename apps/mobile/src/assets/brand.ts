@@ -1,6 +1,6 @@
 import type { ImageSourcePropType } from 'react-native';
 
-export const T2TLogo: ImageSourcePropType = require('../../assets/brand/logo-t2t.png');
+export const T2TLogo: ImageSourcePropType = require('../../assets/logo-t2t.png');
 
 export const BrainCharacter: ImageSourcePropType = require('../../assets/illustrations/cerebro-t2t.png');
 

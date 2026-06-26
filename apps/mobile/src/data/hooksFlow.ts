@@ -252,12 +252,14 @@ export const hooksFlowSteps: HookStep[] = [
     multiSelect: true,
     chipMain: { id: 'exito', label: 'Éxito Profesional' },
     chips: [
+      { id: 'oratoria', label: 'Oratoria' },
       { id: 'liderazgo', label: 'Liderazgo' },
-      { id: 'comunicacion', label: 'Comunicación' },
       { id: 'productividad', label: 'Productividad' },
-      { id: 'creatividad', label: 'Creatividad' },
-      { id: 'foco', label: 'Foco mental' },
       { id: 'gestion', label: 'Gestión del tiempo' },
+      { id: 'crecer', label: 'Crecer' },
+      { id: 'comunicacion', label: 'Comunicación' },
+      { id: 'escuchaActiva', label: 'Escucha Activa' },
+      { id: 'inteligenciaEmocional', label: 'Inteligencia emocional' },
     ],
   },
 

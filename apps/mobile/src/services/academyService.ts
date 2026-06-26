@@ -2,6 +2,7 @@ import { collection, doc, getDoc, getDocs, orderBy, query, serverTimestamp, setD
 import { FS_COL } from '../constants/firestoreCollections';
 import { db } from './firebase';
 import { plans as staticPlans, skills as staticSkills } from '../data/academy';
+import { courseMatchesSkill } from '../utils/skillCatalog';
 import type { Course, CourseModule, DiagnosticResult, Lesson, Plan, Skill } from '../types';
 
 export async function getSkills(): Promise<Skill[]> {
@@ -21,16 +22,14 @@ export async function getCoursesBySkill(skillId: string): Promise<Course[]> {
 export async function getRecommendedCourses(userId: string, topSkills: string[]): Promise<Course[]> {
   void userId;
 
+  const all = await getCourses();
+
   if (!topSkills.length) {
-    // Sin diagnóstico → mostrar cursos al azar del catálogo para no dejar la
-    // sección vacía. Una vez el usuario complete el diagnóstico, esto se
-    // reemplaza por el interleave personalizado de abajo.
-    const all = await getCourses();
     return shuffle(all).slice(0, 8);
   }
 
-  const perSkill = await Promise.all(
-    topSkills.slice(0, 3).map((skillId) => getCourses(skillId)),
+  const perSkill = topSkills.slice(0, 3).map((skillId) =>
+    all.filter((c) => courseMatchesSkill(c.skillId, skillId)),
   );
 
   const interleaved: Course[] = [];
@@ -58,23 +57,35 @@ function shuffle<T>(items: T[]): T[] {
   return copy;
 }
 
+/** Orden plan Beta: planOrder primero, fallback a order de catálogo. */
+export function sortCoursesForPlanBeta(courses: Course[]): Course[] {
+  return [...courses].sort((a, b) => {
+    const ao =
+      typeof a.planOrder === 'number' ? a.planOrder : typeof a.order === 'number' ? a.order : Number.MAX_SAFE_INTEGER;
+    const bo =
+      typeof b.planOrder === 'number' ? b.planOrder : typeof b.order === 'number' ? b.order : Number.MAX_SAFE_INTEGER;
+    return ao - bo;
+  });
+}
+
+/** Cursos con planOrder definido en CRM, ordenados para el plan Beta. */
+export function getPlanOrderedCourses(courses: Course[]): Course[] {
+  return sortCoursesForPlanBeta(courses.filter((c) => typeof c.planOrder === 'number'));
+}
+
 export async function getCourses(skillId?: string): Promise<Course[]> {
-  // Importante: NO usamos orderBy en la query, porque con uno o dos where(==)
-  // + orderBy Firestore exige un índice compuesto que en este proyecto no
-  // está creado. Antes la query fallaba y devolvía [], ocultando los cursos
-  // reales en Explorar y categorías. Ordenamos por `order` en memoria.
   try {
     const base = collection(db, FS_COL.courses);
-    const q = skillId
-      ? query(base, where('isActive', '==', true), where('skillId', '==', skillId))
-      : query(base, where('isActive', '==', true));
+    const q = query(base, where('isActive', '==', true));
     const snapshot = await getDocs(q);
     const items = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as Course);
-    return items.sort((a, b) => {
+    const sorted = items.sort((a, b) => {
       const ao = typeof a.order === 'number' ? a.order : Number.MAX_SAFE_INTEGER;
       const bo = typeof b.order === 'number' ? b.order : Number.MAX_SAFE_INTEGER;
       return ao - bo;
     });
+    if (!skillId) return sorted;
+    return sorted.filter((c) => courseMatchesSkill(c.skillId, skillId));
   } catch {
     return [];
   }

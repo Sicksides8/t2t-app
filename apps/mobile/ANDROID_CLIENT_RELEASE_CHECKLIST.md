@@ -123,14 +123,14 @@ Antes de probar compras reales:
    - `GOOGLE_PLAY_RTDN_VERIFY_TOKEN` — token para el endpoint RTDN (`/api/billing/google/rtdn`).
 2. En la app (`apps/mobile/.env` o EAS env vars):
    - `EXPO_PUBLIC_API_BASE_URL` → URL del web-crm desplegado.
-   - `EXPO_PUBLIC_USE_GOOGLE_BILLING=1` → activa `googlePlayBillingProvider` en Android (sin esto sigue el mock).
+   - `EXPO_PUBLIC_BILLING_MODE=native` → activa Google Play / App Store en builds nativos (sin esto, o con `mock`, sigue el mock).
 
 Checklist rápido:
 
 - [ ] Los 4 product IDs existen en Play Console con nombres exactos (`t2t_pro_*`, `t2t_black_*`).
 - [ ] Cada uno tiene base plan + offer `trial-7d`.
 - [ ] Service account del backend configurado y RTDN apuntando al CRM.
-- [ ] Build EAS (no Expo Go) con plugin `expo-iap` y `EXPO_PUBLIC_USE_GOOGLE_BILLING=1`.
+- [ ] Build EAS (no Expo Go) con plugin `expo-iap` y `EXPO_PUBLIC_BILLING_MODE=native`.
 - [ ] Compra de prueba con cuenta **License tester** en Play Console.
 
 ---

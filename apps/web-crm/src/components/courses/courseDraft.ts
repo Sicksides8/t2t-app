@@ -1,8 +1,14 @@
 import type { CourseAccessTier, CourseLevel, CourseRequiredPlan, LessonDraft } from '../../types';
+import { emptySkillImpact } from '../../lib/courseFields';
 
 export type CourseFormSnapshot = {
   title: string;
   skillId: string;
+  secondarySkillIds: string[];
+  courseCode: string;
+  order: number | '';
+  planOrder: number | '' | null;
+  skillImpact: Record<string, number>;
   description: string;
   thumbnail: string;
   pdfUrl: string;

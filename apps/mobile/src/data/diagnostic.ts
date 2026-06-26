@@ -2,10 +2,9 @@ import { THINKING_FRAMES } from './penpotFrames';
 
 /**
  * Modelo de diagnóstico T2T (rediseño 04→32):
- * - 12 habilidades visibles en el radar (32_Resultado_Radar).
- * - 14 preguntas: 12 mapean 1-a-1 a una skill, 2 son meta (autopercepción + motivación).
- * - Cada pregunta presenta 5 (ó 6 en Q13) opciones de texto distintas. La posición
- *   de la opción seleccionada determina el valor 1-5 que aporta al score de la skill.
+ * - 11 habilidades en el radar, calculadas con fórmulas ponderadas P1–P14.
+ * - 14 preguntas: P1–P12 (skills + P11 liderazgo humano sin eje) + P13/P14 (meta).
+ * - Opciones de skill en escala 2–4–6–8–10; P13 categórica (6 opciones); P14 en escala 2–10.
  */
 
 export type DiagnosticSkillId =
@@ -19,7 +18,6 @@ export type DiagnosticSkillId =
   | 'escucha'
   | 'productividad'
   | 'aprendizaje'
-  | 'liderazgoHumano'
   | 'gestionEmocional';
 
 export type DiagnosticMetaId = 'autopercepcion' | 'motivacion';
@@ -36,7 +34,6 @@ export const DIAGNOSTIC_SKILLS: DiagnosticSkillId[] = [
   'escucha',
   'productividad',
   'aprendizaje',
-  'liderazgoHumano',
   'gestionEmocional',
 ];
 
@@ -45,13 +42,12 @@ export const SKILL_LABELS: Record<DiagnosticSkillId, string> = {
   influencia: 'Influencia',
   adaptabilidad: 'Adaptabilidad',
   comunicacion: 'Comunicación',
-  equipo: 'Trabajo en equipo',
-  resolucion: 'Resolución de problemas',
+  equipo: 'Equipo',
+  resolucion: 'Resolución',
   creatividad: 'Creatividad',
   escucha: 'Escucha',
   productividad: 'Productividad',
   aprendizaje: 'Aprendizaje',
-  liderazgoHumano: 'Liderazgo humano',
   gestionEmocional: 'Gestión emocional',
 };
 
@@ -67,8 +63,7 @@ export const SKILL_LABELS_SHORT: Record<DiagnosticSkillId, string> = {
   escucha: 'Escucha',
   productividad: 'Productiv.',
   aprendizaje: 'Aprendiz.',
-  liderazgoHumano: 'Lid. Hum.',
-  gestionEmocional: 'Gest. Em.',
+  gestionEmocional: 'Gest. Emoc.',
 };
 
 export const META_LABELS: Record<DiagnosticMetaId, string> = {
@@ -77,7 +72,7 @@ export const META_LABELS: Record<DiagnosticMetaId, string> = {
 };
 
 export type DiagnosticOption = {
-  /** 1..5 para preguntas de skill (mapea al score). 1..6 sólo en Q13 (meta). */
+  /** 2/4/6/8/10 para skill; 1..6 sólo en Q13 (meta categórica). */
   value: number;
   label: string;
 };
@@ -101,8 +96,10 @@ export type DiagnosticQuestion = {
   primaryLabel?: string;
 };
 
+const SCALE_VALUES = [2, 4, 6, 8, 10] as const;
+
 const fiveOptions = (labels: [string, string, string, string, string]): DiagnosticOption[] =>
-  labels.map((label, i) => ({ value: i + 1, label }));
+  labels.map((label, i) => ({ value: SCALE_VALUES[i], label }));
 
 export const diagnosticQuestions: DiagnosticQuestion[] = [
   {
@@ -164,7 +161,7 @@ export const diagnosticQuestions: DiagnosticQuestion[] = [
   {
     id: 'q5',
     penFrame: '17_Q_TrabajoEquipo',
-    category: 'TRABAJO EN EQUIPO',
+    category: 'EQUIPO',
     text: 'Trabajar con otras personas para ti suele ser…',
     skillId: 'equipo',
     options: fiveOptions([
@@ -178,7 +175,7 @@ export const diagnosticQuestions: DiagnosticQuestion[] = [
   {
     id: 'q6',
     penFrame: '18_Q_Resolucion',
-    category: 'RESOLUCIÓN DE PROBLEMAS',
+    category: 'RESOLUCIÓN',
     text: 'Cuando aparece un problema complejo…',
     skillId: 'resolucion',
     options: fiveOptions([
@@ -250,7 +247,6 @@ export const diagnosticQuestions: DiagnosticQuestion[] = [
     penFrame: '25_Q_LiderazgoHumano',
     category: 'LIDERAZGO HUMANO',
     text: 'Cuando alguien del equipo se equivoca…',
-    skillId: 'liderazgoHumano',
     options: fiveOptions([
       'Prefiero no involucrarme',
       'Marco el error para que no vuelva a pasar',
@@ -314,19 +310,24 @@ export const REFLEXION_AFTER_QUESTION_INDEX = 3;
 /** Pantallas thinking heredadas (mantenido por compatibilidad — no usado en flujo nuevo). */
 export const onboardingThinkingFrames = THINKING_FRAMES;
 
-import { computeAdjustedScores } from '../utils/diagnosticAlgorithm';
+import { computeAdjustedScores, scoreToScale210 } from '../utils/diagnosticAlgorithm';
 
 export function computeDiagnosticScores(answers: Record<string, number>) {
   const { scores, baseScores, focusAreas } = computeAdjustedScores(
     answers,
     DIAGNOSTIC_SKILLS,
-    diagnosticQuestions,
   );
 
   const ordered = Object.entries(scores).sort((a, b) => b[1] - a[1]);
   const overallScore = Math.round(
     Object.values(scores).reduce((sum, v) => sum + v, 0) / DIAGNOSTIC_SKILLS.length,
   );
+  const overallScore210 =
+    Math.round(
+      (DIAGNOSTIC_SKILLS.reduce((sum, id) => sum + scoreToScale210(scores[id] ?? 0), 0) /
+        DIAGNOSTIC_SKILLS.length) *
+        10,
+    ) / 10;
 
   return {
     scores,
@@ -335,5 +336,6 @@ export function computeDiagnosticScores(answers: Record<string, number>) {
     topSkills: ordered.slice(0, 3).map(([skill]) => skill),
     weakSkills: ordered.slice(-2).map(([skill]) => skill),
     overallScore,
+    overallScore210,
   };
 }

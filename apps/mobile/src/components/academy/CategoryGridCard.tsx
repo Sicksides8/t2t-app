@@ -16,6 +16,10 @@ const SKILL_ICONS: Record<string, IoniconName> = {
   bulb: 'bulb-outline',
   people: 'people-outline',
   crown: 'ribbon',
+  ear: 'ear-outline',
+  happy: 'happy-outline',
+  'color-palette': 'color-palette-outline',
+  book: 'book-outline',
 };
 
 type Props = {

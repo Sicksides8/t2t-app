@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,12 +15,13 @@ import { AppBackground } from '../../components/penpot';
 import { Button, ProgressBar } from '../../components/ui';
 import { COURSE_COINS } from '../../services/gamificationService';
 import { skills } from '../../data/academy';
-import { getLessons, getModules } from '../../services/academyService';
+import { getLessons } from '../../services/academyService';
 import { fetchCourseById } from '../../services/courseService';
 import { enrollInCourse } from '../../services/progressService';
 import { useAcademyStore, useAuthStore } from '../../stores';
+import { exportCertificatePdf } from '../../utils/exportCertificate';
 import { Colors, Radius, Spacing, Typography } from '../../theme';
-import type { Course, CourseModule, Lesson, ModuleLink, RootStackParamList } from '../../types';
+import type { Course, Lesson, ModuleLink, RootStackParamList } from '../../types';
 import { openExternalLink } from '../../utils/openExternalLink';
 import { canAccessCourse, canAccessLesson, getRequiredPlan } from '../../utils/subscriptionAccess';
 import { getPlanDisplayName } from '../../utils/planDisplay';
@@ -33,7 +34,6 @@ function formatDurationMin(seconds: number): string {
 export function CourseDetailScreen({ route, navigation }: NativeStackScreenProps<RootStackParamList, 'CourseDetail'>) {
   const { courseId } = route.params;
   const [course, setCourse] = useState<Course | null>(null);
-  const [modules, setModules] = useState<CourseModule[]>([]);
   const [courseLessons, setCourseLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [resourcesSheet, setResourcesSheet] = useState<
@@ -51,14 +51,12 @@ export function CourseDetailScreen({ route, navigation }: NativeStackScreenProps
     void (async () => {
       setLoading(true);
       try {
-        const [c, m, l] = await Promise.all([
+        const [c, l] = await Promise.all([
           fetchCourseById(courseId),
-          getModules(courseId),
           getLessons(courseId),
         ]);
         if (cancelled) return;
         setCourse(c ?? null);
-        setModules(m);
         setCourseLessons(l);
       } finally {
         if (!cancelled) setLoading(false);
@@ -69,21 +67,11 @@ export function CourseDetailScreen({ route, navigation }: NativeStackScreenProps
     };
   }, [courseId]);
 
-  const lessonsByModule = useMemo(() => {
-    const map = new Map<string, Lesson[]>();
-    for (const lesson of courseLessons) {
-      const list = map.get(lesson.moduleId) ?? [];
-      list.push(lesson);
-      map.set(lesson.moduleId, list);
-    }
-    for (const list of map.values()) {
-      list.sort((a, b) => a.order - b.order);
-    }
-    return map;
-  }, [courseLessons]);
-
   const skill = skills.find((s) => s.id === course?.skillId);
-  const sortedModules = useMemo(() => [...modules].sort((a, b) => a.order - b.order), [modules]);
+  const sortedLessons = useMemo(
+    () => [...courseLessons].sort((a, b) => a.order - b.order),
+    [courseLessons],
+  );
 
   const openLesson = (lessonId: string) => {
     if (!course) return;
@@ -95,15 +83,45 @@ export function CourseDetailScreen({ route, navigation }: NativeStackScreenProps
     navigation.navigate('VideoPlayer', { courseId, lessonId });
   };
 
+  const onDownloadCertificate = () => {
+    if (!course) return;
+    void exportCertificatePdf({
+      userName: user?.displayName || 'Alumno T2T',
+      courseTitle: course.title,
+      certificateId: user?.id ? `${user.id}_${courseId}` : undefined,
+    });
+  };
+
   const onStart = async () => {
     if (course && !canAccessCourse(course, user)) {
       setPaywallVisible(true);
       return;
     }
     await enrollInCourse(courseId);
+    const resumeLesson =
+      progress?.currentLessonId && !completedSet.has(progress.currentLessonId)
+        ? sortedLessons.find((l) => l.id === progress.currentLessonId)
+        : null;
     const next =
-      courseLessons.find((lesson) => !completedSet.has(lesson.id)) ?? courseLessons[0];
+      resumeLesson ??
+      sortedLessons.find((lesson) => !completedSet.has(lesson.id)) ??
+      sortedLessons[0];
     if (next) openLesson(next.id);
+  };
+
+  const onPlayFirstModule = async () => {
+    const firstLesson = sortedLessons[0];
+    if (!firstLesson || !course) return;
+    if (!canAccessCourse(course, user)) {
+      setPaywallVisible(true);
+      return;
+    }
+    if (!canAccessLesson(firstLesson, course, user)) {
+      setPaywallVisible(true);
+      return;
+    }
+    await enrollInCourse(courseId);
+    openLesson(firstLesson.id);
   };
 
   if (loading || !course) {
@@ -117,16 +135,17 @@ export function CourseDetailScreen({ route, navigation }: NativeStackScreenProps
     );
   }
 
-  const moduleCount = sortedModules.length || 1;
-  const coursePdfUrl = course.pdfUrl ?? courseLessons.find((l) => l.pdfUrl)?.pdfUrl;
+  const moduleCount = sortedLessons.length || course.totalLessons || 1;
+  const coursePdfUrl = course.pdfUrl ?? sortedLessons.find((l) => l.pdfUrl)?.pdfUrl;
+  const isCourseComplete = (progress?.percentComplete ?? 0) >= 100;
   const requiredPlan = getRequiredPlan(course);
   const planBadgeLabel = requiredPlan === 'free' ? null : getPlanDisplayName(requiredPlan);
 
-  const nextLesson = courseLessons.find((lesson) => !completedSet.has(lesson.id)) ?? courseLessons[0];
+  const nextLesson = sortedLessons.find((lesson) => !completedSet.has(lesson.id)) ?? sortedLessons[0];
   const nextModuleIndex = (() => {
     if (!nextLesson) return 1;
-    const modIdx = sortedModules.findIndex((m) => m.id === nextLesson.moduleId);
-    return modIdx >= 0 ? modIdx + 1 : 1;
+    const lessonIdx = sortedLessons.findIndex((l) => l.id === nextLesson.id);
+    return lessonIdx >= 0 ? lessonIdx + 1 : 1;
   })();
 
   return (
@@ -138,10 +157,23 @@ export function CourseDetailScreen({ route, navigation }: NativeStackScreenProps
           contentContainerStyle={styles.scroll}
         >
           <View style={styles.hero}>
+            {course.thumbnail ? (
+              <Image
+                source={{ uri: course.thumbnail }}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
+                accessibilityLabel={`Portada de ${course.title}`}
+              />
+            ) : (
+              <LinearGradient
+                colors={['#6E1AAE', '#C040EE']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+            )}
             <LinearGradient
-              colors={['#6E1AAE', '#C040EE']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+              colors={['#1D083A44', '#1D083ACC']}
               style={StyleSheet.absoluteFill}
             />
             <View style={styles.heroTop}>
@@ -154,8 +186,8 @@ export function CourseDetailScreen({ route, navigation }: NativeStackScreenProps
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Reproducir primer módulo"
-              onPress={() => void onStart()}
+              accessibilityLabel="Reproducir módulo 1"
+              onPress={() => void onPlayFirstModule()}
               style={styles.heroPlay}
             >
               <Ionicons name="play" size={36} color={Colors.textPrimary} style={styles.heroPlayIcon} />
@@ -191,56 +223,38 @@ export function CourseDetailScreen({ route, navigation }: NativeStackScreenProps
 
           <View style={styles.modulesSection}>
             <Text style={styles.sectionTitle}>Módulos</Text>
-            {sortedModules.length === 0 ? (
+            {sortedLessons.length === 0 ? (
               <Text style={styles.emptyLessons}>No hay módulos cargados para este curso.</Text>
             ) : (
-              sortedModules.map((mod, modIndex) => {
-                const modLessons = lessonsByModule.get(mod.id) ?? [];
-                const firstLesson = modLessons[0];
-                const allDone = modLessons.length > 0 && modLessons.every((l) => completedSet.has(l.id));
-                const totalMin = Math.max(
-                  1,
-                  Math.round(modLessons.reduce((sum, l) => sum + l.durationSec, 0) / 60),
-                );
-
-                // Bloqueo por plan: si el user no puede acceder a la primera
-                // lección del módulo (y no es gratuita), mostramos candado en
-                // la row y meta con el plan requerido. La lección "gratis"
-                // (lesson.isFree) sigue accesible vía sub-row.
-                const lockedFirst = firstLesson
-                  ? !canAccessLesson(firstLesson, course, user)
-                  : false;
-                const freeLessonInMod = modLessons.find((l) => l.isFree === true);
-                const hasFreeFallback = lockedFirst && Boolean(freeLessonInMod);
-                const metaPlanLabel =
-                  lockedFirst && !hasFreeFallback ? ` · ${planBadgeLabel ?? 'Pro'}` : '';
+              sortedLessons.map((lesson, lessonIndex) => {
+                const allDone = completedSet.has(lesson.id);
+                const locked = !canAccessLesson(lesson, course, user);
+                const metaPlanLabel = locked ? ` · ${planBadgeLabel ?? 'Pro'}` : '';
 
                 const dedupedLinks: ModuleLink[] = [];
                 const seen = new Set<string>();
-                for (const lesson of modLessons) {
-                  for (const link of lesson.links ?? []) {
-                    if (!link?.url || seen.has(link.url)) continue;
-                    seen.add(link.url);
-                    dedupedLinks.push(link);
-                  }
+                for (const link of lesson.links ?? []) {
+                  if (!link?.url || seen.has(link.url)) continue;
+                  seen.add(link.url);
+                  dedupedLinks.push(link);
                 }
-                const modPdfUrl = modLessons.find((l) => l.pdfUrl)?.pdfUrl;
+                const lessonPdfUrl = lesson.pdfUrl;
                 const visibleChips = dedupedLinks.slice(0, 3);
                 const remainingChips = dedupedLinks.length - visibleChips.length;
-                const hasResources = dedupedLinks.length > 0 || Boolean(modPdfUrl);
+                const hasResources = dedupedLinks.length > 0 || Boolean(lessonPdfUrl);
 
-                const openModuleResources = () =>
+                const openLessonResources = () =>
                   setResourcesSheet({
-                    title: `Recursos · ${mod.title}`,
+                    title: `Recursos · ${lesson.title}`,
                     links: dedupedLinks,
-                    pdfUrl: modPdfUrl,
+                    pdfUrl: lessonPdfUrl,
                   });
 
                 return (
-                  <View key={mod.id} style={styles.moduleBlock}>
+                  <View key={lesson.id} style={styles.moduleBlock}>
                     <Pressable
                       accessibilityRole="button"
-                      onPress={() => (firstLesson ? openLesson(firstLesson.id) : null)}
+                      onPress={() => openLesson(lesson.id)}
                       style={({ pressed }) => [
                         styles.moduleRow,
                         allDone && styles.moduleRowDone,
@@ -250,45 +264,31 @@ export function CourseDetailScreen({ route, navigation }: NativeStackScreenProps
                       <View style={allDone ? styles.modIconDone : styles.modIconPending}>
                         {allDone ? (
                           <Ionicons name="checkmark" size={18} color="#0E2A14" />
-                        ) : lockedFirst ? (
+                        ) : locked ? (
                           <Ionicons name="lock-closed" size={16} color={Colors.textPrimary} />
                         ) : (
-                          <Text style={styles.modNumber}>{modIndex + 1}</Text>
+                          <Text style={styles.modNumber}>{lessonIndex + 1}</Text>
                         )}
                       </View>
                       <View style={styles.lessonTextCol}>
                         <Text style={styles.lessonTitle}>
-                          {modIndex + 1} · {mod.title}
+                          {lessonIndex + 1} · {lesson.title}
                         </Text>
                         <Text style={[styles.lessonMeta, allDone && styles.lessonMetaDone]}>
-                          {totalMin} min · {allDone ? 'completado' : 'pendiente'}
+                          {formatDurationMin(lesson.durationSec)} · {allDone ? 'completado' : 'pendiente'}
+                          {lesson.isFree ? ' · gratis' : ''}
                           {metaPlanLabel}
                         </Text>
                       </View>
                     </Pressable>
 
-                    {hasFreeFallback && freeLessonInMod ? (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel="Reproducir lección gratis"
-                        onPress={() => openLesson(freeLessonInMod.id)}
-                        style={({ pressed }) => [
-                          styles.freeLessonPill,
-                          pressed && styles.lessonPressed,
-                        ]}
-                      >
-                        <Ionicons name="play-circle-outline" size={16} color={Colors.accentPrimary} />
-                        <Text style={styles.freeLessonText}>Lección gratis disponible</Text>
-                      </Pressable>
-                    ) : null}
-
                     {hasResources ? (
                       <View style={styles.linksRow}>
-                        {modPdfUrl ? (
+                        {lessonPdfUrl ? (
                           <LessonLinkChip
                             label="PDF"
-                            url={modPdfUrl}
-                            onPress={() => void openExternalLink(modPdfUrl)}
+                            url={lessonPdfUrl}
+                            onPress={() => void openExternalLink(lessonPdfUrl)}
                           />
                         ) : null}
                         {visibleChips.map((link, i) => (
@@ -299,7 +299,7 @@ export function CourseDetailScreen({ route, navigation }: NativeStackScreenProps
                           />
                         ))}
                         {remainingChips > 0 ? (
-                          <LessonLinkMoreChip count={remainingChips} onPress={openModuleResources} />
+                          <LessonLinkMoreChip count={remainingChips} onPress={openLessonResources} />
                         ) : null}
                       </View>
                     ) : null}
@@ -312,6 +312,19 @@ export function CourseDetailScreen({ route, navigation }: NativeStackScreenProps
           <View style={styles.bannerSection}>
             <CoinBanner amount={COURSE_COINS} />
           </View>
+
+          {isCourseComplete ? (
+            <View style={styles.scrollFooter}>
+              <Pressable
+                style={styles.outlineBtn}
+                accessibilityRole="button"
+                onPress={onDownloadCertificate}
+              >
+                <Ionicons name="ribbon-outline" size={18} color={Colors.accentPrimary} />
+                <Text style={styles.outlineText}>Descargar certificado</Text>
+              </Pressable>
+            </View>
+          ) : null}
 
           {coursePdfUrl ? (
             <View style={styles.scrollFooter}>
@@ -328,10 +341,14 @@ export function CourseDetailScreen({ route, navigation }: NativeStackScreenProps
         </ScrollView>
 
         <View style={styles.fixedFooter}>
-          <Button
-            title={`▶  Continuar · Módulo ${nextModuleIndex}`}
-            onPress={() => void onStart()}
-          />
+          {isCourseComplete ? (
+            <Button title="Descargar certificado" onPress={onDownloadCertificate} />
+          ) : (
+            <Button
+              title={`▶  Continuar · Módulo ${nextModuleIndex}`}
+              onPress={() => void onStart()}
+            />
+          )}
         </View>
       </SafeAreaView>
 
@@ -592,25 +609,5 @@ const styles = StyleSheet.create({
   emptyLessons: {
     ...Typography.body,
     color: Colors.textSecondary,
-  },
-  freeLessonPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-    marginLeft: 14 + 32 + Spacing.md,
-    marginTop: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: '#B73CEF14',
-    borderWidth: 1,
-    borderColor: '#B73CEF55',
-  },
-  freeLessonText: {
-    ...Typography.caption,
-    color: Colors.accentPrimary,
-    fontWeight: '700',
-    fontSize: 12,
   },
 });

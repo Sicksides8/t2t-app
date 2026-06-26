@@ -31,7 +31,7 @@ function bucketToLevel(score: number): RadarLevel {
   return 'developing';
 }
 
-/** Penpot 32_Resultado_Radar — pantalla final con radar de 12 ejes + insight + 2 CTAs. */
+/** Penpot 32_Resultado_Radar — pantalla final con radar de 11 ejes + insight + 2 CTAs. */
 export function DiagnosticRadarResultScreen({
   diagnostic,
   onBack,
@@ -58,6 +58,11 @@ export function DiagnosticRadarResultScreen({
   const weakSkill = diagnostic.weakSkills[0] as DiagnosticSkillId | undefined;
   const topName = topSkill ? SKILL_LABELS[topSkill] : 'Liderazgo';
   const weakName = weakSkill ? SKILL_LABELS[weakSkill] : 'Comunicación';
+
+  const score210 =
+    typeof diagnostic.overallScore210 === 'number'
+      ? diagnostic.overallScore210
+      : null;
 
   return (
     <PenpotFlowShell
@@ -89,15 +94,23 @@ export function DiagnosticRadarResultScreen({
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.header}>
-          <Text style={styles.title}>Tu perfil hoy</Text>
           <Text style={styles.script}>Mirá tus músculos</Text>
-          <Text style={styles.subtitle}>12 habilidades · una mirada honesta</Text>
+          <Text style={styles.title}>Tu perfil hoy</Text>
+          <Text style={styles.subtitle}>
+            {score210 != null
+              ? `Puntaje total · ${score210} / 10 · 11 habilidades`
+              : '11 habilidades · una mirada honesta'}
+          </Text>
         </View>
 
         <View style={styles.chartWrap}>
-          <DiagnosticRadarChart axes={axes} size={300} maxRadius={108} />
+          <DiagnosticRadarChart axes={axes} size={300} maxRadius={100} />
         </View>
 
         {onBrainMap ? (
@@ -158,32 +171,46 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.divider,
   },
+  scrollView: {
+    flex: 1,
+  },
   scroll: {
     paddingBottom: Spacing.xl,
   },
   header: {
     alignItems: 'center',
-    gap: 4,
-    marginBottom: Spacing.md,
+    gap: 8,
+    marginBottom: Spacing.lg,
+    paddingHorizontal: Spacing.sm,
+    width: '100%',
   },
   title: {
     ...Typography.h1,
     color: Colors.textPrimary,
     fontSize: 26,
+    lineHeight: 34,
+    textAlign: 'center',
+    alignSelf: 'stretch',
+    paddingVertical: 2,
   },
   script: {
     ...Typography.handwritten,
     color: Colors.accentHighlight,
     fontSize: 24,
+    lineHeight: 32,
+    textAlign: 'center',
   },
   subtitle: {
     ...Typography.caption,
     color: Colors.textTertiary,
     fontSize: 12,
+    textAlign: 'center',
   },
   chartWrap: {
     alignItems: 'center',
-    marginVertical: Spacing.md,
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.sm,
   },
   legend: {
     flexDirection: 'row',

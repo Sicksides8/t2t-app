@@ -2,27 +2,28 @@
  * PaywallModal — bloquea acceso a contenido premium con CTA "Probar 7 días gratis".
  *
  * Flujo:
- *  - "Probar gratis" -> startTrial(user.id, 'pro') del provider activo.
+ *  - "Probar gratis" -> startTrial(user.id, planId, cycle) del provider activo.
+ *  - "Restaurar compras" -> restorePurchases (Google Play cuando está activo).
  *  - "Más adelante"  -> cierra sin acción.
- *
- * Diseñado para reutilizarse desde CourseDetailScreen, lecciones bloqueadas
- * y futuras pantallas que necesiten gating con upsell.
- *
- * TODO MERCADOPAGO: el flujo de "Probar 7 días" hoy llama al mockProvider.
- * Cuando se conecte la pasarela real, el provider seleccionado por
- * getBillingProvider() es quien decide si abre IAP nativo, redirect a MP, etc.
  */
 import React, { useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Radius, Spacing, Typography } from '../../theme';
-import { getBillingProvider, getCanonicalPlan } from '../../services/subscriptionService';
-import type { SubscriptionPlanId } from '../../types';
+import {
+  getBillingProvider,
+  getCanonicalPlan,
+  restorePurchases,
+  usesNativeStoreBilling,
+} from '../../services/subscriptionService';
+import type { BillingCycle, SubscriptionPlanId } from '../../types';
 
 type Props = {
   visible: boolean;
   planId?: SubscriptionPlanId;
+  /** Ciclo inicial; el usuario puede cambiarlo con el toggle. */
+  defaultCycle?: BillingCycle;
   title?: string;
   description?: string;
   userId: string | null | undefined;
@@ -33,6 +34,7 @@ type Props = {
 export function PaywallModal({
   visible,
   planId = 'pro',
+  defaultCycle = 'monthly',
   title = 'Contenido Pro',
   description = 'Desbloqueá todos los cursos con 7 días gratis. Sin tarjeta, cancelás cuando quieras.',
   userId,
@@ -41,7 +43,10 @@ export function PaywallModal({
 }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cycle, setCycle] = useState<BillingCycle>(defaultCycle);
   const plan = getCanonicalPlan(planId);
+  const price = cycle === 'monthly' ? plan.priceMonthly : plan.priceYearly;
+  const periodLabel = cycle === 'monthly' ? '/ mes' : '/ año';
 
   const startTrial = async () => {
     if (!userId) {
@@ -51,11 +56,33 @@ export function PaywallModal({
     setBusy(true);
     setError(null);
     try {
-      await getBillingProvider().startTrial(userId, planId);
+      await getBillingProvider().startTrial(userId, planId, cycle);
       onSuccess?.();
       onClose();
-    } catch (err) {
+    } catch {
       setError('No se pudo activar el trial. Intentá de nuevo.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!userId) {
+      setError('Iniciá sesión para restaurar compras.');
+      return;
+    }
+    if (!usesNativeStoreBilling()) {
+      setError('Restaurar compras está disponible en la app instalada desde la tienda.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await restorePurchases(userId);
+      onSuccess?.();
+      onClose();
+    } catch {
+      setError('No se encontraron compras para restaurar.');
     } finally {
       setBusy(false);
     }
@@ -79,6 +106,25 @@ export function PaywallModal({
           </LinearGradient>
 
           <View style={styles.body}>
+            <View style={styles.toggle}>
+              <Pressable
+                style={[styles.toggleBtn, cycle === 'monthly' && styles.toggleBtnActive]}
+                onPress={() => setCycle('monthly')}
+              >
+                <Text style={[styles.toggleText, cycle === 'monthly' && styles.toggleTextActive]}>
+                  Mensual
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.toggleBtn, cycle === 'yearly' && styles.toggleBtnActive]}
+                onPress={() => setCycle('yearly')}
+              >
+                <Text style={[styles.toggleText, cycle === 'yearly' && styles.toggleTextActive]}>
+                  Anual
+                </Text>
+              </Pressable>
+            </View>
+
             <View style={styles.row}>
               <Ionicons name="checkmark-circle" size={18} color={Colors.accentHighlight} />
               <Text style={styles.bullet}>Catálogo completo desbloqueado</Text>
@@ -90,7 +136,7 @@ export function PaywallModal({
             <View style={styles.row}>
               <Ionicons name="checkmark-circle" size={18} color={Colors.accentHighlight} />
               <Text style={styles.bullet}>
-                7 días gratis, luego USD {plan.priceMonthly.toFixed(2)} / mes
+                7 días gratis, luego {plan.currency} {price.toFixed(2)} {periodLabel}
               </Text>
             </View>
 
@@ -108,6 +154,17 @@ export function PaywallModal({
                 <Text style={styles.primaryText}>Probar 7 días gratis</Text>
               )}
             </Pressable>
+
+            {usesNativeStoreBilling() ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => void handleRestore()}
+                disabled={busy}
+                style={styles.restoreBtn}
+              >
+                <Text style={styles.restoreText}>Restaurar compras</Text>
+              </Pressable>
+            ) : null}
 
             <Pressable accessibilityRole="button" onPress={onClose} style={styles.secondaryBtn}>
               <Text style={styles.secondaryText}>Más adelante</Text>
@@ -165,6 +222,32 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     gap: 12,
   },
+  toggle: {
+    flexDirection: 'row',
+    backgroundColor: '#1F0A40',
+    borderRadius: 999,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: '#FFFFFF14',
+    marginBottom: 4,
+  },
+  toggleBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 999,
+    alignItems: 'center',
+  },
+  toggleBtnActive: {
+    backgroundColor: Colors.accentPrimary,
+  },
+  toggleText: {
+    color: Colors.textTertiary,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  toggleTextActive: {
+    color: Colors.textPrimary,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -192,6 +275,15 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontWeight: '800',
     fontSize: 15,
+  },
+  restoreBtn: {
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  restoreText: {
+    color: Colors.accentHighlight,
+    fontWeight: '700',
+    fontSize: 13,
   },
   secondaryBtn: {
     paddingVertical: 10,

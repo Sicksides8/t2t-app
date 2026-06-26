@@ -22,6 +22,8 @@ export const FS_COL = {
   payments: `${P}payments`,
   achievements: `${P}achievements`,
   weeklyChallenges: `${P}weekly_challenges`,
+  /** Respuestas al desafío semanal: t2t_weekly_challenge_responses/{userId}_{challengeId} */
+  weeklyChallengeResponses: `${P}weekly_challenge_responses`,
   config: `${P}config`,
   waitlist: `${P}waitlist`,
   /** Progreso por usuario: t2t_progress/{uid}/… */

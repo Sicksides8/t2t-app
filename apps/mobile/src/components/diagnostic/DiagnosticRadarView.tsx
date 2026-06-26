@@ -1,8 +1,7 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { computeDiagnosticScores, DIAGNOSTIC_SKILLS } from '../../data/diagnostic';
-import { skills } from '../../data/academy';
+import { computeDiagnosticScores, DIAGNOSTIC_SKILLS, SKILL_LABELS } from '../../data/diagnostic';
 import type { DiagnosticResult } from '../../types';
 import { Colors, Spacing } from '../../theme';
 import { CardGlass } from '../ui';
@@ -18,8 +17,8 @@ export function DiagnosticRadarView({ diagnostic }: Props) {
     [diagnostic.answers],
   );
 
-  const topName = skills.find((s) => s.id === topSkills[0])?.name ?? 'Comunicación';
-  const weakName = skills.find((s) => s.id === weakSkills[0])?.name ?? 'Productividad';
+  const topName = topSkills[0] ? SKILL_LABELS[topSkills[0] as keyof typeof SKILL_LABELS] : 'Comunicación';
+  const weakName = weakSkills[0] ? SKILL_LABELS[weakSkills[0] as keyof typeof SKILL_LABELS] : 'Productividad';
 
   return (
     <View style={styles.wrap}>

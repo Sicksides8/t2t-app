@@ -11,7 +11,7 @@ import {
   SplashScreen,
   VideoPlayerScreen,
 } from '../screens/academy/AcademyScreen';
-import { flushPendingDiagnosticIfAuthenticated } from '../services/diagnosticService';
+import { flushPendingDiagnosticIfAuthenticated, loadDiagnosticResult } from '../services/diagnosticService';
 import { getUserProfile, onAuthChange } from '../services/authService';
 import { recordActivity } from '../services/streakService';
 import { scheduleStreakReminder } from '../services/streakReminder';
@@ -86,6 +86,10 @@ export default function RootNavigator() {
         // Hidratar progreso desde Firestore antes de marcar inicializado
         // para que pantallas como Mis cursos arranquen con datos correctos.
         await useAcademyStore.getState().loadUserProgress(firebaseUser.uid);
+        const remoteDiagnostic = await loadDiagnosticResult(firebaseUser.uid);
+        if (remoteDiagnostic) {
+          useAcademyStore.getState().setDiagnostic(remoteDiagnostic);
+        }
         setInitialized();
       });
     }
@@ -123,7 +127,11 @@ export default function RootNavigator() {
             <Stack.Screen name="Main" component={MainTabs} />
             <Stack.Screen name="CourseDetail" component={CourseDetailScreen} />
             <Stack.Screen name="SkillCatalog" component={SkillCatalogScreen} />
-            <Stack.Screen name="VideoPlayer" component={VideoPlayerScreen} />
+            <Stack.Screen
+              name="VideoPlayer"
+              component={VideoPlayerScreen}
+              options={{ animation: 'fade', statusBarStyle: 'light' }}
+            />
           </>
         )}
       </Stack.Navigator>

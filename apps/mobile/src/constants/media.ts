@@ -17,9 +17,8 @@ export function getWelcomeVideoUrl(): string {
 
 export function getLessonVideoUrl(url?: string): string {
   const trimmed = (url || '').trim();
-  if (isMockVideoUrl(trimmed)) return '';
   if (trimmed && trimmed.startsWith('http') && !trimmed.includes('example.com')) {
     return trimmed;
   }
-  return '';
+  return MOCK_VIDEO_URL;
 }

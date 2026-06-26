@@ -113,6 +113,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /t2t_weekly_challenge_responses/{id} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create, update: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() >= 20;
+      allow delete: if false;
+    }
+
     match /t2t_config/{docId} {
       allow read: if true;
       allow write: if false;

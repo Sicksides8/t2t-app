@@ -2,7 +2,7 @@ import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ProgressRing } from '../ui';
+import { SvgProgressRing } from '../ui';
 import { skills } from '../../data/academy';
 import { Colors, Radius, Spacing, Typography } from '../../theme';
 import type { Course } from '../../types';
@@ -57,7 +57,7 @@ export function MyCourseRow({
           ) : null}
         </View>
         <View style={styles.actions}>
-          <ProgressRing value={progressPercent} size={32} />
+          <SvgProgressRing value={progressPercent} size={32} strokeWidth={3} />
           <Pressable style={styles.cta} onPress={onContinue}>
             <Text style={styles.ctaText}>{cta}</Text>
           </Pressable>

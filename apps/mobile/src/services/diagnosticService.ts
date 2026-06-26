@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { FS_COL } from '../constants/firestoreCollections';
 import { auth, db } from './firebase';
 import type { DiagnosticResult } from '../types';
@@ -29,6 +29,40 @@ export async function readPendingDiagnostic(): Promise<DiagnosticResult | null> 
 
 async function clearPendingDiagnostic(): Promise<void> {
   await AsyncStorage.removeItem(PENDING_KEY);
+}
+
+function parseDiagnosticDoc(data: Record<string, unknown>, userId: string): DiagnosticResult {
+  const completedRaw = data.completedAt as { toDate?: () => Date } | string | undefined;
+  let completedAt: Date | undefined;
+  if (completedRaw && typeof completedRaw === 'object' && 'toDate' in completedRaw) {
+    completedAt = completedRaw.toDate?.();
+  } else if (typeof completedRaw === 'string') {
+    completedAt = new Date(completedRaw);
+  }
+
+  return {
+    userId,
+    answers: (data.answers as Record<string, number>) ?? {},
+    scores: (data.scores as Record<string, number>) ?? {},
+    baseScores: data.baseScores as Record<string, number> | undefined,
+    focusAreas: data.focusAreas as string[] | undefined,
+    topSkills: Array.isArray(data.topSkills) ? (data.topSkills as string[]) : [],
+    weakSkills: Array.isArray(data.weakSkills) ? (data.weakSkills as string[]) : [],
+    overallScore210:
+      typeof data.overallScore210 === 'number' ? data.overallScore210 : undefined,
+    completedAt,
+  };
+}
+
+export async function loadDiagnosticResult(userId: string): Promise<DiagnosticResult | null> {
+  if (!userId) return null;
+  try {
+    const snap = await getDoc(doc(db, FS_COL.diagnosticResults, userId));
+    if (!snap.exists()) return null;
+    return parseDiagnosticDoc(snap.data() as Record<string, unknown>, userId);
+  } catch {
+    return null;
+  }
 }
 
 export async function saveDiagnosticResult(diagnostic: DiagnosticResult): Promise<void> {

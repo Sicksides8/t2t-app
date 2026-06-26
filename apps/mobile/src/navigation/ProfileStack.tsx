@@ -1,5 +1,6 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { DiagnosticRetakeScreen } from '../screens/profile/DiagnosticRetakeScreen';
 import {
   CertificatesScreen,
   CertificateDetailScreen,
@@ -29,6 +30,7 @@ export default function ProfileStack() {
       <Stack.Screen name="Subscription" component={SubscriptionScreen} />
       <Stack.Screen name="PaymentDetail" component={PaymentDetailScreen} />
       <Stack.Screen name="DiagnosticApp" component={DiagnosticAppScreen} />
+      <Stack.Screen name="DiagnosticRetake" component={DiagnosticRetakeScreen} />
       <Stack.Screen name="Certificates" component={CertificatesScreen} />
       <Stack.Screen name="CertificateDetail" component={CertificateDetailScreen} />
       <Stack.Screen name="Progress" component={ProgressScreen} />

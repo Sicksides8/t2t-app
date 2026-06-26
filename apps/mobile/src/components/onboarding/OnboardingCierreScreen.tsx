@@ -1,11 +1,15 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../ui';
 import { PenpotFlowShell } from '../penpot';
+import type { Course } from '../../types';
+import { formatCourseDurationMin, formatFirstTrainingSubtitle } from '../../utils/courseDisplay';
 import { Colors, Radius, Spacing, Typography } from '../../theme';
 
 type Props = {
+  courses: Course[];
+  loading?: boolean;
   onStart: () => void;
   onExplore: () => void;
 };
@@ -17,14 +21,29 @@ type RowConfig = {
   duration: string;
 };
 
-const ROWS: RowConfig[] = [
-  { icon: 'book-outline', tint: 'green', label: 'Módulo: Decidir bajo presión', duration: '2 min' },
-  { icon: 'chatbubble-outline', tint: 'purple', label: 'Reto: Practicar en una reunión real', duration: '3 min' },
-  { icon: 'sparkles', tint: 'green', label: 'Reflexión guiada', duration: '1 min' },
+const ROW_ICONS: Array<keyof typeof Ionicons.glyphMap> = [
+  'book-outline',
+  'chatbubble-outline',
+  'sparkles',
 ];
 
+function buildRows(courses: Course[]): RowConfig[] {
+  return courses.slice(0, 3).map((course, index) => ({
+    icon: ROW_ICONS[index] ?? 'book-outline',
+    tint: index % 2 === 0 ? 'green' : 'purple',
+    label: course.title,
+    duration: formatCourseDurationMin(course),
+  }));
+}
+
 /** Penpot 35_Cierre — cierre del onboarding pre-registro. */
-export function OnboardingCierreScreen({ onStart, onExplore }: Props) {
+export function OnboardingCierreScreen({ courses, loading = false, onStart, onExplore }: Props) {
+  const primaryCourse = courses[0];
+  const rows = buildRows(courses);
+  const cardSubtitle = primaryCourse
+    ? formatFirstTrainingSubtitle(primaryCourse)
+    : 'Sesiones cortas adaptadas a tu perfil';
+
   return (
     <PenpotFlowShell
       orbVariant="default"
@@ -53,7 +72,7 @@ export function OnboardingCierreScreen({ onStart, onExplore }: Props) {
           </View>
           <View style={styles.cardHeaderText}>
             <Text style={styles.cardTitle}>Tu primer entrenamiento</Text>
-            <Text style={styles.cardSubtitle}>5 min · Liderazgo básico</Text>
+            <Text style={styles.cardSubtitle}>{cardSubtitle}</Text>
           </View>
           <View style={styles.dayPill}>
             <Text style={styles.dayPillText}>Día 1</Text>
@@ -62,29 +81,40 @@ export function OnboardingCierreScreen({ onStart, onExplore }: Props) {
 
         <View style={styles.divider} />
 
-        {ROWS.map((row, i) => (
-          <React.Fragment key={row.label}>
-            <View style={styles.row}>
-              <View
-                style={[
-                  styles.rowIconBox,
-                  row.tint === 'green' ? styles.rowIconGreen : styles.rowIconPurple,
-                ]}
-              >
-                <Ionicons
-                  name={row.icon}
-                  size={16}
-                  color={row.tint === 'green' ? Colors.accentHighlight : Colors.accentPrimary}
-                />
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator color={Colors.accentPrimary} />
+            <Text style={styles.loadingText}>Preparando tus cursos…</Text>
+          </View>
+        ) : rows.length ? (
+          rows.map((row, i) => (
+            <React.Fragment key={`${row.label}-${i}`}>
+              <View style={styles.row}>
+                <View
+                  style={[
+                    styles.rowIconBox,
+                    row.tint === 'green' ? styles.rowIconGreen : styles.rowIconPurple,
+                  ]}
+                >
+                  <Ionicons
+                    name={row.icon}
+                    size={16}
+                    color={row.tint === 'green' ? Colors.accentHighlight : Colors.accentPrimary}
+                  />
+                </View>
+                <Text style={styles.rowLabel} numberOfLines={2}>
+                  {row.label}
+                </Text>
+                <Text style={styles.rowDuration}>{row.duration}</Text>
               </View>
-              <Text style={styles.rowLabel} numberOfLines={1}>
-                {row.label}
-              </Text>
-              <Text style={styles.rowDuration}>{row.duration}</Text>
-            </View>
-            {i < ROWS.length - 1 ? <View style={styles.rowDivider} /> : null}
-          </React.Fragment>
-        ))}
+              {i < rows.length - 1 ? <View style={styles.rowDivider} /> : null}
+            </React.Fragment>
+          ))
+        ) : (
+          <Text style={styles.emptyText}>
+            Estamos cargando el catálogo. Vas a ver tus recomendaciones en cuanto entres.
+          </Text>
+        )}
       </View>
     </PenpotFlowShell>
   );
@@ -171,6 +201,24 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#FFFFFF1A',
     marginVertical: Spacing.md,
+  },
+  loadingWrap: {
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.lg,
+  },
+  loadingText: {
+    ...Typography.caption,
+    color: Colors.textTertiary,
+    fontSize: 12,
+  },
+  emptyText: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+    paddingVertical: Spacing.md,
   },
   row: {
     flexDirection: 'row',
