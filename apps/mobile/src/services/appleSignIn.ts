@@ -21,7 +21,7 @@ async function sha256Nonce(rawNonce: string): Promise<string> {
   return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, rawNonce);
 }
 
-async function requestAppleSignInNative(): Promise<User | null> {
+async function requestAppleSignInNative(extras?: import('./authService').OnboardingProfileExtras): Promise<User | null> {
   const available = await AppleAuthentication.isAvailableAsync();
   if (!available) {
     const err = new Error('Sign in with Apple no esta disponible en este dispositivo.');
@@ -47,7 +47,7 @@ async function requestAppleSignInNative(): Promise<User | null> {
       throw err;
     }
 
-    return loginWithApple(credential.identityToken, rawNonce);
+    return loginWithApple(credential.identityToken, rawNonce, extras);
   } catch (error: unknown) {
     const code =
       typeof error === 'object' && error !== null && 'code' in error
@@ -92,15 +92,17 @@ async function signInWithAppleFirebaseWeb(): Promise<UserCredential> {
  * Sign in with Apple: nativo en iOS, OAuth Firebase en web.
  * Android: no disponible (retorna null).
  */
-export async function requestAppleSignIn(): Promise<User | null> {
+export async function requestAppleSignIn(
+  extras?: import('./authService').OnboardingProfileExtras,
+): Promise<User | null> {
   if (Platform.OS === 'ios') {
-    return requestAppleSignInNative();
+    return requestAppleSignInNative(extras);
   }
 
   if (Platform.OS === 'web') {
     const credential = await signInWithAppleFirebaseWeb();
     const { getOrCreateUserProfile } = await import('./authService');
-    return getOrCreateUserProfile(credential.user);
+    return getOrCreateUserProfile(credential.user, extras);
   }
 
   return null;

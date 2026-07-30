@@ -1,3 +1,5 @@
+import { CAROUSEL_SLIDE_COPY, LOADER_ANALYZING_TASKS } from '../constants/onboardingCopy';
+
 /**
  * Datos del carrusel onboarding rediseñado (04 → 31).
  * - carouselSlides: 5 story slides (04_Impacto … 08_Transformacion).
@@ -37,7 +39,11 @@ export const carouselSlides: CarouselSlide[] = [
     penFrame: '05_Identificacion',
     sections: [
       { kind: 'hero', text: 'La universidad te da conocimientos.' },
-      { kind: 'body', text: 'La IA tampoco te lo resuelve: necesita que te entrenes.' },
+      {
+        kind: 'subtitle',
+        text: CAROUSEL_SLIDE_COPY.identificacion.subtitle,
+        divider: true,
+      },
     ],
   },
   {
@@ -45,8 +51,8 @@ export const carouselSlides: CarouselSlide[] = [
     penFrame: '06_Tension',
     sections: [
       { kind: 'pre', text: 'Hoy la diferencia ya no está en lo que sabes.' },
-      { kind: 'hero', text: 'Está en cómo piensas y trabajas con otros.' },
-      { kind: 'accent', text: 'Eso se entrena y se mejora.' },
+      { kind: 'hero', text: 'Está en cómo pensás y trabajás con otros.' },
+      { kind: 'accent', text: CAROUSEL_SLIDE_COPY.tension.accent },
     ],
   },
   {
@@ -55,17 +61,24 @@ export const carouselSlides: CarouselSlide[] = [
     sections: [
       { kind: 'pre', text: 'YouTube tiene videos.' },
       { kind: 'hero', text: 'T2T tiene tu plan de entrenamiento.' },
-      { kind: 'subtitle', text: 'Un sistema que se adapta a tu nivel, ritmo y objetivos profesionales.', divider: true },
-      { kind: 'body', text: 'Solo invertirás 15-30 minutos por semana.' },
+      {
+        kind: 'subtitle',
+        text: CAROUSEL_SLIDE_COPY.diferencial.subtitle,
+        divider: true,
+      },
     ],
   },
   {
     id: 'transformacion',
     penFrame: '08_Transformacion',
     sections: [
-      { kind: 'pre', text: 'Lo que entrenas todos los días' },
-      { kind: 'pre', text: 'termina definiendo' },
-      { kind: 'accent', text: 'quién te conviertes.' },
+      { kind: 'pre', text: CAROUSEL_SLIDE_COPY.transformacion.pre },
+      { kind: 'accent', text: CAROUSEL_SLIDE_COPY.transformacion.accent },
+      {
+        kind: 'subtitle',
+        text: CAROUSEL_SLIDE_COPY.transformacion.subtitle,
+        divider: true,
+      },
     ],
   },
 ];
@@ -107,6 +120,8 @@ export type ReflectionFrame = {
   accentHero?: string;
   /** Texto opcional blanco bold grande — ej 21_T_Reflexion_Q8. */
   hero?: string;
+  /** Más separación vertical (ej. 27_T_Reflexion_Q12 «Tu futuro»). */
+  layout?: 'default' | 'spaced';
 };
 
 export const reflectionFrames: ReflectionFrame[] = [
@@ -130,6 +145,7 @@ export const reflectionFrames: ReflectionFrame[] = [
     label: 'Tu futuro',
     body: 'Tu carrera puede abrirte una puerta.',
     hero: 'Lo que hagas después depende de tus habilidades.',
+    layout: 'spaced',
   },
 ];
 
@@ -167,9 +183,9 @@ export const progressLoaderFrames: ProgressLoaderFrame[] = [
     percent: 33,
     statusLabel: 'Analizando tus elecciones',
     tasks: [
-      { label: 'Respuestas registradas', state: 'done' },
-      { label: 'Detectando patrones', state: 'inProgress' },
-      { label: 'Construyendo tu perfil', state: 'pending' },
+      { label: LOADER_ANALYZING_TASKS[0], state: 'done' },
+      { label: LOADER_ANALYZING_TASKS[1], state: 'inProgress' },
+      { label: LOADER_ANALYZING_TASKS[2], state: 'pending' },
     ],
   },
   {

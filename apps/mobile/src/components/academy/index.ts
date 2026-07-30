@@ -11,6 +11,7 @@ export { CategoryGridCard } from './CategoryGridCard';
 export { ExploreCourseTile } from './ExploreCourseTile';
 export { LessonLinkRow, LessonLinkChip, LessonLinkMoreChip } from './LessonLinkRow';
 export { LessonResourcesSheet } from './LessonResourcesSheet';
+export { AcademyVideoPlayer } from './AcademyVideoPlayer';
 export { VideoSettingsSheet, type VideoSettingsOption } from './VideoSettingsSheet';
 export { VideoSubtitleOverlay } from './VideoSubtitleOverlay';
 export { PaywallModal } from './PaywallModal';

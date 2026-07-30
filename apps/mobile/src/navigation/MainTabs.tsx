@@ -83,6 +83,15 @@ export default function MainTabs() {
       <Tabs.Screen
         name="ProfileTab"
         component={ProfileStack}
+        listeners={({ navigation, route }) => ({
+          tabPress: (e) => {
+            const routeName = getFocusedRouteNameFromRoute(route) ?? 'ProfileMain';
+            if (routeName !== 'ProfileMain') {
+              e.preventDefault();
+              navigation.navigate('ProfileTab', { screen: 'ProfileMain' });
+            }
+          },
+        })}
         options={({ route }) => {
           const routeName = getFocusedRouteNameFromRoute(route) ?? 'ProfileMain';
           const hideTabBar = PROFILE_ROUTES_HIDE_TAB_BAR.has(routeName);

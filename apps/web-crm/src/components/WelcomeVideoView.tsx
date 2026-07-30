@@ -5,20 +5,27 @@ import { Trash2 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { AppShell } from './layout/AppShell';
 import { MediaUploader } from './courses/MediaUploader';
+import { SubtitlesEditor } from './courses/SubtitlesEditor';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 import { useToast } from './ui/Toast';
+import type { SubtitleTrack } from '../types';
 import styles from './WelcomeVideoView.module.css';
 
-type ConfigResponse = { welcomeVideoUrl: string | null };
+type ConfigResponse = {
+  welcomeVideoUrl: string | null;
+  welcomeVideoSubtitles: SubtitleTrack[];
+};
 
 export function WelcomeVideoView() {
   const toast = useToast();
   const [currentUrl, setCurrentUrl] = useState<string | null>(null);
+  const [subtitles, setSubtitles] = useState<SubtitleTrack[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const persistSeqRef = useRef(0);
+  const removedAssetUrlsRef = useRef<Set<string>>(new Set());
 
   const busy = saving || uploading;
 
@@ -27,6 +34,7 @@ export function WelcomeVideoView() {
       setLoading(true);
       const data = await apiFetch<ConfigResponse>('/api/admin/welcome-video');
       setCurrentUrl(data.welcomeVideoUrl);
+      setSubtitles(data.welcomeVideoSubtitles ?? []);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudo leer la configuracion';
       toast.show({ tone: 'error', message });
@@ -40,16 +48,20 @@ export function WelcomeVideoView() {
   }, [load]);
 
   const persist = useCallback(
-    async (videoUrl: string | null, options?: { onSuccessMessage?: string }) => {
+    async (
+      patch: { videoUrl?: string | null; subtitles?: SubtitleTrack[] },
+      options?: { onSuccessMessage?: string },
+    ) => {
       const seq = ++persistSeqRef.current;
       setSaving(true);
       try {
         const data = await apiFetch<ConfigResponse>('/api/admin/welcome-video', {
           method: 'PUT',
-          body: JSON.stringify({ videoUrl }),
+          body: JSON.stringify(patch),
         });
         if (seq !== persistSeqRef.current) return;
         setCurrentUrl(data.welcomeVideoUrl);
+        setSubtitles(data.welcomeVideoSubtitles ?? []);
         toast.show({
           tone: 'success',
           message: options?.onSuccessMessage ?? 'Configuracion actualizada',
@@ -69,18 +81,34 @@ export function WelcomeVideoView() {
 
   const handleUpload = useCallback(
     (url: string | undefined) => {
-      // El uploader limpia el orphan anterior internamente cuando reemplaza,
-      // y luego llama onChange con la nueva URL. Solo persistimos el cambio.
       if (!url) return;
-      void persist(url, { onSuccessMessage: 'Video de bienvenida actualizado' });
+      void persist({ videoUrl: url }, { onSuccessMessage: 'Video de bienvenida actualizado' });
+    },
+    [persist],
+  );
+
+  const handleSubtitlesChange = useCallback(
+    (next: SubtitleTrack[]) => {
+      setSubtitles(next);
+      void persist(
+        { subtitles: next },
+        { onSuccessMessage: 'Subtitulos del video de bienvenida actualizados' },
+      );
     },
     [persist],
   );
 
   const handleRemove = useCallback(() => {
     setConfirmRemove(false);
-    void persist(null, { onSuccessMessage: 'Volviste al video demo por defecto' });
+    void persist(
+      { videoUrl: null, subtitles: [] },
+      { onSuccessMessage: 'Volviste al video demo por defecto' },
+    );
   }, [persist]);
+
+  const trackRemovedAsset = useCallback((url: string) => {
+    removedAssetUrlsRef.current.add(url);
+  }, []);
 
   return (
     <AppShell title="Video de bienvenida">
@@ -88,8 +116,9 @@ export function WelcomeVideoView() {
         <header className={styles.header}>
           <h2 className={styles.title}>Video de bienvenida del onboarding</h2>
           <p className={styles.description}>
-            Este video se reproduce en el paso final del onboarding (paso 56). Si no subis uno, la
-            app usa el video demo por defecto. Subi un .mp4, .webm o .mov de hasta 2 GB.
+            Este video se reproduce en el paso final del onboarding (paso 56) y en el home
+            post-registro. Si no subis uno, la app usa el video demo por defecto. Subi un .mp4,
+            .webm o .mov de hasta 2 GB.
           </p>
         </header>
 
@@ -124,6 +153,17 @@ export function WelcomeVideoView() {
               />
             </div>
 
+            <div className={styles.uploaderBlock}>
+              <div className={styles.sectionLabel}>Subtitulos por idioma (opcional)</div>
+              <SubtitlesEditor
+                value={subtitles}
+                scope="welcome"
+                disabled={busy}
+                onPrevReplaced={trackRemovedAsset}
+                onChange={handleSubtitlesChange}
+              />
+            </div>
+
             {currentUrl ? (
               <div className={styles.actions}>
                 <button
@@ -142,7 +182,7 @@ export function WelcomeVideoView() {
         <ConfirmDialog
           open={confirmRemove}
           title="Quitar video de bienvenida"
-          message="El video custom se borrara del storage y la app volvera a usar el demo por defecto. ¿Continuar?"
+          message="El video custom se borrara del storage y la app volvera a usar el demo por defecto. Tambien se quitaran los subtitulos asociados. ¿Continuar?"
           confirmLabel="Quitar"
           cancelLabel="Cancelar"
           tone="danger"

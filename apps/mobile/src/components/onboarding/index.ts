@@ -3,6 +3,8 @@ export { DiagnosticActionScreen } from './DiagnosticActionScreen';
 export { DiagnosticOpenerScreen } from './DiagnosticOpenerScreen';
 export { OnboardingCarouselSlide } from './OnboardingCarouselSlide';
 export { OnboardingCierreScreen } from './OnboardingCierreScreen';
+export { OnboardingExperienceLevelScreen } from './OnboardingExperienceLevelScreen';
+export { OnboardingPlanHorizonScreen } from './OnboardingPlanHorizonScreen';
 export { OnboardingStorySlide } from './OnboardingStorySlide';
 export { PenpotClosureScreen } from './PenpotClosureScreen';
 export { ProgressLoaderScreen } from './ProgressLoaderScreen';

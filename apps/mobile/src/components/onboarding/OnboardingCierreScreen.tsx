@@ -10,6 +10,7 @@ import { Colors, Radius, Spacing, Typography } from '../../theme';
 type Props = {
   courses: Course[];
   loading?: boolean;
+  primaryLabel?: string;
   onStart: () => void;
   onExplore: () => void;
 };
@@ -37,7 +38,13 @@ function buildRows(courses: Course[]): RowConfig[] {
 }
 
 /** Penpot 35_Cierre — cierre del onboarding pre-registro. */
-export function OnboardingCierreScreen({ courses, loading = false, onStart, onExplore }: Props) {
+export function OnboardingCierreScreen({
+  courses,
+  loading = false,
+  primaryLabel = 'Empezar mi primer día',
+  onStart,
+  onExplore,
+}: Props) {
   const primaryCourse = courses[0];
   const rows = buildRows(courses);
   const cardSubtitle = primaryCourse
@@ -50,7 +57,7 @@ export function OnboardingCierreScreen({ courses, loading = false, onStart, onEx
       contentStyle={styles.content}
       footer={
         <View style={styles.footer}>
-          <Button title="Empezar mi primer día" onPress={onStart} />
+          <Button title={primaryLabel} onPress={onStart} />
           <Pressable onPress={onExplore} style={styles.exploreWrap} hitSlop={8}>
             <Text style={styles.exploreText}>Explorar mi plan</Text>
           </Pressable>

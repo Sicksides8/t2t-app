@@ -152,7 +152,7 @@ export function ExploreScreen() {
     if (filters.maxDurationMin) base = base.filter((c) => c.durationMin <= filters.maxDurationMin!);
     if (filters.plan) {
       // Filtramos contra el plan canónico requerido del curso (deriva de
-      // accessTier; isPremium queda como fallback). FREE/PRO/ELITE matchean
+      // accessTier; isPremium queda como fallback). FREE/PRO/BLACK matchean
       // exactamente el tier del curso.
       base = base.filter((c) => {
         const required = getRequiredPlan(c);

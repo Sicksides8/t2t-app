@@ -3,6 +3,7 @@ import { FS_COL } from '../constants/firestoreCollections';
 import { db } from './firebase';
 import { plans as staticPlans, skills as staticSkills } from '../data/academy';
 import { courseMatchesSkill } from '../utils/skillCatalog';
+import { apiFetch, hasApiBaseUrl } from './api';
 import type { Course, CourseModule, DiagnosticResult, Lesson, Plan, Skill } from '../types';
 
 export async function getSkills(): Promise<Skill[]> {
@@ -111,6 +112,19 @@ export async function getModules(courseId: string): Promise<CourseModule[]> {
 }
 
 export async function getLessons(courseId: string): Promise<Lesson[]> {
+  if (hasApiBaseUrl()) {
+    try {
+      const response = await apiFetch<{ success: boolean; data: Lesson[] }>(
+        `/api/courses/${courseId}/lessons`,
+      );
+      if (Array.isArray(response.data) && response.data.length > 0) {
+        return [...response.data].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      }
+    } catch {
+      /* fallback Firestore */
+    }
+  }
+
   try {
     const snapshot = await getDocs(query(collection(db, FS_COL.lessons), where('courseId', '==', courseId)));
     const items = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as Lesson);

@@ -40,8 +40,8 @@ const styles = StyleSheet.create({
   script: {
     ...Typography.handwritten,
     color: Colors.accentHighlight,
-    fontSize: 36,
-    lineHeight: 42,
+    fontSize: 43,
+    lineHeight: 50,
   },
   divider: {
     width: 32,
@@ -53,13 +53,13 @@ const styles = StyleSheet.create({
   subtitle: {
     ...Typography.body,
     color: Colors.textSecondary,
-    fontSize: 18,
+    fontSize: 22,
   },
   hero: {
     ...Typography.hero,
     color: Colors.textPrimary,
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 34,
+    lineHeight: 41,
     marginTop: Spacing.xs,
   },
 });

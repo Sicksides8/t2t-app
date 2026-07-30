@@ -1,5 +1,6 @@
 import type { ComponentProps } from 'react';
 import type { Ionicons } from '@expo/vector-icons';
+import { WELCOME_VIDEO_CONTENT } from '../constants/welcomeVideo';
 import type { PlanHorizonDays } from '../types';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
@@ -8,6 +9,7 @@ export type HookIconOption = {
   id: string;
   label: string;
   subtitle?: string;
+  sideNote?: string;
   icon: IoniconName;
   tileColor?: string;
   iconColor?: string;
@@ -97,7 +99,7 @@ export type HookStep =
       kind: 'interstitial';
       title: string;
       body: string;
-      icon: IoniconName;
+      icon: IoniconName | 'brain';
     })
   | (StepBase & Counted & {
       kind: 'progressWithQuestion';
@@ -105,18 +107,20 @@ export type HookStep =
       subtitle?: string;
       tasks: string[];
       question: { preScript: string; text: string; yesLabel?: string; noLabel?: string };
+      footnote?: string;
     })
   | (StepBase & Counted & {
       kind: 'socialProof';
       title: string;
       tasks: string[];
-      statHeadline: string;
+      statHeadline?: string;
       testimonial: HookTestimonial;
     })
   | (StepBase & NotCounted & {
       kind: 'planReady';
       content: HookPlanReadyContent;
       ctaLabel: string;
+      icon?: IoniconName | 'trophy' | 'gift' | 'rocket-outline';
     })
   | (StepBase & Counted & {
       kind: 'pricing';
@@ -204,50 +208,13 @@ export type HookStep =
     });
 
 export const hooksFlowSteps: HookStep[] = [
-  // STEP 1 — TipoUsuario (counted)
-  {
-    id: '40_Hook_TipoUsuario',
-    penId: '40',
-    kind: 'iconSelect',
-    counted: true,
-    title: '¿Cuál te describe?',
-    subtitle: 'Seleccioná todas las que apliquen',
-    multiSelect: true,
-    options: [
-      {
-        id: 'estudiante',
-        label: 'Estudiante',
-        subtitle: 'Aprendo formalmente',
-        icon: 'school-outline',
-        tileColor: '#FFFFFF14',
-        iconColor: '#FFFFFF',
-      },
-      {
-        id: 'profesional',
-        label: 'Joven profesional',
-        subtitle: 'Trabajo en una empresa',
-        icon: 'briefcase-outline',
-        tileColor: '#B73CEF',
-        iconColor: '#FFFFFF',
-      },
-      {
-        id: 'humano',
-        label: 'Humano curioso',
-        subtitle: 'Quiero crecer en habilidades blandas',
-        icon: 'sparkles-outline',
-        tileColor: '#FFFFFF14',
-        iconColor: '#FFFFFF',
-      },
-    ],
-  },
-
-  // STEP 2 — Objetivos (counted)
+  // STEP 1 — Objetivos (counted)
   {
     id: '41_Hook_Objetivos',
     penId: '41',
     kind: 'chipSelect',
     counted: true,
-    title: '¿Qué querés lograr?',
+    title: '¿Qué querés lograr con nosotros?',
     subtitle: 'Elegí todas las que apliquen',
     multiSelect: true,
     chipMain: { id: 'exito', label: 'Éxito Profesional' },
@@ -258,7 +225,7 @@ export const hooksFlowSteps: HookStep[] = [
       { id: 'gestion', label: 'Gestión del tiempo' },
       { id: 'crecer', label: 'Crecer' },
       { id: 'comunicacion', label: 'Comunicación' },
-      { id: 'escuchaActiva', label: 'Escucha Activa' },
+      { id: 'escuchaActiva', label: 'Escucha activa' },
       { id: 'inteligenciaEmocional', label: 'Inteligencia emocional' },
     ],
   },
@@ -319,9 +286,9 @@ export const hooksFlowSteps: HookStep[] = [
     penId: '44',
     kind: 'interstitial',
     counted: true,
-    title: 'Estás en el lugar adecuado',
-    body: 'Tus respuestas nos ayudan a crear un plan paso a paso para que alcances tus metas.',
-    icon: 'trending-up',
+    title: 'Estás en el lugar adecuado para ser tu mejor versión',
+    body: 'Más de 40 cursos y sumamos 10 por semana: 120 videos para que practiques mientras te guiamos paso a paso.',
+    icon: 'brain',
   },
 
   // STEP 5 — GenerandoPlan + Sí/No (counted)
@@ -339,6 +306,7 @@ export const hooksFlowSteps: HookStep[] = [
       yesLabel: 'Sí',
       noLabel: 'No',
     },
+    footnote: 'Mirá, no tenemos dudas: somos tu gimnasio mental.',
   },
 
   // STEP 6 — SocialProof (counted)
@@ -349,7 +317,6 @@ export const hooksFlowSteps: HookStep[] = [
     counted: true,
     title: '¡Ya casi estamos!',
     tasks: ['Analizando tus objetivos', 'Creando perfil mental', 'Creando tu programa'],
-    statHeadline: 'Miles de personas ya entrenan su mente con T2T',
     testimonial: {
       name: 'Lorena Castillo',
       role: 'Líder de compras · Dunlop Argentina',
@@ -407,14 +374,64 @@ export const hooksFlowSteps: HookStep[] = [
     counted: false,
     content: {
       scriptLine: '¡Listo!',
-      headline: 'Ya tenemos tu plan',
+      headline: 'Ya sabés lo que querés — vamos a hacerlo realidad',
       caption: 'Personalizado según tu diagnóstico',
       ribbonLabel: 'Plan listo',
     },
     ctaLabel: 'Ver mi plan',
+    icon: 'rocket-outline',
   },
 
-  // STEP 7 — Pricing (counted, header dedicado)
+  // STEP — Nombre (counted)
+  {
+    id: '49_Hook_Nombre',
+    penId: '49',
+    kind: 'nameInput',
+    counted: true,
+    title: '¿Cómo te gustaría que te llamemos?',
+    preScript: '¡Comencemos!',
+    placeholder: 'Tu nombre',
+    caption: 'Puedes cambiarlo después en tu perfil',
+  },
+
+  // STEP — TipoUsuario (counted)
+  {
+    id: '40_Hook_TipoUsuario',
+    penId: '40',
+    kind: 'iconSelect',
+    counted: true,
+    title: '¿Cuál te describe?',
+    subtitle: 'Seleccioná todas las que apliquen',
+    multiSelect: true,
+    options: [
+      {
+        id: 'estudiante',
+        label: 'Estudiante',
+        subtitle: 'Aprendo formalmente',
+        icon: 'school-outline',
+        tileColor: '#FFFFFF14',
+        iconColor: '#FFFFFF',
+      },
+      {
+        id: 'profesional',
+        label: 'Joven profesional',
+        subtitle: 'Trabajo en una empresa',
+        icon: 'briefcase-outline',
+        tileColor: '#B73CEF',
+        iconColor: '#FFFFFF',
+      },
+      {
+        id: 'humano',
+        label: 'Humano curioso',
+        subtitle: 'Quiero crecer en habilidades blandas',
+        icon: 'sparkles-outline',
+        tileColor: '#FFFFFF14',
+        iconColor: '#FFFFFF',
+      },
+    ],
+  },
+
+  // STEP — Pricing (counted, header dedicado)
   {
     id: '51_Onboarding_Plan',
     penId: '51',
@@ -422,9 +439,9 @@ export const hooksFlowSteps: HookStep[] = [
     counted: true,
     title: 'Planes',
     stats: [
-      { value: '40+', label: 'habilidades' },
-      { value: '+10', label: 'instructores' },
-      { value: '120', label: 'módulos' },
+      { value: '40+', label: 'cursos' },
+      { value: '+10', label: 'por semana' },
+      { value: '120', label: 'videos' },
     ],
     defaultPeriod: 'monthly',
     plans: [
@@ -462,7 +479,7 @@ export const hooksFlowSteps: HookStep[] = [
     footnote: 'Sin tarjeta. Cancelás cuando quieras.',
   },
 
-  // STEP 8 — Edad (counted)
+  // STEP — Edad (counted)
   {
     id: '48_Hook_Edad',
     penId: '48',
@@ -473,19 +490,7 @@ export const hooksFlowSteps: HookStep[] = [
     ranges: ['18-24', '25-34', '35-44', '45-54', '+55'],
   },
 
-  // STEP 9 — Nombre (counted)
-  {
-    id: '49_Hook_Nombre',
-    penId: '49',
-    kind: 'nameInput',
-    counted: true,
-    title: '¿Cómo te gustaría que te llamemos?',
-    preScript: '¡Comencemos!',
-    placeholder: 'Tu nombre',
-    caption: 'Puedes cambiarlo después en tu perfil',
-  },
-
-  // STEP 10 — Confirmar Plan (counted, header dedicado)
+  // STEP — Confirmar Plan (counted, header dedicado)
   {
     id: '52_Confirmar_Plan',
     penId: '52',
@@ -622,11 +627,11 @@ export const hooksFlowSteps: HookStep[] = [
     kind: 'welcomeVideo',
     counted: false,
     title: 'Bienvenida',
-    durationLabel: 'BIENVENIDA · 1:24',
-    scriptLine: 'Hagámoslo juntos',
-    headline: 'Bienvenido a tu gimnasio',
-    authorName: 'Gustavo Rodríguez',
-    authorRole: 'Director de T2T Academy',
+    durationLabel: WELCOME_VIDEO_CONTENT.durationLabel,
+    scriptLine: WELCOME_VIDEO_CONTENT.scriptLine,
+    headline: WELCOME_VIDEO_CONTENT.headline,
+    authorName: WELCOME_VIDEO_CONTENT.authorName,
+    authorRole: WELCOME_VIDEO_CONTENT.authorRole,
     ctaLabel: 'Ir al inicio',
     skipLabel: 'Omitir',
   },

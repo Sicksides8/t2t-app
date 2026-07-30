@@ -25,6 +25,7 @@ import type { Course, Lesson, ModuleLink, RootStackParamList } from '../../types
 import { openExternalLink } from '../../utils/openExternalLink';
 import { canAccessCourse, canAccessLesson, getRequiredPlan } from '../../utils/subscriptionAccess';
 import { getPlanDisplayName } from '../../utils/planDisplay';
+import { displayCoursePercent } from '../../utils/courseProgress';
 
 function formatDurationMin(seconds: number): string {
   const min = Math.max(1, Math.round(seconds / 60));
@@ -137,7 +138,7 @@ export function CourseDetailScreen({ route, navigation }: NativeStackScreenProps
 
   const moduleCount = sortedLessons.length || course.totalLessons || 1;
   const coursePdfUrl = course.pdfUrl ?? sortedLessons.find((l) => l.pdfUrl)?.pdfUrl;
-  const isCourseComplete = (progress?.percentComplete ?? 0) >= 100;
+  const isCourseComplete = displayCoursePercent(progress) >= 100;
   const requiredPlan = getRequiredPlan(course);
   const planBadgeLabel = requiredPlan === 'free' ? null : getPlanDisplayName(requiredPlan);
 
@@ -218,7 +219,7 @@ export function CourseDetailScreen({ route, navigation }: NativeStackScreenProps
               </View>
             </View>
             <Text style={styles.description}>{course.description}</Text>
-            {progress ? <ProgressBar value={progress.percentComplete} /> : null}
+            {progress ? <ProgressBar value={displayCoursePercent(progress)} /> : null}
           </View>
 
           <View style={styles.modulesSection}>

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, ActivityIndicator, Modal, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, ActivityIndicator, Modal, Platform, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -22,17 +22,16 @@ import {
   ProfileMenuCard,
   ProfileNotificationRow,
   ProfilePlanCard,
-  ProfileProgressStreakHero,
   ProfileScreenShell,
   ProfileSettingRow,
   ProfileStatTiles,
   ProfileStatsRow,
   ProfileUpsellRow,
-  SkillStrengthRow,
 } from '../../components/profile';
 import { Button, CardGlass, ScreenWrapper, T2TCoin, TAB_SCREEN_EDGES } from '../../components/ui';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { CourseListSkeleton } from '../../components/ui/Skeleton';
+import { profileGoBack } from '../../navigation/profileNavigation';
 import { plans, skills } from '../../data/academy';
 import * as authService from '../../services/authService';
 import { fetchCourseById } from '../../services/courseService';
@@ -211,7 +210,7 @@ export function RedeemCodeScreen({ navigation }: ProfileProps) {
         await refreshUserProfile();
         Alert.alert('¡Listo!', result.message, [
           { text: 'Ver mi suscripción', onPress: () => navigation.navigate('Subscription') },
-          { text: 'OK', onPress: () => navigation.goBack(), style: 'cancel' },
+          { text: 'OK', onPress: () => profileGoBack(navigation), style: 'cancel' },
         ]);
       } else {
         Alert.alert('No se pudo canjear', result.message);
@@ -225,7 +224,7 @@ export function RedeemCodeScreen({ navigation }: ProfileProps) {
 
   if (alreadyPaid) {
     return (
-      <ProfileScreenShell title="Canjear código" onBack={() => navigation.goBack()}>
+      <ProfileScreenShell title="Canjear código" navigation={navigation}>
         <ProfileGiftHero />
         <View style={styles.redeemBlockedCard}>
           <Ionicons
@@ -251,7 +250,7 @@ export function RedeemCodeScreen({ navigation }: ProfileProps) {
   }
 
   return (
-    <ProfileScreenShell title="Canjear código" onBack={() => navigation.goBack()}>
+    <ProfileScreenShell title="Canjear código" navigation={navigation}>
       <ProfileGiftHero />
       <Text style={styles.intro}>
         Ingresá el código para activar tu plan con descuento. Sólo para usuarios que aún no
@@ -318,7 +317,7 @@ export function EditProfileScreen({ navigation }: ProfileProps) {
   return (
     <ProfileScreenShell
       title="Editar perfil"
-      onBack={() => navigation.goBack()}
+      navigation={navigation}
       footer={<Button title="Guardar cambios" loading={busy} onPress={() => void saveProfile()} />}
     >
       <ProfileEditAvatar
@@ -377,46 +376,40 @@ export function SubscriptionScreen({ navigation }: ProfileProps) {
     status === 'trialing' || status === 'active' || status === 'cancelled';
   const canCancel = status === 'trialing' || status === 'active';
 
-  const handleCancel = () => {
-    if (!user?.id) return;
-    Alert.alert(
-      'Cancelar suscripción',
-      'Conservás el acceso hasta el fin del período pagado. ¿Querés continuar?',
-      [
-        { text: 'Volver', style: 'cancel' },
-        {
-          text: 'Cancelar plan',
-          style: 'destructive',
-          onPress: async () => {
-            setBusy(true);
-            try {
-              // TODO MERCADOPAGO: en producción se llama a la API de MP para
-              // cancelar la preferencia recurrente y el webhook actualiza el doc.
-              await getBillingProvider().cancel(user.id);
-              await refreshUserProfile();
-              Alert.alert('Listo', 'Tu plan fue cancelado. Mantenés el acceso hasta el vencimiento.');
-            } catch (err) {
-              console.error('[SubscriptionScreen] cancel failed:', err);
-              Alert.alert('Error', 'No se pudo cancelar. Intentá de nuevo.');
-            } finally {
-              setBusy(false);
-            }
-          },
-        },
-      ],
-    );
+  const handleOpenStoreSubscriptions = async () => {
+    if (!user?.id || busy) return;
+    setBusy(true);
+    try {
+      await getBillingProvider().cancel(user.id);
+      const storeLabel = Platform.OS === 'ios' ? 'Suscripciones de Apple' : 'Google Play';
+      Alert.alert(
+        storeLabel,
+        Platform.OS === 'ios'
+          ? 'Te llevamos a Ajustes para gestionar tu suscripción.'
+          : 'Te llevamos a Google Play para gestionar o cancelar tu suscripción. Mantenés el acceso hasta el fin del período pagado.',
+      );
+    } catch (err) {
+      console.error('[SubscriptionScreen] open store subscriptions failed:', err);
+      Alert.alert('Error', 'No se pudo abrir la gestión de suscripciones. Intentá de nuevo.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleSelectPlan = async (newPlanId: SubscriptionPlanId, cycle: BillingCycle) => {
     if (!user?.id) return;
+    const previousPlan = user.subscriptionPlan;
     setChangeOpen(false);
     setBusy(true);
     try {
       await getBillingProvider().changePlan(user.id, newPlanId, { cycle });
       await refreshUserProfile();
+      const updatedPlan = useAuthStore.getState().user?.subscriptionPlan;
       const list = await getPaymentHistory(user.id);
       setPayments(list);
-      Alert.alert('Plan actualizado', `Tu nuevo plan es ${getPlanDisplayName(newPlanId)}.`);
+      if (updatedPlan === newPlanId && updatedPlan !== previousPlan) {
+        Alert.alert('Plan actualizado', `Tu nuevo plan es ${getPlanDisplayName(newPlanId)}.`);
+      }
     } catch (err) {
       console.error('[SubscriptionScreen] changePlan failed:', err);
       const message =
@@ -428,25 +421,30 @@ export function SubscriptionScreen({ navigation }: ProfileProps) {
   };
 
   return (
-    <ProfileScreenShell title="Mi suscripción" onBack={() => navigation.goBack()}>
+    <ProfileScreenShell title="Mi suscripción" navigation={navigation}>
       <ProfilePlanCard plan={plan} status={status} renewsAt={user?.subscriptionRenewsAt} />
 
       {hasActiveSubscription ? (
-        <View style={styles.subActionsRow}>
-          <Button
-            title="Cambiar de plan"
-            variant="ghost"
-            onPress={() => setChangeOpen(true)}
-            disabled={busy}
-            style={styles.subActionBtn}
-          />
-          {canCancel ? (
+        <View style={styles.subActionsCol}>
+          <View style={styles.subActionsRow}>
             <Button
-              title="Cancelar"
+              title="Cambiar de plan"
               variant="ghost"
-              onPress={handleCancel}
+              onPress={() => setChangeOpen(true)}
               disabled={busy}
               style={styles.subActionBtn}
+            />
+          </View>
+          {canCancel ? (
+            <ProfileLinkRow
+              icon="open-outline"
+              title={
+                Platform.OS === 'ios'
+                  ? 'Gestionar en Suscripciones de Apple'
+                  : 'Gestionar o cancelar en Google Play'
+              }
+              subtitle="La cancelación se hace desde tu cuenta de la tienda. Mantenés el acceso hasta el fin del período pagado."
+              onPress={handleOpenStoreSubscriptions}
             />
           ) : null}
         </View>
@@ -536,6 +534,12 @@ function ChangePlanModal({
           <Text style={styles.modalTitle}>Cambiar de plan</Text>
           <Text style={styles.muted}>Elegí el plan y el ciclo de facturación.</Text>
 
+          <Text style={styles.prorationHint}>
+            {Platform.OS === 'ios'
+              ? 'Si subís de plan, Apple aplica el saldo de días restantes. Si bajás, el cambio aplica al próximo ciclo.'
+              : 'Si subís de plan, Google Play aplica el saldo de días restantes (prorrateo). Si bajás, el cambio aplica al próximo ciclo.'}
+          </Text>
+
           <View style={styles.changePlanToggle}>
             <Pressable
               style={[styles.changePlanToggleBtn, cycle === 'monthly' && styles.changePlanToggleBtnActive]}
@@ -568,7 +572,7 @@ function ChangePlanModal({
           {previewEstimate ? (
             <Text style={styles.prorationHint}>
               {previewEstimate.isUpgrade
-                ? `Cargo estimado hoy: ${previewEstimate.currency} ${previewEstimate.estimatedCharge.toFixed(2)} (Google Play muestra el monto exacto al confirmar).`
+                ? `Cargo estimado hoy: ${previewEstimate.currency} ${previewEstimate.estimatedCharge.toFixed(2)} (${Platform.OS === 'ios' ? 'Apple' : 'Google Play'} muestra el monto exacto al confirmar).`
                 : 'El cambio se aplicará sin cargo adicional inmediato.'}
             </Text>
           ) : null}
@@ -621,7 +625,7 @@ export function PaymentDetailScreen({
 
   if (!payment) {
     return (
-      <ProfileScreenShell title="Detalle del pago" onBack={() => navigation.goBack()}>
+      <ProfileScreenShell title="Detalle del pago" navigation={navigation}>
         <Text style={styles.muted}>Cargando…</Text>
       </ProfileScreenShell>
     );
@@ -634,7 +638,7 @@ export function PaymentDetailScreen({
   return (
     <ProfileScreenShell
       title="Detalle del pago"
-      onBack={() => navigation.goBack()}
+      navigation={navigation}
       footer={<Button title="Descargar comprobante (PDF)" onPress={handleDownload} />}
     >
       <View style={styles.paymentHero}>
@@ -744,7 +748,7 @@ export function DiagnosticAppScreen({ navigation }: ProfileProps) {
   return (
     <ProfileScreenShell
       title="Tu evolución"
-      onBack={() => navigation.goBack()}
+      navigation={navigation}
       footer={
         <>
           <Button title="Actualizar mi plan" onPress={viewTrainingPlan} />
@@ -816,7 +820,7 @@ export function CertificatesScreen({ navigation }: ProfileProps) {
   };
 
   return (
-    <ProfileScreenShell title="Certificados y logros" onBack={() => navigation.goBack()}>
+    <ProfileScreenShell title="Certificados y logros" navigation={navigation}>
       {loading ? <CourseListSkeleton /> : null}
       {items.length === 0 && !loading ? (
         <EmptyState
@@ -873,7 +877,7 @@ export function CertificateDetailScreen({
   };
 
   return (
-    <ProfileScreenShell title="Certificado" onBack={() => navigation.goBack()}>
+    <ProfileScreenShell title="Certificado" navigation={navigation}>
       <View style={styles.certCard}>
         <View style={styles.certSeal}>
           <Ionicons name="ribbon" size={22} color="#FFFFFF" />
@@ -899,51 +903,13 @@ export function CertificateDetailScreen({
 }
 
 export function ProgressScreen({ navigation }: ProfileProps) {
-  const user = useAuthStore((state) => state.user);
-  const progressMap = useAcademyStore((state) => state.progress);
-  const diagnostic = useAcademyStore((state) => state.diagnostic);
-  const profileStats = useMemo(() => computeProfileStats(progressMap, user), [progressMap, user]);
-  const skillScores = useMemo(() => {
-    const fromAnswers = computeDiagnosticScores(diagnostic.answers).scores;
-    return { ...fromAnswers, ...(diagnostic.scores || {}) };
-  }, [diagnostic.answers, diagnostic.scores]);
-
   return (
-    <ProfileScreenShell title="Mi progreso" onBack={() => navigation.goBack()}>
-      <ProfileProgressStreakHero
-        streakDays={profileStats.streakDays}
-        longestStreak={profileStats.longestStreak}
-        freezes={profileStats.freezes}
-      />
-
-      <Pressable style={styles.coinsLinkRow} onPress={() => navigation.navigate('CoinsHistory')}>
-        <T2TCoin size={44} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.coinsLinkValue}>{profileStats.coins} T2T Coins</Text>
-          <Text style={styles.coinsLinkCaption}>Ganás coins al completar módulos</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={18} color={Colors.accentPrimary} />
-      </Pressable>
-
-      <View style={[styles.coinsLinkRow, styles.coinsLinkRowDisabled]}>
-        <Ionicons name="lock-closed-outline" size={22} color={Colors.textTertiary} />
-        <Text style={styles.coinsLinkDisabledText}>Tienda de Coins · próximamente</Text>
-      </View>
-
-      <View style={styles.progressSectionHead}>
-        <Ionicons name="barbell-outline" size={18} color={Colors.accentHighlight} />
-        <Text style={[styles.sectionH2, { marginBottom: 0, flex: 1, marginLeft: 8 }]}>
-          Músculos en entrenamiento
-        </Text>
-        <Pressable onPress={() => navigation.navigate('DiagnosticApp')}>
-          <Text style={styles.progressLink}>Ver todo</Text>
-        </Pressable>
-      </View>
-
-      {DIAGNOSTIC_SKILLS.map((id) => {
-        const name = SKILL_LABELS[id];
-        return <SkillStrengthRow key={id} name={name} pct={skillScores[id] ?? 0} />;
-      })}
+    <ProfileScreenShell
+      title="Mi progreso"
+      navigation={navigation}
+      contentStyle={styles.comingSoonContent}
+    >
+      <Text style={styles.comingSoonText}>Próximamente</Text>
     </ProfileScreenShell>
   );
 }
@@ -981,7 +947,7 @@ export function CoinsHistoryScreen({ navigation }: ProfileProps) {
   }, [user?.id]);
 
   return (
-    <ProfileScreenShell title="T2T Coins" onBack={() => navigation.goBack()}>
+    <ProfileScreenShell title="T2T Coins" navigation={navigation}>
       <ProfileCoinsHero balance={user?.coins ?? 0} />
       {loading ? <CourseListSkeleton /> : null}
       {!loading && txs.length === 0 ? (
@@ -1090,7 +1056,7 @@ export function WeeklyChallengeScreen({ navigation }: ProfileProps) {
       setStatus('success');
       setStatusMessage('¡Gracias! Tu reflexión fue guardada.');
       Alert.alert('¡Gracias!', 'Tu reflexión fue enviada.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
+        { text: 'OK', onPress: () => profileGoBack(navigation) },
       ]);
     } catch (err) {
       const message =
@@ -1107,7 +1073,7 @@ export function WeeklyChallengeScreen({ navigation }: ProfileProps) {
 
   if (loading) {
     return (
-      <ProfileScreenShell title="Desafío semanal" onBack={() => navigation.goBack()}>
+      <ProfileScreenShell title="Desafío semanal" navigation={navigation}>
         <ActivityIndicator color={Colors.accentPrimary} size="large" style={{ marginTop: Spacing.xxl }} />
       </ProfileScreenShell>
     );
@@ -1116,10 +1082,10 @@ export function WeeklyChallengeScreen({ navigation }: ProfileProps) {
   return (
     <ProfileScreenShell
       title="Desafío semanal"
-      onBack={() => navigation.goBack()}
+      navigation={navigation}
       footer={
         alreadySent ? (
-          <Button title="Volver" variant="outline" onPress={() => navigation.goBack()} />
+          <Button title="Volver" variant="outline" onPress={() => profileGoBack(navigation)} />
         ) : (
           <View style={styles.reflectionFooter}>
             {statusMessage ? (
@@ -1230,7 +1196,7 @@ export function AppNotificationsScreen({ navigation }: ProfileProps) {
   return (
     <ProfileScreenShell
       title="Notificaciones"
-      onBack={() => navigation.goBack()}
+      navigation={navigation}
       rightLabel={hasUnread ? 'Marcar leídas' : undefined}
       onRightPress={hasUnread ? markAllRead : undefined}
     >
@@ -1263,7 +1229,7 @@ export function AppNotificationsScreen({ navigation }: ProfileProps) {
 export function SystemStatesScreen({ navigation }: ProfileProps) {
   const version = Constants.expoConfig?.version || '1.0.0';
   return (
-    <ProfileScreenShell title="Ajustes" onBack={() => navigation.goBack()}>
+    <ProfileScreenShell title="Ajustes" navigation={navigation}>
       <ProfileSettingRow icon="phone-portrait-outline" label="Versión de la app" value={version} />
       <ProfileSettingRow
         icon="cloud-offline-outline"
@@ -1578,46 +1544,15 @@ const styles = StyleSheet.create({
     color: '#777777',
     fontSize: 11,
   },
-  coinsLinkRow: {
-    flexDirection: 'row',
+  comingSoonContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 14,
-    backgroundColor: 'rgba(42, 16, 82, 0.45)',
-    borderWidth: 1,
-    borderColor: '#FFFFFF1F',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 10,
   },
-  coinsLinkRowDisabled: {
-    opacity: 0.6,
-  },
-  coinsLinkValue: {
-    color: Colors.accentHighlight,
-    fontWeight: '800',
-    fontSize: 18,
-  },
-  coinsLinkCaption: {
-    color: Colors.textTertiary,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  coinsLinkDisabledText: {
-    flex: 1,
-    color: Colors.textTertiary,
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  progressSectionHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-    marginBottom: 12,
-  },
-  progressLink: {
-    color: Colors.accentHighlight,
-    fontWeight: '800',
-    fontSize: 13,
+  comingSoonText: {
+    ...Typography.bodyMedium,
+    color: Colors.textSecondary,
+    textAlign: 'center',
   },
   reflectionWrap: {
     position: 'relative',
@@ -1703,6 +1638,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1.4,
     marginTop: 12,
     marginBottom: 8,
+  },
+  subActionsCol: {
+    gap: 4,
+    marginBottom: 12,
   },
   subActionsRow: {
     flexDirection: 'row',

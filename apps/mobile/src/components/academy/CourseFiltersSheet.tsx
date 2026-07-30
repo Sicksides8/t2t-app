@@ -6,7 +6,7 @@ import { Button } from '../ui';
 const { height: SCREEN_H } = Dimensions.get('window');
 
 export type CourseDurationBucket = 5 | 15 | 30;
-export type CoursePlanFilter = 'FREE' | 'PRO' | 'ELITE';
+export type CoursePlanFilter = 'FREE' | 'PRO' | 'BLACK';
 
 export type CourseFilters = {
   maxDurationMin?: CourseDurationBucket;
@@ -30,7 +30,7 @@ const DURATIONS: { id: CourseDurationBucket; label: string }[] = [
 const PLANS: { id: CoursePlanFilter; label: string }[] = [
   { id: 'FREE', label: 'Open' },
   { id: 'PRO', label: 'Pro' },
-  { id: 'ELITE', label: 'Black' },
+  { id: 'BLACK', label: 'Black' },
 ];
 
 export function CourseFiltersSheet({ visible, filters, resultCount, onApply, onClose }: Props) {

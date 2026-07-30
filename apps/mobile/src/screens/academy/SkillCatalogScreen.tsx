@@ -12,6 +12,7 @@ import { fetchCourses } from '../../services/courseService';
 import { useAcademyStore, useAuthStore } from '../../stores';
 import { courseMatchesSkill } from '../../utils/skillCatalog';
 import { canAccessCourse } from '../../utils/subscriptionAccess';
+import { displayCoursePercent } from '../../utils/courseProgress';
 import { Colors, Spacing, Typography } from '../../theme';
 import type { Course, RootStackParamList } from '../../types';
 
@@ -70,7 +71,7 @@ export function SkillCatalogScreen({ route, navigation }: NativeStackScreenProps
     }
     if (tab === 'in-progress') {
       base = base.filter((c) => {
-        const pct = progressMap[c.id]?.percentComplete ?? 0;
+        const pct = displayCoursePercent(progressMap[c.id]);
         return pct > 0 && pct < 100;
       });
     }
@@ -142,7 +143,7 @@ export function SkillCatalogScreen({ route, navigation }: NativeStackScreenProps
             <CourseCard
               key={course.id}
               course={course}
-              progressPercent={progressMap[course.id]?.percentComplete}
+              progressPercent={displayCoursePercent(progressMap[course.id])}
               locked={!canAccessCourse(course, user)}
               onPress={() => navigation.navigate('CourseDetail', { courseId: course.id })}
             />

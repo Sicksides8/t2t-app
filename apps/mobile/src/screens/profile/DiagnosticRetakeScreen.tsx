@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { DiagnosticQuestionsFlow } from '../../components/diagnostic/DiagnosticQuestionsFlow';
+import { profileGoBack } from '../../navigation/profileNavigation';
 import { saveDiagnosticResult } from '../../services/diagnosticService';
 import { useAcademyStore } from '../../stores';
 import type { ProfileStackParamList } from '../../types';
@@ -28,7 +29,7 @@ export function DiagnosticRetakeScreen({ navigation }: Props) {
   return (
     <DiagnosticQuestionsFlow
       mode="retake"
-      onCancel={() => navigation.goBack()}
+      onCancel={() => profileGoBack(navigation)}
       onResultPrimary={() => void handleComplete()}
     />
   );

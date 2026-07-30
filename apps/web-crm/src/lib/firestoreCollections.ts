@@ -18,8 +18,8 @@ export const FS_COL = {
   subscriptionCodes: `${P}subscription_codes`,
   coinsTransactions: `${P}coins_transactions`,
   subscriptionRedemptions: `${P}subscription_redemptions`,
-  /** Historial de pagos (mock o real): t2t_payments/{txId}. */
-  payments: `${P}payments`,
+  /** Idempotencia verify/RTDN: t2t_billing_events/{dedupeKey}. */
+  billingEvents: `${P}billing_events`,
   achievements: `${P}achievements`,
   weeklyChallenges: `${P}weekly_challenges`,
   weeklyChallengeResponses: `${P}weekly_challenge_responses`,

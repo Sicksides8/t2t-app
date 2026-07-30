@@ -47,6 +47,7 @@ export async function completeLesson(
   courseId: string,
   lessonId: string,
   progress?: CourseProgress,
+  totalLessons?: number,
 ): Promise<void> {
   const userId = auth.currentUser?.uid;
   if (userId && progress) {
@@ -56,7 +57,12 @@ export async function completeLesson(
   await tryApi(() =>
     apiFetch('/api/progress/lesson-complete', {
       method: 'POST',
-      body: JSON.stringify({ courseId, lessonId }),
+      body: JSON.stringify({
+        courseId,
+        lessonId,
+        totalLessons,
+        percentComplete: progress?.percentComplete,
+      }),
     }),
   );
 }

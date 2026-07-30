@@ -26,6 +26,9 @@ export type BillingCycle = 'monthly' | 'yearly';
  */
 export type PlanHorizonDays = 30 | 60 | 90;
 
+/** Nivel de experiencia elegido en onboarding pre-registro. */
+export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
+
 export interface User {
   id: string;
   email: string;
@@ -44,6 +47,11 @@ export interface User {
    * `53_Plan_Personalizado` para escalar título, packs y ruta de hitos.
    */
   planHorizonDays?: PlanHorizonDays;
+  /**
+   * Nivel de experiencia (principiante / intermedio / avanzado) elegido
+   * en onboarding pre-registro.
+   */
+  experienceLevel?: ExperienceLevel;
   /**
    * Fecha en la que el usuario arrancó (o re-arrancó) su plan de entrenamiento.
    * Se setea junto con `planHorizonDays`. La home la usa para calcular

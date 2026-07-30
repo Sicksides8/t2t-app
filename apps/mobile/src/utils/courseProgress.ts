@@ -3,6 +3,23 @@ import type { CourseProgress } from '../types';
 /** Segundos mínimos de reproducción antes de contar progreso parcial. */
 export const MIN_MEANINGFUL_WATCH_SEC = 30;
 
+/** Por debajo de este % sin lecciones completadas = ruido legacy o apertura accidental. */
+export const PHANTOM_PERCENT_THRESHOLD = 5;
+
+export function sanitizeStoredPercent(
+  percentComplete: number,
+  lessonsCompleted: string[],
+): number {
+  if (lessonsCompleted.length > 0) return percentComplete;
+  if (percentComplete > 0 && percentComplete <= PHANTOM_PERCENT_THRESHOLD) return 0;
+  return percentComplete;
+}
+
+export function displayCoursePercent(progress: CourseProgress | undefined): number {
+  if (!progress) return 0;
+  return sanitizeStoredPercent(progress.percentComplete, progress.lessonsCompleted);
+}
+
 export function hasMeaningfulWatchTime(watchedSec: number, durationSec?: number): boolean {
   if (watchedSec < MIN_MEANINGFUL_WATCH_SEC) return false;
   if (durationSec && durationSec > 0 && durationSec < MIN_MEANINGFUL_WATCH_SEC * 2) {
@@ -67,11 +84,16 @@ export function buildWatchProgressUpdate(
     return null;
   }
 
+  const percentComplete = sanitizeStoredPercent(
+    Math.max(current.percentComplete, nextPercent),
+    current.lessonsCompleted,
+  );
+
   return {
     ...current,
     courseId,
     currentLessonId: lessonId,
-    percentComplete: Math.max(current.percentComplete, nextPercent),
+    percentComplete,
     updatedAt: new Date(),
   };
 }

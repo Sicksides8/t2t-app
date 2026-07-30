@@ -39,6 +39,16 @@ export function HookIconSelectList({ options, selectedIds, onToggle }: Props) {
               <Text style={styles.label}>{opt.label}</Text>
               {opt.subtitle ? <Text style={styles.subtitle}>{opt.subtitle}</Text> : null}
             </View>
+            {opt.sideNote ? (
+              <Text
+                style={[
+                  styles.sideNote,
+                  opt.sideNote === 'RECOMENDADO' && styles.sideNoteRecommended,
+                ]}
+              >
+                {opt.sideNote}
+              </Text>
+            ) : null}
             <View style={selected ? styles.checkOn : styles.checkOff}>
               {selected ? <Ionicons name="checkmark" size={14} color={Colors.textPrimary} /> : null}
             </View>
@@ -93,6 +103,18 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
     marginTop: 2,
     fontSize: 12,
+  },
+  sideNote: {
+    ...Typography.caption,
+    color: Colors.textTertiary,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    maxWidth: 72,
+    textAlign: 'right',
+  },
+  sideNoteRecommended: {
+    color: Colors.accentHighlight,
   },
   checkOn: {
     width: 22,

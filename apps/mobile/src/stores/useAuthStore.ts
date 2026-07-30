@@ -6,6 +6,23 @@ import { cancelStreakReminder } from '../services/streakReminder';
 import { getBillingProvider, restorePurchases } from '../services/subscriptionService';
 import { mapAuthError } from '../utils/mapAuthError';
 import type { User } from '../types';
+import { usePreferencesStore } from './usePreferencesStore';
+
+function consumePendingOnboardingExtras(): authService.OnboardingProfileExtras | undefined {
+  const prefs = usePreferencesStore.getState();
+  const { planHorizonDays, experienceLevel } = prefs;
+  if (!planHorizonDays && !experienceLevel) return undefined;
+  const extras: authService.OnboardingProfileExtras = {
+    diagnosticCompleted: true,
+  };
+  if (planHorizonDays) {
+    extras.planHorizonDays = planHorizonDays;
+    extras.planStartedAt = new Date();
+  }
+  if (experienceLevel) extras.experienceLevel = experienceLevel;
+  prefs.clearOnboardingPrefs();
+  return extras;
+}
 
 export type PendingAuthRoute = 'Login' | 'SignUp' | null;
 
@@ -72,7 +89,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   register: async (email, password, displayName) => {
     set({ isLoading: true, error: null });
     try {
-      const user = await authService.register(email, password, displayName);
+      const extras = consumePendingOnboardingExtras();
+      const user = await authService.register(email, password, displayName, extras);
       set({ user, isAuthenticated: true, isLoading: false });
       await afterAuthSession(user.id);
     } catch (error: unknown) {
@@ -85,7 +103,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loginWithGoogle: async (idToken) => {
     set({ isLoading: true, error: null });
     try {
-      const user = await authService.loginWithGoogle(idToken);
+      const extras = consumePendingOnboardingExtras();
+      const user = await authService.loginWithGoogle(idToken, extras);
       set({ user, isAuthenticated: true, isLoading: false });
       await afterAuthSession(user.id);
     } catch (error: unknown) {
@@ -110,7 +129,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ isLoading: false });
         return;
       }
-      const user = await authService.loginWithGoogle(idToken);
+      const extras = consumePendingOnboardingExtras();
+      const user = await authService.loginWithGoogle(idToken, extras);
       set({ user, isAuthenticated: true, isLoading: false });
       await afterAuthSession(user.id);
     } catch (error: unknown) {
@@ -126,7 +146,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signInWithAppleNative: async () => {
     set({ isLoading: true, error: null });
     try {
-      const user = await authService.signInWithAppleOAuth();
+      const extras = consumePendingOnboardingExtras();
+      const user = await authService.signInWithAppleOAuth(extras);
       set({ user, isAuthenticated: true, isLoading: false });
       await afterAuthSession(user.id);
     } catch (error: unknown) {

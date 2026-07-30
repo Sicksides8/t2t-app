@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
     ...Typography.bodyMedium,
     color: Colors.textPrimary,
     fontWeight: '700',
-    fontSize: 16,
+    fontSize: 20,
   },
   grid: {
     flexDirection: 'row',

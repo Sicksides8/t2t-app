@@ -13,6 +13,7 @@ type Props = {
   question: { preScript: string; text: string; yesLabel?: string; noLabel?: string };
   onAnswer: (value: 'yes' | 'no') => void;
   showQuestion: boolean;
+  footnote?: string;
 };
 
 function TaskBarRow({
@@ -67,6 +68,7 @@ export function HookProgressWithQuestion({
   question,
   onAnswer,
   showQuestion,
+  footnote,
 }: Props) {
   return (
     <View style={styles.wrap}>
@@ -112,6 +114,8 @@ export function HookProgressWithQuestion({
           </View>
         </View>
       ) : null}
+
+      {showQuestion && footnote ? <Text style={styles.footnote}>{footnote}</Text> : null}
     </View>
   );
 }
@@ -205,5 +209,13 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontWeight: '700',
     fontSize: 15,
+  },
+  footnote: {
+    ...Typography.caption,
+    color: Colors.textTertiary,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 4,
+    textAlign: 'center',
   },
 });

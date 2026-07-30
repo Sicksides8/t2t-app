@@ -63,7 +63,12 @@ import {
   VIDEO_PLAYBACK_RATES,
 } from '../../stores';
 import { getNextLesson, resolveActiveLesson } from '../../utils/moduleProgress';
+import { formatLessonChipLabel, formatLessonTitle } from '../../utils/lessonDisplay';
 import { buildWatchProgressUpdate, hasMeaningfulWatchTime } from '../../utils/courseProgress';
+import {
+  canTrustPlaybackComplete,
+  isPartialStreamDuration,
+} from '../../utils/videoCompletionGuard';
 import {
   applyPlaybackRate,
   clampTimelineTime,
@@ -145,6 +150,8 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
   const courseIdRef = useRef(route.params.courseId);
   const pendingPlayRef = useRef(false);
   const sourceLoadGenRef = useRef(0);
+  const partialReloadLessonRef = useRef<string | null>(null);
+  const resumeTimeByLessonRef = useRef<Record<string, number>>({});
   const videoViewRef = useRef<VideoView>(null);
 
   useFocusEffect(
@@ -341,6 +348,7 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
   useEffect(() => {
     if (!lesson?.id) return;
 
+    partialReloadLessonRef.current = null;
     if (lesson.id) {
       autoCompletedRef.current.delete(lesson.id);
     }
@@ -386,11 +394,35 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
 
       try {
         applyPlaybackRate(player, playbackRateRef.current);
+        const savedResume = resumeTimeByLessonRef.current[lesson.id];
+        const alreadyDone = progressMap[route.params.courseId]?.lessonsCompleted.includes(lesson.id);
+        if (
+          savedResume &&
+          savedResume > 2 &&
+          !alreadyDone &&
+          lesson.durationSec > 0 &&
+          savedResume < lesson.durationSec * 0.95
+        ) {
+          player.currentTime = savedResume;
+          setCurrentTime(savedResume);
+        }
       } catch {
         /* noop */
       }
     })();
-  }, [lesson?.id, lesson?.videoUrl, videoSourceUri, player]);
+
+    return () => {
+      try {
+        const currentLesson = lessonRef.current;
+        const ct = player.currentTime;
+        if (currentLesson?.id && ct > 5) {
+          resumeTimeByLessonRef.current[currentLesson.id] = ct;
+        }
+      } catch {
+        /* noop */
+      }
+    };
+  }, [lesson?.id, lesson?.videoUrl, videoSourceUri, player, route.params.courseId, progressMap]);
 
   useEffect(() => {
     if (playerStatus !== 'readyToPlay' || !pendingPlayRef.current) return;
@@ -506,7 +538,7 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
       const currentLesson = lessonRef.current;
       if (!currentLesson || blockAutoCompleteRef.current || rateSettlingRef.current) return;
       if (autoCompletedRef.current.has(currentLesson.id)) return;
-      if (!isVideoTimelineComplete(currentTime, duration)) return;
+      if (!canTrustPlaybackComplete(currentTime, duration, currentLesson.durationSec)) return;
 
       autoCompletedRef.current.add(currentLesson.id);
       finalizeAtEnd(duration);

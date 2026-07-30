@@ -11,6 +11,7 @@ import {
 } from '../../data/diagnostic';
 import { bucketSkill } from '../../utils/diagnosticBuckets';
 import type { DiagnosticResult } from '../../types';
+import { RADAR_ONBOARDING_COPY } from '../../constants/onboardingCopy';
 import { Colors, Radius, Spacing, Typography } from '../../theme';
 import { DiagnosticRadarChart, type RadarAxis, type RadarLevel } from './DiagnosticRadarChart';
 
@@ -22,6 +23,8 @@ type Props = {
   onSecondary: () => void;
   /** Abre la vista 34_Mapa_Cerebral (vista secundaria del radar). */
   onBrainMap?: () => void;
+  /** Onboarding pre-auth usa copy distinto y CTA «Siguiente». */
+  variant?: 'default' | 'onboarding';
 };
 
 function bucketToLevel(score: number): RadarLevel {
@@ -39,7 +42,9 @@ export function DiagnosticRadarResultScreen({
   onPrimary,
   onSecondary,
   onBrainMap,
+  variant = 'default',
 }: Props) {
+  const isOnboarding = variant === 'onboarding';
   const axes: RadarAxis[] = useMemo(
     () =>
       DIAGNOSTIC_SKILLS.map((skillId) => {
@@ -70,8 +75,13 @@ export function DiagnosticRadarResultScreen({
       contentStyle={styles.content}
       footer={
         <View style={styles.footer}>
-          <Button title="Ver mi plan de entrenamiento" onPress={onPrimary} />
-          <Button title="Recibir resultado por email" variant="ghost" onPress={onSecondary} />
+          <Button
+            title={isOnboarding ? RADAR_ONBOARDING_COPY.primaryLabel : 'Ver mi plan de entrenamiento'}
+            onPress={onPrimary}
+          />
+          {!isOnboarding ? (
+            <Button title="Recibir resultado por email" variant="ghost" onPress={onSecondary} />
+          ) : null}
         </View>
       }
     >
@@ -100,17 +110,26 @@ export function DiagnosticRadarResultScreen({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.script}>Mirá tus músculos</Text>
-          <Text style={styles.title}>Tu perfil hoy</Text>
-          <Text style={styles.subtitle}>
-            {score210 != null
-              ? `Puntaje total · ${score210} / 10 · 11 habilidades`
-              : '11 habilidades · una mirada honesta'}
+          {!isOnboarding ? (
+            <Text style={styles.script}>Mirá tus músculos</Text>
+          ) : null}
+          <Text style={styles.title}>
+            {isOnboarding ? RADAR_ONBOARDING_COPY.title : 'Tu perfil hoy'}
           </Text>
+          <Text style={styles.subtitle}>
+            {isOnboarding
+              ? RADAR_ONBOARDING_COPY.subtitle
+              : score210 != null
+                ? `Puntaje total · ${score210} / 10 · 11 habilidades`
+                : '11 habilidades · una mirada honesta'}
+          </Text>
+          {isOnboarding ? (
+            <Text style={styles.caption}>{RADAR_ONBOARDING_COPY.caption}</Text>
+          ) : null}
         </View>
 
         <View style={styles.chartWrap}>
-          <DiagnosticRadarChart axes={axes} size={300} maxRadius={100} />
+          <DiagnosticRadarChart axes={axes} size={320} maxRadius={92} />
         </View>
 
         {onBrainMap ? (
@@ -206,11 +225,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
   },
+  caption: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    fontSize: 13,
+    textAlign: 'center',
+  },
   chartWrap: {
     alignItems: 'center',
     marginTop: Spacing.sm,
     marginBottom: Spacing.md,
-    paddingHorizontal: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+    minHeight: 340,
   },
   legend: {
     flexDirection: 'row',

@@ -415,72 +415,74 @@ export const googlePlayBillingProvider: IBillingProvider = {
   },
 
   async changePlan(userId, newPlanId, options?: ChangePlanOptions) {
-    const current = await this.getCurrent(userId);
-    const cycle: BillingCycle =
-      options?.cycle ?? (current?.cycle === 'yearly' ? 'yearly' : 'monthly');
-    if (newPlanId === 'free') {
-      return this.cancel(userId);
-    }
+    return runBillingExclusive(async () => {
+      const current = await this.getCurrent(userId);
+      const cycle: BillingCycle =
+        options?.cycle ?? (current?.cycle === 'yearly' ? 'yearly' : 'monthly');
+      if (newPlanId === 'free') {
+        return this.cancel(userId);
+      }
 
-    const productId = resolvePlayProductId(newPlanId, cycle);
-    await ensureConnection();
-    const playSub = await fetchPlaySubscription(productId);
-    const offerToken = pickOfferToken(playSub, false);
+      const productId = resolvePlayProductId(newPlanId, cycle);
+      await ensureConnection();
+      const playSub = await fetchPlaySubscription(productId);
+      const offerToken = pickOfferToken(playSub, false);
 
-    const hasActiveGoogleSub =
-      current &&
-      current.source === 'google' &&
-      current.planId !== 'free' &&
-      (current.status === 'active' || current.status === 'trialing');
+      const hasActiveGoogleSub =
+        current &&
+        current.source === 'google' &&
+        current.planId !== 'free' &&
+        (current.status === 'active' || current.status === 'trialing');
 
-    if (hasActiveGoogleSub && current) {
-      const currentProductId = resolvePlayProductId(current.planId, current.cycle);
-      const purchaseToken = await resolveActivePurchaseToken(current, currentProductId);
-      const isUpgrade = isSubscriptionUpgrade(
-        current.planId,
-        current.cycle,
-        newPlanId,
-        cycle,
-      );
-      const replacementModeAndroid = isUpgrade
-        ? REPLACEMENT_WITH_TIME_PRORATION
-        : REPLACEMENT_WITHOUT_PRORATION;
+      if (hasActiveGoogleSub && current) {
+        const currentProductId = resolvePlayProductId(current.planId, current.cycle);
+        const purchaseToken = await resolveActivePurchaseToken(current, currentProductId);
+        const isUpgrade = isSubscriptionUpgrade(
+          current.planId,
+          current.cycle,
+          newPlanId,
+          cycle,
+        );
+        const replacementModeAndroid = isUpgrade
+          ? REPLACEMENT_WITH_TIME_PRORATION
+          : REPLACEMENT_WITHOUT_PRORATION;
 
-      if (purchaseToken && currentProductId !== productId) {
-        try {
-          return await launchPurchase({
-            userId,
-            productId,
-            offerToken,
-            obfuscatedAccountId: userId,
-            purchaseTokenAndroid: purchaseToken,
-            replacementModeAndroid,
-          });
-        } catch (err) {
-          if (err instanceof Error && /already.*owned/i.test(err.message)) {
-            await deepLinkToSubscriptions({
-              skuAndroid: productId,
-              packageNameAndroid: PACKAGE_NAME,
+        if (purchaseToken && currentProductId !== productId) {
+          try {
+            return await launchPurchase({
+              userId,
+              productId,
+              offerToken,
+              obfuscatedAccountId: userId,
+              purchaseTokenAndroid: purchaseToken,
+              replacementModeAndroid,
             });
-            throw new Error('Cambiá tu plan desde Google Play y volvé acá para confirmarlo.');
+          } catch (err) {
+            if (err instanceof Error && /already.*owned/i.test(err.message)) {
+              await deepLinkToSubscriptions({
+                skuAndroid: productId,
+                packageNameAndroid: PACKAGE_NAME,
+              });
+              throw new Error('Cambiá tu plan desde Google Play y volvé acá para confirmarlo.');
+            }
+            throw err;
           }
-          throw err;
         }
       }
-    }
 
-    try {
-      return await this.subscribe(userId, newPlanId, cycle, 'google');
-    } catch (err) {
-      if (err instanceof Error && /already.*owned/i.test(err.message)) {
-        await deepLinkToSubscriptions({
-          skuAndroid: productId,
-          packageNameAndroid: PACKAGE_NAME,
-        });
-        throw new Error('Cambiá tu plan desde Google Play y volvé acá para confirmarlo.');
+      try {
+        return await this.subscribe(userId, newPlanId, cycle, 'google');
+      } catch (err) {
+        if (err instanceof Error && /already.*owned/i.test(err.message)) {
+          await deepLinkToSubscriptions({
+            skuAndroid: productId,
+            packageNameAndroid: PACKAGE_NAME,
+          });
+          throw new Error('Cambiá tu plan desde Google Play y volvé acá para confirmarlo.');
+        }
+        throw err;
       }
-      throw err;
-    }
+    });
   },
 
   async getCurrent(userId) {

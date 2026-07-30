@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '../ui';
+import { WelcomeVideoPlayer } from '../shared/WelcomeVideoPlayer';
 import { PenpotFlowShell } from '../penpot';
 import type { CarouselSlide } from '../../data/onboardingFlow';
+import { getAppConfig } from '../../services/appConfigService';
 import { Colors, Spacing, Typography } from '../../theme';
 
 type Props = {
@@ -14,6 +16,23 @@ type Props = {
 
 /** Penpot 04_Impacto..08_Transformacion — story slides del carrusel intro. */
 export function OnboardingCarouselSlide({ slide, dotIndex, totalDots, onNext }: Props) {
+  const isTension = slide.id === 'tension';
+  const isDiferencial = slide.id === 'diferencial';
+  const isTransformacion = slide.id === 'transformacion';
+  const isImpacto = slide.id === 'impacto';
+  const [impactVideoUrl, setImpactVideoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isImpacto) return;
+    let cancelled = false;
+    void getAppConfig().then((cfg) => {
+      if (!cancelled) setImpactVideoUrl(cfg.onboardingImpactVideoUrl);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isImpacto]);
+
   return (
     <PenpotFlowShell
       orbVariant="default"
@@ -37,7 +56,12 @@ export function OnboardingCarouselSlide({ slide, dotIndex, totalDots, onNext }: 
         ))}
       </View>
 
-      <View style={styles.body}>
+      <View style={[styles.body, isTension && styles.bodyTension, isTransformacion && styles.bodyTransformacion]}>
+        {isImpacto ? (
+          <View style={styles.impactVideoWrap}>
+            <WelcomeVideoPlayer videoUrl={impactVideoUrl ?? undefined} compact fullscreenOnStart />
+          </View>
+        ) : null}
         {slide.sections.map((section, i) => {
           if (section.kind === 'pre') {
             return (
@@ -48,7 +72,10 @@ export function OnboardingCarouselSlide({ slide, dotIndex, totalDots, onNext }: 
           }
           if (section.kind === 'hero') {
             return (
-              <Text key={i} style={styles.hero}>
+              <Text
+                key={i}
+                style={[styles.hero, isTension && i > 0 && styles.heroAfterPre]}
+              >
                 {section.text}
               </Text>
             );
@@ -69,7 +96,7 @@ export function OnboardingCarouselSlide({ slide, dotIndex, totalDots, onNext }: 
             );
           }
           return (
-            <Text key={i} style={styles.body2}>
+            <Text key={i} style={[styles.body2, isDiferencial && styles.body2Large]}>
               {section.text}
             </Text>
           );
@@ -105,6 +132,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 20,
     paddingBottom: Spacing.xxl,
+  },
+  bodyTension: {
+    gap: 28,
+  },
+  bodyTransformacion: {
+    gap: 16,
+  },
+  impactVideoWrap: {
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  heroAfterPre: {
+    marginTop: Spacing.md,
   },
   pre: {
     ...Typography.body,
@@ -144,6 +184,10 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 16,
     lineHeight: 22,
+  },
+  body2Large: {
+    fontSize: 20,
+    lineHeight: 28,
   },
   footer: {
     gap: Spacing.sm,

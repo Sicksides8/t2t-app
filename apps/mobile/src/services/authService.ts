@@ -11,20 +11,32 @@ import {
   updateProfile,
   type User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { Platform } from 'react-native';
 import { FS_COL } from '../constants/firestoreCollections';
 import { apiFetch, hasApiBaseUrl } from './api';
 import { auth, db } from './firebase';
-import type { User } from '../types';
+import type { User, ExperienceLevel, PlanHorizonDays } from '../types';
 
 export async function login(email: string, password: string): Promise<User> {
   const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
   return getOrCreateUserProfile(credential.user);
 }
 
-export async function register(email: string, password: string, displayName: string): Promise<User> {
+export type OnboardingProfileExtras = {
+  planHorizonDays?: PlanHorizonDays;
+  experienceLevel?: ExperienceLevel;
+  diagnosticCompleted?: boolean;
+  planStartedAt?: Date;
+};
+
+export async function register(
+  email: string,
+  password: string,
+  displayName: string,
+  extras?: OnboardingProfileExtras,
+): Promise<User> {
   const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
   await updateProfile(credential.user, { displayName });
   await sendEmailVerification(credential.user);
@@ -32,26 +44,35 @@ export async function register(email: string, password: string, displayName: str
     email,
     displayName,
     avatar: credential.user.photoURL || undefined,
-  });
+  }, extras);
 }
 
-export async function loginWithGoogle(idToken: string): Promise<User> {
+export async function loginWithGoogle(
+  idToken: string,
+  extras?: OnboardingProfileExtras,
+): Promise<User> {
   const credential = GoogleAuthProvider.credential(idToken);
   const result = await signInWithCredential(auth, credential);
-  return getOrCreateUserProfile(result.user);
+  return getOrCreateUserProfile(result.user, extras);
 }
 
 /** Credencial Apple cuando ya tenés idToken (p. ej. desde otro SDK). */
-export async function loginWithApple(identityToken: string, nonce: string): Promise<User> {
+export async function loginWithApple(
+  identityToken: string,
+  nonce: string,
+  extras?: OnboardingProfileExtras,
+): Promise<User> {
   const provider = new OAuthProvider('apple.com');
   const result = await signInWithCredential(auth, provider.credential({ idToken: identityToken, rawNonce: nonce }));
-  return getOrCreateUserProfile(result.user);
+  return getOrCreateUserProfile(result.user, extras);
 }
 
 /** Apple: nativo en iOS (expo-apple-authentication), OAuth web en web. */
-export async function signInWithAppleOAuth(): Promise<User> {
+export async function signInWithAppleOAuth(
+  extras?: OnboardingProfileExtras,
+): Promise<User> {
   const { requestAppleSignIn } = await import('./appleSignIn');
-  const user = await requestAppleSignIn();
+  const user = await requestAppleSignIn(extras);
   if (!user) {
     const err = new Error('Inicio con Apple cancelado');
     Object.assign(err, { code: 'ERR_REQUEST_CANCELED' });
@@ -101,7 +122,10 @@ export async function getUserProfile(userId: string): Promise<User> {
   return fromFirestore(snapshot.id, snapshot.data());
 }
 
-export async function getOrCreateUserProfile(firebaseUser: FirebaseUser): Promise<User> {
+export async function getOrCreateUserProfile(
+  firebaseUser: FirebaseUser,
+  extras?: OnboardingProfileExtras,
+): Promise<User> {
   const snapshot = await getDoc(doc(db, FS_COL.users, firebaseUser.uid));
   if (snapshot.exists()) {
     return fromFirestore(snapshot.id, snapshot.data());
@@ -111,17 +135,24 @@ export async function getOrCreateUserProfile(firebaseUser: FirebaseUser): Promis
     email: firebaseUser.email || '',
     displayName: firebaseUser.displayName || 'Alumno T2T',
     avatar: firebaseUser.photoURL || undefined,
-  });
+  }, extras);
 }
 
-async function createUserProfile(uid: string, data: { email: string; displayName: string; avatar?: string }): Promise<User> {
+async function createUserProfile(
+  uid: string,
+  data: { email: string; displayName: string; avatar?: string },
+  extras?: OnboardingProfileExtras,
+): Promise<User> {
   const profile: Omit<User, 'id'> = {
     email: data.email,
     displayName: data.displayName,
     avatar: data.avatar,
     role: 'student',
     onboardingCompleted: false,
-    diagnosticCompleted: false,
+    diagnosticCompleted: Boolean(extras?.diagnosticCompleted),
+    planHorizonDays: extras?.planHorizonDays,
+    experienceLevel: extras?.experienceLevel,
+    planStartedAt: extras?.planStartedAt,
     notificationTokens: [],
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -134,6 +165,11 @@ async function createUserProfile(uid: string, data: { email: string; displayName
     role: profile.role,
     onboardingCompleted: profile.onboardingCompleted,
     diagnosticCompleted: profile.diagnosticCompleted,
+    ...(profile.planHorizonDays ? { planHorizonDays: profile.planHorizonDays } : {}),
+    ...(profile.experienceLevel ? { experienceLevel: profile.experienceLevel } : {}),
+    ...(profile.planStartedAt
+      ? { planStartedAt: Timestamp.fromDate(profile.planStartedAt) }
+      : {}),
     notificationTokens: profile.notificationTokens,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -181,6 +217,12 @@ function fromFirestore(id: string, data: any): User {
       data.planHorizonDays === 30 || data.planHorizonDays === 60 || data.planHorizonDays === 90
         ? data.planHorizonDays
         : undefined,
+    experienceLevel:
+      data.experienceLevel === 'beginner' ||
+      data.experienceLevel === 'intermediate' ||
+      data.experienceLevel === 'advanced'
+        ? data.experienceLevel
+        : undefined,
     planStartedAt: data.planStartedAt?.toDate?.() || undefined,
     selectedPlan: data.selectedPlan,
     subscriptionPlan: isPlanId(data.subscriptionPlan) ? data.subscriptionPlan : undefined,
@@ -223,6 +265,7 @@ export async function updateUserFields(
       | 'subscriptionId'
       | 'hookSelections'
       | 'planHorizonDays'
+      | 'experienceLevel'
       | 'planStartedAt'
       | 'selectedPlan'
       | 'subscriptionPlan'

@@ -16,8 +16,8 @@ import {
 } from '../../utils/radarChart';
 import { Colors } from '../../theme';
 
-const DEFAULT_SIZE = 280;
-const DEFAULT_MAX_R = 95;
+const DEFAULT_SIZE = 300;
+const DEFAULT_MAX_R = 88;
 
 export type RadarLevel = 'strong' | 'developing' | 'toTrain';
 
@@ -187,32 +187,39 @@ export function DiagnosticRadarChart({
       </Svg>
       {resolvedAxes.map((axis, i) => {
         const dense = axisCount > 8;
-        const offset = dense ? 24 : 22;
+        const offset = dense ? 32 : 28;
         const pos = labelPosition(axisCount, size, maxRadius, i, offset);
-        const labelWidth = dense ? 92 : 80;
-        const fontSize = dense ? 12 : 11;
-        const lineHeight = fontSize + 4;
-        const maxChars = dense ? 14 : 12;
-        const label =
-          axis.label.length > maxChars ? `${axis.label.slice(0, maxChars - 1)}…` : axis.label;
+        const labelWidth = dense ? 108 : 96;
+        const fontSize = dense ? 12.5 : 12;
+        const lineHeight = fontSize + 3;
         return (
-          <Text
+          <View
             key={axis.key}
             style={[
-              styles.label,
+              styles.labelWrap,
               {
                 left: pos.x - labelWidth / 2,
-                top: pos.y - lineHeight / 2,
+                top: pos.y - lineHeight,
                 width: labelWidth,
-                color: Colors.textPrimary,
-                fontSize,
-                lineHeight,
               },
             ]}
-            numberOfLines={1}
           >
-            {label}
-          </Text>
+            <Text
+              style={[
+                styles.label,
+                {
+                  color: Colors.textPrimary,
+                  fontSize,
+                  lineHeight,
+                },
+              ]}
+              numberOfLines={2}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+            >
+              {axis.label}
+            </Text>
+          </View>
         );
       })}
     </View>
@@ -226,8 +233,16 @@ const styles = StyleSheet.create({
   chart: {
     ...StyleSheet.absoluteFillObject,
   },
-  label: {
+  labelWrap: {
     position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: '#1D083ACC',
+  },
+  label: {
     fontFamily: 'Poppins-SemiBold',
     fontWeight: '600',
     textAlign: 'center',

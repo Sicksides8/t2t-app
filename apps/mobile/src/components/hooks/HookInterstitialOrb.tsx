@@ -1,13 +1,13 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import type { ComponentProps } from 'react';
 import { Colors, Typography } from '../../theme';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 type Props = {
-  icon: IoniconName;
+  icon: IoniconName | 'brain';
   title: string;
   body: string;
 };
@@ -17,7 +17,11 @@ export function HookInterstitialOrb({ icon, title, body }: Props) {
     <View style={styles.wrap}>
       <View style={styles.glow} />
       <View style={styles.orb}>
-        <Ionicons name={icon} size={72} color={Colors.accentPrimary} />
+        {icon === 'brain' ? (
+          <MaterialCommunityIcons name="brain" size={72} color={Colors.accentPrimary} />
+        ) : (
+          <Ionicons name={icon} size={72} color={Colors.accentPrimary} />
+        )}
       </View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.body}>{body}</Text>

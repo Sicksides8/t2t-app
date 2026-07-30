@@ -4,7 +4,7 @@ import { FS_COL } from '../constants/firestoreCollections';
 import { db } from '../services/firebase';
 import type { CourseProgress, DiagnosticResult } from '../types';
 import { computeDiagnosticScores } from '../data/diagnostic';
-import { buildLessonCompleteProgress, buildWatchProgressUpdate } from '../utils/courseProgress';
+import { buildLessonCompleteProgress, buildWatchProgressUpdate, sanitizeStoredPercent } from '../utils/courseProgress';
 
 interface AcademyState {
   selectedCourseId?: string;
@@ -148,16 +148,13 @@ export const useAcademyStore = create<AcademyState>((set, get) => ({
         const data = docSnap.data() as Partial<CourseProgress>;
         const courseId = data.courseId || docSnap.id;
         const lessonsCompleted = Array.isArray(data.lessonsCompleted) ? data.lessonsCompleted : [];
-        let percentComplete = typeof data.percentComplete === 'number' ? data.percentComplete : 0;
-        // Legacy: 1% por haber abierto el reproductor sin ver tiempo real.
-        if (percentComplete === 1 && lessonsCompleted.length === 0) {
-          percentComplete = 0;
-        }
+        const rawPercent = typeof data.percentComplete === 'number' ? data.percentComplete : 0;
+        const percentComplete = sanitizeStoredPercent(rawPercent, lessonsCompleted);
         next[courseId] = {
           courseId,
           lessonsCompleted,
           currentLessonId: data.currentLessonId,
-          percentComplete: typeof data.percentComplete === 'number' ? data.percentComplete : 0,
+          percentComplete,
           skillImpactApplied: Boolean(data.skillImpactApplied),
           updatedAt: data.updatedAt ? new Date(data.updatedAt as unknown as string) : new Date(),
         };

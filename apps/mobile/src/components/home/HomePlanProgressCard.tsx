@@ -24,7 +24,8 @@ type Props = {
 export function HomePlanProgressCard({ horizonDays, startedAt, onPress }: Props) {
   const elapsedDays = computeElapsedDays(startedAt);
   const currentDay = Math.min(horizonDays, Math.max(1, elapsedDays + 1));
-  const percent = Math.min(100, Math.round((currentDay / horizonDays) * 100));
+  /** Días transcurridos (no el día en curso) — evita 3% en el día 1 sin actividad previa. */
+  const percent = Math.min(100, Math.round((elapsedDays / horizonDays) * 100));
 
   const Wrapper: React.ComponentType<{ children: React.ReactNode }> = onPress
     ? ({ children }) => (
@@ -65,7 +66,11 @@ export function HomePlanProgressCard({ horizonDays, startedAt, onPress }: Props)
         </View>
 
         <Text style={styles.caption}>
-          {percent < 100 ? `${percent}% del recorrido` : 'Checkpoint alcanzado · revisá tu radar'}
+          {percent <= 0
+            ? 'Recién arrancás · el progreso suma día a día'
+            : percent < 100
+              ? `${percent}% del recorrido`
+              : 'Checkpoint alcanzado · revisá tu radar'}
         </Text>
       </LinearGradient>
     </Wrapper>

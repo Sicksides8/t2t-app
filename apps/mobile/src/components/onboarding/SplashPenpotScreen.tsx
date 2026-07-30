@@ -58,16 +58,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   logoWrap: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: 112,
+    height: 112,
+    borderRadius: 56,
     alignItems: 'center',
     justifyContent: 'center',
   },
   logo: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: 112,
+    height: 112,
+    borderRadius: 56,
   },
   brand: {
     ...Typography.h1,

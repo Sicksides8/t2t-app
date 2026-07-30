@@ -1,21 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Button } from '../ui';
 import { PenpotFlowShell } from '../penpot';
 import type { LoaderIconKey, LoaderTask, LoaderTint, ProgressLoaderFrame } from '../../data/onboardingFlow';
 import { Colors, Spacing, Typography } from '../../theme';
 
 /** Duración de la barra principal y checklist (ms). */
 export const LOADER_ANIMATION_MS = 4800;
-/** Pausa breve al llegar al % final antes de avanzar (ms). */
-export const LOADER_HOLD_MS = 900;
 
 type Props = {
   frame: ProgressLoaderFrame;
-  /** Tiempo (ms) de la animación de barra + checklist. */
   durationMs?: number;
-  /** Pausa al final antes de `onComplete`. */
-  holdMs?: number;
+  /** Si true, muestra botón «Continuar» al terminar la animación (no auto-advance). */
+  manualAdvance?: boolean;
   onComplete: () => void;
 };
 
@@ -66,14 +64,10 @@ function animatedTasks(
   })) as [LoaderTask, LoaderTask, LoaderTask];
 }
 
-/**
- * Penpot 16/22/28/31 — loaders intercalados con icono circular, barra animada,
- * % contando, checklist con spinner rotando + auto-advance.
- */
 export function ProgressLoaderScreen({
   frame,
   durationMs = LOADER_ANIMATION_MS,
-  holdMs = LOADER_HOLD_MS,
+  manualAdvance = false,
   onComplete,
 }: Props) {
   const tint = TINT_COLORS[frame.tint];
@@ -83,6 +77,7 @@ export function ProgressLoaderScreen({
   const spinAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const [displayedPct, setDisplayedPct] = useState(0);
+  const [ready, setReady] = useState(false);
   const [tasks, setTasks] = useState<[LoaderTask, LoaderTask, LoaderTask]>(() =>
     animatedTasks(frame.tasks, 0),
   );
@@ -90,6 +85,7 @@ export function ProgressLoaderScreen({
   useEffect(() => {
     progressAnim.setValue(0);
     setDisplayedPct(0);
+    setReady(false);
     setTasks(animatedTasks(frame.tasks, 0));
 
     const id = progressAnim.addListener(({ value }) => {
@@ -102,7 +98,15 @@ export function ProgressLoaderScreen({
       duration: durationMs,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
-    }).start();
+    }).start(({ finished }) => {
+      if (finished) {
+        if (manualAdvance) {
+          setReady(true);
+        } else {
+          onComplete();
+        }
+      }
+    });
 
     const spinLoop = Animated.loop(
       Animated.timing(spinAnim, {
@@ -132,16 +136,13 @@ export function ProgressLoaderScreen({
     );
     pulseLoop.start();
 
-    const t = setTimeout(onComplete, durationMs + holdMs);
-
     return () => {
       progressAnim.removeListener(id);
       progressAnim.stopAnimation();
       spinLoop.stop();
       pulseLoop.stop();
-      clearTimeout(t);
     };
-  }, [frame.id, frame.percent, frame.tasks, durationMs, holdMs, onComplete, progressAnim, spinAnim, pulseAnim]);
+  }, [frame.id, frame.percent, frame.tasks, durationMs, manualAdvance, onComplete, progressAnim, spinAnim, pulseAnim]);
 
   const barWidth = progressAnim.interpolate({
     inputRange: [0, 1],
@@ -154,7 +155,15 @@ export function ProgressLoaderScreen({
   });
 
   return (
-    <PenpotFlowShell orbVariant="thinking" contentStyle={styles.content}>
+    <PenpotFlowShell
+      orbVariant="thinking"
+      contentStyle={styles.content}
+      footer={
+        manualAdvance && ready ? (
+          <Button title="Continuar" onPress={onComplete} />
+        ) : undefined
+      }
+    >
       <View style={styles.center}>
         <View style={[styles.ring, { borderColor: tint.ring }]}>
           <Animated.View
@@ -268,12 +277,12 @@ const styles = StyleSheet.create({
   title: {
     ...Typography.h1,
     color: Colors.textPrimary,
-    fontSize: 22,
+    fontSize: 26,
     textAlign: 'center',
   },
   accent: {
     ...Typography.h1,
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: '700',
     textAlign: 'center',
     marginTop: -Spacing.xs,
@@ -292,7 +301,7 @@ const styles = StyleSheet.create({
   statusLabel: {
     ...Typography.caption,
     color: Colors.textTertiary,
-    fontSize: 12,
+    fontSize: 14,
     marginTop: -Spacing.xs,
   },
   checklist: {
@@ -307,18 +316,18 @@ const styles = StyleSheet.create({
   rowDone: {
     ...Typography.body,
     color: Colors.textSecondary,
-    fontSize: 14,
+    fontSize: 17,
   },
   rowActive: {
     ...Typography.body,
     color: Colors.textPrimary,
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: '700',
   },
   rowPending: {
     ...Typography.body,
     color: Colors.textTertiary,
-    fontSize: 14,
+    fontSize: 17,
   },
   spinner: {
     width: 18,

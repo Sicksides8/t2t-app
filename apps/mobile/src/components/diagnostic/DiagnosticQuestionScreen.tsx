@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { PenpotFlowShell } from '../penpot';
 import { Button } from '../ui';
 import type { DiagnosticOption, DiagnosticQuestion } from '../../data/diagnostic';
+import { DIAGNOSTIC_QUESTION_PRIMARY_LABEL, DIAGNOSTIC_STARTED_BANNER } from '../../constants/onboardingCopy';
 import { Colors, Radius, Spacing, Typography } from '../../theme';
 
 type Props = {
@@ -35,7 +36,7 @@ export function DiagnosticQuestionScreen({
   }, [question.id, savedValue]);
 
   const progressPct = ((questionIndex + 1) / totalQuestions) * 100;
-  const primaryLabel = question.primaryLabel ?? 'Continuar';
+  const primaryLabel = question.primaryLabel ?? DIAGNOSTIC_QUESTION_PRIMARY_LABEL;
 
   return (
     <PenpotFlowShell
@@ -61,6 +62,12 @@ export function DiagnosticQuestionScreen({
           {questionIndex + 1}/{totalQuestions}
         </Text>
       </View>
+
+      {questionIndex < 4 ? (
+        <View style={styles.diagnosticBanner}>
+          <Text style={styles.diagnosticBannerText}>{DIAGNOSTIC_STARTED_BANNER}</Text>
+        </View>
+      ) : null}
 
       <View style={styles.progressTrack}>
         <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
@@ -143,8 +150,26 @@ const styles = StyleSheet.create({
   counter: {
     ...Typography.bodyMedium,
     color: Colors.textPrimary,
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '600',
+  },
+  diagnosticBanner: {
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xs,
+    alignSelf: 'stretch',
+    backgroundColor: '#4CC35B22',
+    borderWidth: 1,
+    borderColor: '#4CC35B55',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  diagnosticBannerText: {
+    ...Typography.caption,
+    color: Colors.accentHighlight,
+    fontWeight: '700',
+    fontSize: 14,
+    textAlign: 'center',
   },
   progressTrack: {
     height: 3,
@@ -176,14 +201,14 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     color: Colors.accentHighlight,
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: 16,
     letterSpacing: 1.4,
   },
   question: {
     ...Typography.h1,
     color: Colors.textPrimary,
-    fontSize: 24,
-    lineHeight: 30,
+    fontSize: 29,
+    lineHeight: 36,
     marginTop: Spacing.sm,
   },
   options: {
@@ -229,8 +254,8 @@ const styles = StyleSheet.create({
     flex: 1,
     ...Typography.body,
     color: Colors.textPrimary,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 17,
+    lineHeight: 24,
   },
   optionTextSelected: {
     fontWeight: '600',

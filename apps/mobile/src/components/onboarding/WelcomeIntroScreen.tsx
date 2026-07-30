@@ -21,6 +21,7 @@ export function WelcomeIntroScreen({ onNext, onSkipToLogin }: Props) {
   return (
     <PenpotFlowShell
       orbVariant="default"
+      backgroundAnchor="topBlue"
       contentStyle={styles.content}
       footer={
         <View style={styles.footer}>

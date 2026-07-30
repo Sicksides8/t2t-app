@@ -8,7 +8,7 @@ const BAR_ANIMATION_MS = 2200;
 type Props = {
   title: string;
   tasks: string[];
-  statHeadline: string;
+  statHeadline?: string;
   testimonial: HookTestimonial;
 };
 
@@ -58,7 +58,7 @@ export function HookSocialProof({ title, tasks, statHeadline, testimonial }: Pro
         ))}
       </View>
 
-      <Text style={styles.statHeadline}>{statHeadline}</Text>
+      {statHeadline ? <Text style={styles.statHeadline}>{statHeadline}</Text> : null}
 
       <View style={styles.polaroidShadow}>
         <View style={styles.ribbon} />

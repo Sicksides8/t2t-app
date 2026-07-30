@@ -35,7 +35,7 @@ import { getBillingProvider } from '../../services/subscriptionService';
 import { applyCodeToUser } from '../../services/couponService';
 import { useAuthStore } from '../../stores';
 import { Colors, Spacing } from '../../theme';
-import type { PlanHorizonDays, SubscriptionPlanId, SubscriptionSource, BillingCycle } from '../../types';
+import type { PlanHorizonDays, SubtitleTrack, SubscriptionPlanId, SubscriptionSource, BillingCycle } from '../../types';
 import { getPlanDisplayName } from '../../utils/planDisplay';
 
 const HORIZON_STEP_ID = '46b_Hook_Horizonte';
@@ -48,7 +48,6 @@ function parseHorizonDays(id: string | undefined): PlanHorizonDays | null {
 }
 
 const PROGRESS_TICK_MS = 1800;
-const SOCIAL_PROOF_AUTO_MS = 5200;
 
 /**
  * Pasarela de pago a usar al activar el trial desde "Confirmar plan".
@@ -94,12 +93,19 @@ export function HooksFlowScreen() {
    * todavía no resolvió, el componente cae al fallback demo.
    */
   const [remoteWelcomeUrl, setRemoteWelcomeUrl] = useState<string | null>(null);
+  const [remoteWelcomeSubtitles, setRemoteWelcomeSubtitles] = useState<SubtitleTrack[]>([]);
   const user = useAuthStore((state) => state.user);
   const setOnboardingCompleted = useAuthStore((state) => state.setOnboardingCompleted);
   const refreshUserProfile = useAuthStore((state) => state.refreshUserProfile);
 
   // helpers
-  const steps = hooksFlowSteps;
+  const steps = useMemo(
+    () =>
+      user?.planHorizonDays
+        ? hooksFlowSteps.filter((s) => s.id !== HORIZON_STEP_ID)
+        : hooksFlowSteps,
+    [user?.planHorizonDays],
+  );
   const counted = useMemo(() => countedSteps(steps), [steps]);
 
   // Branch resolution: if we are in a branch we render that instead of the linear step
@@ -198,7 +204,10 @@ export function HooksFlowScreen() {
   useEffect(() => {
     let cancelled = false;
     void getAppConfig().then((cfg) => {
-      if (!cancelled) setRemoteWelcomeUrl(cfg.welcomeVideoUrl);
+      if (!cancelled) {
+        setRemoteWelcomeUrl(cfg.welcomeVideoUrl);
+        setRemoteWelcomeSubtitles(cfg.welcomeVideoSubtitles);
+      }
     });
     return () => {
       cancelled = true;
@@ -417,13 +426,6 @@ export function HooksFlowScreen() {
     return () => clearTimeout(t);
   }, [current, progressTaskIndex]);
 
-  // socialProof: auto-advance after a delay
-  useEffect(() => {
-    if (current.kind !== 'socialProof') return undefined;
-    const t = setTimeout(() => void persistAndAdvance(true), SOCIAL_PROOF_AUTO_MS);
-    return () => clearTimeout(t);
-  }, [current, persistAndAdvance]);
-
   const toggleOption = useCallback((id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -483,18 +485,26 @@ export function HooksFlowScreen() {
 
   // Render
   const showTopBar = current.kind !== 'welcomeVideo';
-  const showPrimaryButton =
-    current.kind !== 'progressWithQuestion' &&
-    current.kind !== 'socialProof' &&
-    current.kind !== 'welcomeVideo' &&
-    current.kind !== 'specialOffer' &&
-    current.kind !== 'confirmPlan' &&
-    current.kind !== 'badge' &&
-    current.kind !== 'planReady' &&
-    current.kind !== 'codeApplied' &&
-    current.kind !== 'personalizedPlan';
+  const showPrimaryButton = (() => {
+    if (current.kind === 'progressWithQuestion') return questionAnswered;
+    if (current.kind === 'socialProof') return true;
+    if (
+      current.kind === 'welcomeVideo' ||
+      current.kind === 'specialOffer' ||
+      current.kind === 'confirmPlan' ||
+      current.kind === 'badge' ||
+      current.kind === 'planReady' ||
+      current.kind === 'codeApplied' ||
+      current.kind === 'personalizedPlan'
+    ) {
+      return false;
+    }
+    return true;
+  })();
 
   const primaryLabel = (() => {
+    if (current.kind === 'progressWithQuestion') return 'Seguir';
+    if (current.kind === 'socialProof') return 'Continuar';
     if (current.kind === 'pricing') return current.ctaLabel;
     if (current.kind === 'redeemCode') return current.ctaLabel;
     return 'Continuar';
@@ -576,6 +586,7 @@ export function HooksFlowScreen() {
         onRedeemTap: () => setBranch({ kind: 'redeem' }),
         onWelcomeSkip: () => void finishHooks(),
         remoteWelcomeUrl,
+        remoteWelcomeSubtitles,
       })}
 
       {/* Special Offer modal */}
@@ -621,6 +632,7 @@ type RenderCtx = {
   onRedeemTap: () => void;
   onWelcomeSkip: () => void;
   remoteWelcomeUrl: string | null;
+  remoteWelcomeSubtitles: SubtitleTrack[];
 };
 
 function renderStepBody(ctx: RenderCtx) {
@@ -674,10 +686,10 @@ function renderStepBody(ctx: RenderCtx) {
           tasks={step.tasks}
           activeIndex={ctx.progressTaskIndex}
           question={step.question}
+          footnote={step.footnote}
           showQuestion={ctx.progressTaskIndex >= step.tasks.length - 1 && !ctx.questionAnswered}
           onAnswer={() => {
             ctx.setQuestionAnswered(true);
-            setTimeout(() => ctx.onAdvance(), 280);
           }}
         />
       );
@@ -691,7 +703,7 @@ function renderStepBody(ctx: RenderCtx) {
         />
       );
     case 'planReady':
-      return <HookPlanReady content={step.content} icon="trophy" />;
+      return <HookPlanReady content={step.content} icon={step.icon ?? 'rocket-outline'} />;
     case 'codeApplied':
       return <HookPlanReady content={step.content} icon="gift" />;
     case 'pricing':
@@ -778,6 +790,7 @@ function renderStepBody(ctx: RenderCtx) {
           authorName={step.authorName}
           authorRole={step.authorRole}
           videoUrl={ctx.remoteWelcomeUrl ?? step.videoUrl}
+          subtitles={ctx.remoteWelcomeSubtitles}
           skipLabel={step.skipLabel}
           onSkip={ctx.onWelcomeSkip}
         />

@@ -8,6 +8,7 @@ import { AppBackground } from './AppBackground';
 type Props = {
   children: React.ReactNode;
   orbVariant?: PenpotOrbVariant;
+  backgroundAnchor?: 'center' | 'topBlue';
   scroll?: boolean;
   contentStyle?: ViewStyle;
   header?: React.ReactNode;
@@ -18,6 +19,7 @@ type Props = {
 export function PenpotFlowShell({
   children,
   orbVariant = 'default',
+  backgroundAnchor = 'center',
   scroll = false,
   contentStyle,
   header,
@@ -31,7 +33,7 @@ export function PenpotFlowShell({
 
   return (
     <View style={styles.root}>
-      <AppBackground variant={orbVariant} />
+      <AppBackground variant={orbVariant} backgroundAnchor={backgroundAnchor} />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         {header ? <View style={styles.header}>{header}</View> : null}
         {scroll ? (

@@ -13,15 +13,19 @@ import {
   HomeSkillChip,
   HomeStreakCard,
   HomeTodayHero,
+  HomeWelcomeVideoCard,
 } from '../../components/home';
 import { EmptyState, ScreenWrapper, TAB_SCREEN_EDGES } from '../../components/ui';
 import { CourseListSkeleton } from '../../components/ui/Skeleton';
 import { skills } from '../../data/academy';
 import { getLessons, getPlanOrderedCourses, getRecommendedCourses } from '../../services/academyService';
-import { useAcademyStore, useAuthStore, useCourseStore, useNotificationStore } from '../../stores';
+import { getAppConfig } from '../../services/appConfigService';
+import { navigateToProfileScreen } from '../../navigation/profileNavigation';
+import { useAcademyStore, useAuthStore, useCourseStore, useNotificationStore, usePreferencesStore } from '../../stores';
 import { Spacing } from '../../theme';
 import { computeProfileStats } from '../../utils/profileStats';
 import { dayKey } from '../../services/streakService';
+import { displayCoursePercent } from '../../utils/courseProgress';
 import { formatHeroMeta, pickHeroCourse, pickNextLesson } from '../../utils/homeRoutine';
 import { sameSkillId } from '../../utils/skillId';
 import {
@@ -34,6 +38,7 @@ import type {
   Lesson,
   MainTabParamList,
   RootStackParamList,
+  SubtitleTrack,
   SubscriptionPlanId,
 } from '../../types';
 
@@ -56,6 +61,31 @@ export function HomeScreen() {
   const [heroLessons, setHeroLessons] = useState<Lesson[]>([]);
   const [paywallVisible, setPaywallVisible] = useState(false);
   const [paywallPlan, setPaywallPlan] = useState<SubscriptionPlanId>('pro');
+  const [remoteWelcomeUrl, setRemoteWelcomeUrl] = useState<string | null>(null);
+  const [remoteWelcomeSubtitles, setRemoteWelcomeSubtitles] = useState<SubtitleTrack[]>([]);
+  const preferencesHydrated = usePreferencesStore((state) => state.hydrated);
+  const homeWelcomeVideoDismissedByUser = usePreferencesStore(
+    (state) => state.homeWelcomeVideoDismissedByUser,
+  );
+  const dismissHomeWelcomeVideo = usePreferencesStore((state) => state.dismissHomeWelcomeVideo);
+  const hydratePreferences = usePreferencesStore((state) => state.hydrate);
+
+  useEffect(() => {
+    void hydratePreferences();
+  }, [hydratePreferences]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getAppConfig().then((cfg) => {
+      if (!cancelled) {
+        setRemoteWelcomeUrl(cfg.welcomeVideoUrl);
+        setRemoteWelcomeSubtitles(cfg.welcomeVideoSubtitles);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     void loadCourses();
@@ -78,7 +108,7 @@ export function HomeScreen() {
 
   const continueCourses = useMemo(() => {
     return displayCourses
-      .map((course) => ({ course, pct: progressMap[course.id]?.percentComplete ?? 0 }))
+      .map((course) => ({ course, pct: displayCoursePercent(progressMap[course.id]) }))
       .filter((x) => x.pct > 0 && x.pct < 100)
       .sort((a, b) => b.pct - a.pct)
       .map((x) => x.course);
@@ -116,6 +146,11 @@ export function HomeScreen() {
   const heroMeta = heroSkill
     ? formatHeroMeta(heroSkill.name, heroDurationMin)
     : 'Explorá el catálogo · Hacer hoy';
+
+  const showWelcomeVideo =
+    !!user?.id &&
+    preferencesHydrated &&
+    !homeWelcomeVideoDismissedByUser[user.id];
 
   const featuredSkills = useMemo(() => [...skills].sort((a, b) => a.order - b.order).slice(0, 4), []);
 
@@ -176,7 +211,7 @@ export function HomeScreen() {
         <HomePlanProgressCard
           horizonDays={user.planHorizonDays}
           startedAt={user.planStartedAt}
-          onPress={() => navigation.navigate('ProfileTab', { screen: 'DiagnosticApp' })}
+          onPress={() => navigateToProfileScreen(navigation, 'DiagnosticApp')}
         />
       ) : null}
 
@@ -192,7 +227,7 @@ export function HomeScreen() {
               <ContinueCourseCard
                 key={course.id}
                 course={course}
-                progressPercent={progressMap[course.id]?.percentComplete ?? 0}
+                progressPercent={displayCoursePercent(progressMap[course.id])}
                 locked={!canAccessCourse(course, user)}
                 onPress={() => openCourseFromCarousel(course)}
               />
@@ -207,6 +242,16 @@ export function HomeScreen() {
           meta={heroMeta}
           thumbnail={heroCourse.thumbnail}
           onPress={openHero}
+        />
+      ) : null}
+
+      {showWelcomeVideo ? (
+        <HomeWelcomeVideoCard
+          videoUrl={remoteWelcomeUrl ?? undefined}
+          subtitles={remoteWelcomeSubtitles}
+          onDismiss={() => {
+            if (user?.id) dismissHomeWelcomeVideo(user.id);
+          }}
         />
       ) : null}
 
@@ -241,7 +286,7 @@ export function HomeScreen() {
                 <ContinueCourseCard
                   key={course.id}
                   course={course}
-                  progressPercent={progressMap[course.id]?.percentComplete ?? 0}
+                  progressPercent={displayCoursePercent(progressMap[course.id])}
                   locked={!canAccessCourse(course, user)}
                   onPress={() => openCourseFromCarousel(course)}
                 />

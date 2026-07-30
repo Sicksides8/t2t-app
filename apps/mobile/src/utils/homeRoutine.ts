@@ -1,4 +1,5 @@
 import type { Course, CourseProgress, Lesson } from '../types';
+import { displayCoursePercent } from './courseProgress';
 
 export function pickHeroCourse(
   courses: Course[],
@@ -7,7 +8,7 @@ export function pickHeroCourse(
   if (!courses.length) return null;
 
   const inProgress = courses
-    .map((course) => ({ course, pct: progressMap[course.id]?.percentComplete ?? 0 }))
+    .map((course) => ({ course, pct: displayCoursePercent(progressMap[course.id]) }))
     .filter((x) => x.pct > 0 && x.pct < 100)
     .sort((a, b) => b.pct - a.pct);
 

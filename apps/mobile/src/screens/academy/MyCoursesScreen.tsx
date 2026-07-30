@@ -10,6 +10,7 @@ import { ScreenWrapper, TAB_SCREEN_EDGES } from '../../components/ui';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useAcademyStore, useAuthStore, useCourseStore } from '../../stores';
 import { canAccessCourse } from '../../utils/subscriptionAccess';
+import { displayCoursePercent } from '../../utils/courseProgress';
 import { Colors, Spacing } from '../../theme';
 import type { MainTabParamList, RootStackParamList } from '../../types';
 
@@ -39,7 +40,7 @@ export function MyCoursesScreen() {
     const completed: typeof allCourses = [];
 
     for (const course of allCourses) {
-      const pct = progressMap[course.id]?.percentComplete ?? 0;
+      const pct = displayCoursePercent(progressMap[course.id]);
       if (pct >= 100) completed.push(course);
       else if (pct > 0) inProgress.push(course);
     }
@@ -85,7 +86,7 @@ export function MyCoursesScreen() {
         />
       ) : (
         activeList.map((course) => {
-          const pct = progressMap[course.id]?.percentComplete ?? 0;
+          const pct = displayCoursePercent(progressMap[course.id]);
           return (
             <MyCourseRow
               key={course.id}

@@ -1,16 +1,21 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import type { ComponentProps } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Typography } from '../../theme';
 import type { HookPlanReadyContent } from '../../data/hooksFlow';
 
+type IoniconName = ComponentProps<typeof Ionicons>['name'];
+
 type Props = {
   content: HookPlanReadyContent;
-  icon?: 'trophy' | 'gift';
+  icon?: IoniconName | 'trophy' | 'gift';
 };
 
-export function HookPlanReady({ content, icon = 'trophy' }: Props) {
+export function HookPlanReady({ content, icon = 'rocket-outline' }: Props) {
+  const iconName: IoniconName =
+    icon === 'trophy' ? 'trophy' : icon === 'gift' ? 'gift' : icon;
   return (
     <View style={styles.wrap}>
       <View style={styles.glow1} />
@@ -21,7 +26,7 @@ export function HookPlanReady({ content, icon = 'trophy' }: Props) {
         end={{ x: 1, y: 1 }}
         style={styles.tile}
       >
-        <Ionicons name={icon} size={56} color="#0E2A14" />
+        <Ionicons name={iconName} size={56} color="#0E2A14" />
       </LinearGradient>
 
       <View style={styles.polaroidWrap}>

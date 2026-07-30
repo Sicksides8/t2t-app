@@ -15,7 +15,7 @@ import { flushPendingDiagnosticIfAuthenticated, loadDiagnosticResult } from '../
 import { getUserProfile, onAuthChange } from '../services/authService';
 import { recordActivity } from '../services/streakService';
 import { scheduleStreakReminder } from '../services/streakReminder';
-import { useAcademyStore, useAuthStore, useNotificationStore } from '../stores';
+import { useAcademyStore, useAuthStore, useNotificationStore, usePreferencesStore } from '../stores';
 import { Colors, Spacing, Typography } from '../theme';
 import type { RootStackParamList } from '../types';
 import AuthStack from './AuthStack';
@@ -57,6 +57,7 @@ export default function RootNavigator() {
       if (seen) {
         await setHasSeenOnboarding(JSON.parse(seen));
       }
+      await usePreferencesStore.getState().hydrate();
 
       unsub = onAuthChange(async (firebaseUser) => {
         if (!firebaseUser) {

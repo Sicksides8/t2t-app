@@ -55,15 +55,15 @@ export const SKILL_LABELS: Record<DiagnosticSkillId, string> = {
 export const SKILL_LABELS_SHORT: Record<DiagnosticSkillId, string> = {
   liderazgo: 'Liderazgo',
   influencia: 'Influencia',
-  adaptabilidad: 'Adaptabil.',
-  comunicacion: 'Comunic.',
+  adaptabilidad: 'Adaptabilidad',
+  comunicacion: 'Comunicación',
   equipo: 'Equipo',
   resolucion: 'Resolución',
   creatividad: 'Creatividad',
   escucha: 'Escucha',
-  productividad: 'Productiv.',
-  aprendizaje: 'Aprendiz.',
-  gestionEmocional: 'Gest. Emoc.',
+  productividad: 'Productividad',
+  aprendizaje: 'Aprendizaje',
+  gestionEmocional: 'Gestión emocional',
 };
 
 export const META_LABELS: Record<DiagnosticMetaId, string> = {

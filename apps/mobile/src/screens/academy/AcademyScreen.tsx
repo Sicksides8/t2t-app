@@ -13,6 +13,8 @@ import {
   DiagnosticOpenerScreen,
   OnboardingCarouselSlide,
   OnboardingCierreScreen,
+  OnboardingExperienceLevelScreen,
+  OnboardingPlanHorizonScreen,
   ProgressLoaderScreen,
   ReflectionScreen,
   SplashPenpotScreen,
@@ -25,10 +27,15 @@ import {
   progressLoaderFrames,
   reflectionFrames,
 } from '../../data/onboardingFlow';
+import {
+  CLOSURE_PRIMARY_LABEL,
+  DIAGNOSTIC_QUESTION_PRIMARY_LABEL,
+  DIAGNOSTIC_STARTED_BANNER,
+} from '../../constants/onboardingCopy';
 import { getFirstTrainingCourses } from '../../services/courseService';
 import { sendDiagnosticResultEmail } from '../../services/diagnosticEmailService';
 import { saveDiagnosticResult } from '../../services/diagnosticService';
-import { useAcademyStore, useAuthStore } from '../../stores';
+import { useAcademyStore, useAuthStore, usePreferencesStore } from '../../stores';
 import type { Course, RootStackParamList } from '../../types';
 
 export { HooksFlowScreen as HooksFlow } from './HooksFlowScreen';
@@ -52,6 +59,8 @@ type OnboardingStep =
   | { kind: 'reflection'; reflectionIndex: number } // 15, 21, 27
   | { kind: 'loader'; loaderIndex: number } // 16, 22, 28, 31
   | { kind: 'result' } // 32
+  | { kind: 'planHorizon' }
+  | { kind: 'experienceLevel' }
   | { kind: 'closure' };
 
 /**
@@ -112,6 +121,8 @@ function buildOnboardingSteps(): OnboardingStep[] {
   });
 
   steps.push({ kind: 'result' });
+  steps.push({ kind: 'planHorizon' });
+  steps.push({ kind: 'experienceLevel' });
   steps.push({ kind: 'closure' });
   return steps;
 }
@@ -138,6 +149,10 @@ export function OnboardingFlow({ navigation }: Partial<NativeStackScreenProps<Ro
   const diagnostic = useAcademyStore((state) => state.diagnostic);
   const setHasSeenOnboarding = useAuthStore((state) => state.setHasSeenOnboarding);
   const setPendingAuthRoute = useAuthStore((state) => state.setPendingAuthRoute);
+  const planHorizonDays = usePreferencesStore((state) => state.planHorizonDays);
+  const experienceLevel = usePreferencesStore((state) => state.experienceLevel);
+  const setPlanHorizonDays = usePreferencesStore((state) => state.setPlanHorizonDays);
+  const setExperienceLevel = usePreferencesStore((state) => state.setExperienceLevel);
 
   const totalSteps = ONBOARDING_STEPS.length;
   const step = ONBOARDING_STEPS[stepIndex];
@@ -271,19 +286,33 @@ export function OnboardingFlow({ navigation }: Partial<NativeStackScreenProps<Ro
 
   if (step.kind === 'reflection') {
     const frame = reflectionFrames[step.reflectionIndex];
-    return <ReflectionScreen frame={frame} onNext={goNext} />;
+    return (
+      <ReflectionScreen
+        frame={frame}
+        banner={DIAGNOSTIC_STARTED_BANNER}
+        primaryLabel={step.reflectionIndex === 0 ? DIAGNOSTIC_QUESTION_PRIMARY_LABEL : 'Continuar'}
+        onNext={goNext}
+      />
+    );
   }
 
   if (step.kind === 'loader') {
     const frame = progressLoaderFrames[step.loaderIndex];
     const isLastLoader = step.loaderIndex === progressLoaderFrames.length - 1;
+    const isAnalyzingLoader = step.loaderIndex === 0;
     const onComplete = () => {
       if (isLastLoader) {
         ensureDiagnosticReady();
       }
       goNext();
     };
-    return <ProgressLoaderScreen frame={frame} onComplete={onComplete} />;
+    return (
+      <ProgressLoaderScreen
+        frame={frame}
+        manualAdvance={isAnalyzingLoader}
+        onComplete={onComplete}
+      />
+    );
   }
 
   if (step.kind === 'result') {
@@ -319,9 +348,34 @@ export function OnboardingFlow({ navigation }: Partial<NativeStackScreenProps<Ro
     return (
       <DiagnosticRadarResultScreen
         diagnostic={diagnostic}
+        variant="onboarding"
         onPrimary={goNext}
         onSecondary={() => setResultView('email')}
         onBrainMap={() => setResultView('brainMap')}
+      />
+    );
+  }
+
+  if (step.kind === 'planHorizon') {
+    return (
+      <OnboardingPlanHorizonScreen
+        initialDays={planHorizonDays ?? 60}
+        onNext={(days) => {
+          setPlanHorizonDays(days);
+          goNext();
+        }}
+      />
+    );
+  }
+
+  if (step.kind === 'experienceLevel') {
+    return (
+      <OnboardingExperienceLevelScreen
+        initialLevel={experienceLevel}
+        onNext={(level) => {
+          setExperienceLevel(level);
+          goNext();
+        }}
       />
     );
   }
@@ -330,6 +384,7 @@ export function OnboardingFlow({ navigation }: Partial<NativeStackScreenProps<Ro
     <OnboardingCierreScreen
       courses={closureCourses}
       loading={closureLoading}
+      primaryLabel={CLOSURE_PRIMARY_LABEL}
       onStart={() => void finish()}
       onExplore={() => void finish()}
     />

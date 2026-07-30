@@ -22,6 +22,8 @@ try {
 
 type Props = {
   variant?: PenpotOrbVariant;
+  /** Desplaza el PNG para mostrar más azul arriba (p. ej. welcome). */
+  backgroundAnchor?: 'center' | 'topBlue';
 };
 
 /**
@@ -29,8 +31,7 @@ type Props = {
  * base. Esto evita el "Element type is invalid" cuando Metro no tiene el
  * asset registrado todavía.
  */
-export function AppBackground(_props: Props) {
-  void _props;
+export function AppBackground({ backgroundAnchor = 'center' }: Props) {
   if (!BG_IMAGE) {
     return <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.bg]} />;
   }
@@ -39,6 +40,7 @@ export function AppBackground(_props: Props) {
       source={BG_IMAGE}
       resizeMode="cover"
       style={[StyleSheet.absoluteFill, styles.bg]}
+      imageStyle={backgroundAnchor === 'topBlue' ? styles.imageTopBlue : undefined}
     />
   );
 }
@@ -54,5 +56,8 @@ export function AppBackgroundOrbs({ variant = 'default' }: Props) {
 const styles = StyleSheet.create({
   bg: {
     backgroundColor: Colors.bgPrimary,
+  },
+  imageTopBlue: {
+    transform: [{ translateY: -72 }],
   },
 });
