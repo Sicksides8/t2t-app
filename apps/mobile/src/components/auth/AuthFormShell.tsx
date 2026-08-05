@@ -1,10 +1,30 @@
-import React from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { createContext, useCallback, useContext, useRef } from 'react';
+import {
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { T2TLogo } from '../../assets/brand';
 import { PenpotFlowShell } from '../penpot';
 import { Button } from '../ui';
 import { Colors, Spacing, Typography } from '../../theme';
+
+type AuthScrollApi = {
+  registerField: (key: string, node: View | null) => void;
+  scrollToField: (key: string) => void;
+};
+
+const AuthScrollContext = createContext<AuthScrollApi | null>(null);
+
+export function useAuthScroll(): AuthScrollApi | null {
+  return useContext(AuthScrollContext);
+}
 
 type Props = {
   title: string;
@@ -30,6 +50,35 @@ export function AuthFormShell({
   primaryDisabled,
   footerLink,
 }: Props) {
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollContentRef = useRef<View>(null);
+  const fieldNodes = useRef<Map<string, View>>(new Map());
+
+  const registerField = useCallback((key: string, node: View | null) => {
+    if (node) fieldNodes.current.set(key, node);
+    else fieldNodes.current.delete(key);
+  }, []);
+
+  const scrollToField = useCallback((key: string) => {
+    const field = fieldNodes.current.get(key);
+    const content = scrollContentRef.current;
+    if (!field || !content || !scrollRef.current) return;
+
+    field.measureInWindow((_fx, fy) => {
+      content.measureInWindow((_cx, cy) => {
+        const yInContent = fy - cy;
+        scrollRef.current?.scrollTo({
+          y: Math.max(0, yInContent - 24),
+          animated: true,
+        });
+      });
+    });
+  }, []);
+
+  const scrollApi = useRef<AuthScrollApi>({ registerField, scrollToField }).current;
+  scrollApi.registerField = registerField;
+  scrollApi.scrollToField = scrollToField;
+
   return (
     <PenpotFlowShell
       orbVariant="auth"
@@ -50,30 +99,52 @@ export function AuthFormShell({
         </View>
       }
     >
-      {onBack ? (
-        <Pressable onPress={onBack} style={styles.backBtn} hitSlop={8}>
-          <Ionicons name="chevron-back" size={20} color={Colors.textPrimary} />
-        </Pressable>
-      ) : null}
-
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
       >
-        <Image source={T2TLogo} style={styles.logo} resizeMode="contain" accessibilityLabel="T2T Academy" />
+        {onBack ? (
+          <Pressable onPress={onBack} style={styles.backBtn} hitSlop={8}>
+            <Ionicons name="chevron-back" size={20} color={Colors.textPrimary} />
+          </Pressable>
+        ) : null}
 
-        <View style={styles.header}>
-          <Text style={styles.title}>{title}</Text>
-          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-        </View>
-        <View style={styles.form}>{children}</View>
-      </ScrollView>
+        <AuthScrollContext.Provider value={scrollApi}>
+          <ScrollView
+            ref={scrollRef}
+            style={styles.flex}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            automaticallyAdjustKeyboardInsets
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <View ref={scrollContentRef} collapsable={false}>
+              <Image
+                source={T2TLogo}
+                style={styles.logo}
+                resizeMode="contain"
+                accessibilityLabel="T2T Academy"
+              />
+
+              <View style={styles.header}>
+                <Text style={styles.title}>{title}</Text>
+                {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+              </View>
+              <View style={styles.form}>{children}</View>
+            </View>
+          </ScrollView>
+        </AuthScrollContext.Provider>
+      </KeyboardAvoidingView>
     </PenpotFlowShell>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   content: {
     flex: 1,
     paddingTop: 0,
@@ -95,7 +166,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 20,
     paddingTop: Spacing.lg,
-    paddingBottom: Spacing.xl,
+    paddingBottom: Spacing.xl + 48,
   },
   logo: {
     width: 72,

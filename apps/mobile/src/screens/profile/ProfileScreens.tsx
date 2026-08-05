@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, ActivityIndicator, Modal, Platform, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import type { CompositeScreenProps } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Constants from 'expo-constants';
@@ -28,7 +29,8 @@ import {
   ProfileStatsRow,
   ProfileUpsellRow,
 } from '../../components/profile';
-import { Button, CardGlass, ScreenWrapper, T2TCoin, TAB_SCREEN_EDGES } from '../../components/ui';
+import { Button, CardGlass, ScreenWrapper, T2TCoin, TAB_SCREEN_EDGES, AppAlert } from '../../components/ui';
+import type { AppAlertTone } from '../../components/ui';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { CourseListSkeleton } from '../../components/ui/Skeleton';
 import { profileGoBack } from '../../navigation/profileNavigation';
@@ -138,11 +140,18 @@ export function ProfileMainScreen({ navigation }: ProfileProps) {
 
   useEffect(() => {
     if (!user?.id) return;
-    void refreshUserProfile();
-    void getGamificationRepo()
-      .getUserCoins(user.id)
-      .then(() => refreshUserProfile())
-      .catch(() => undefined);
+    void (async () => {
+      try {
+        const coins = await getGamificationRepo().getUserCoins(user.id);
+        const current = useAuthStore.getState().user;
+        if (current && current.id === user.id && current.coins !== coins) {
+          useAuthStore.getState().setUser({ ...current, coins });
+        }
+        await refreshUserProfile();
+      } catch {
+        /* offline */
+      }
+    })();
   }, [user?.id, refreshUserProfile]);
 
   return (
@@ -272,43 +281,95 @@ export function EditProfileScreen({ navigation }: ProfileProps) {
   const user = useAuthStore((state) => state.user);
   const refreshUserProfile = useAuthStore((state) => state.refreshUserProfile);
   const [displayName, setDisplayName] = useState(user?.displayName || '');
-  const [bio, setBio] = useState('');
+  const [bio, setBio] = useState(user?.bio || '');
   const [busy, setBusy] = useState(false);
+  const [alert, setAlert] = useState<{
+    tone: AppAlertTone;
+    title: string;
+    message: string;
+  } | null>(null);
+
+  const emailValue = user?.email || auth.currentUser?.email || 'Sin email';
 
   useEffect(() => {
     setDisplayName(user?.displayName || '');
-  }, [user?.displayName]);
+    setBio(user?.bio || '');
+  }, [user?.displayName, user?.bio]);
 
   const saveProfile = async () => {
     if (!user?.id) return;
     const next = displayName.trim() || user.displayName;
+    const nextBio = bio.trim();
     setBusy(true);
     try {
-      await authService.updateUserFields(user.id, { displayName: next });
+      await authService.updateUserFields(user.id, { displayName: next, bio: nextBio });
       if (auth.currentUser) await updateProfile(auth.currentUser, { displayName: next });
       await refreshUserProfile();
+      setAlert({
+        tone: 'success',
+        title: 'Perfil actualizado',
+        message: 'Tus cambios se guardaron correctamente.',
+      });
+    } catch (error: unknown) {
+      if (__DEV__) {
+        console.warn('[EditProfile] save failed', error);
+      }
+      setAlert({
+        tone: 'error',
+        title: 'No se pudo guardar',
+        message: 'Revisá la conexión e intentá de nuevo.',
+      });
     } finally {
       setBusy(false);
     }
   };
 
   const pickAndUploadAvatar = async () => {
-    if (!user?.id) return;
+    if (!user?.id || busy) return;
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return;
+    if (!perm.granted) {
+      setAlert({
+        tone: 'error',
+        title: 'Permiso necesario',
+        message: 'Necesitamos acceso a tus fotos para cambiar el avatar.',
+      });
+      return;
+    }
     const picked = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.85,
     });
     if (picked.canceled || !picked.assets[0]?.uri) return;
+    const asset = picked.assets[0];
     setBusy(true);
     try {
-      const url = await uploadUserAvatar(picked.assets[0].uri, user.id);
+      const url = await uploadUserAvatar(asset.uri, user.id, {
+        size: asset.fileSize,
+        contentType: asset.mimeType,
+        filename: asset.fileName || undefined,
+      });
       await authService.updateUserFields(user.id, { avatar: url });
       if (auth.currentUser) await updateProfile(auth.currentUser, { photoURL: url });
       await refreshUserProfile();
+      setAlert({
+        tone: 'success',
+        title: 'Foto actualizada',
+        message: 'Tu foto de perfil se subió correctamente.',
+      });
+    } catch (error: unknown) {
+      if (__DEV__) {
+        console.warn('[EditProfile] avatar upload failed', error);
+      }
+      setAlert({
+        tone: 'error',
+        title: 'No se pudo subir la foto',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Revisá la conexión e intentá con otra imagen.',
+      });
     } finally {
       setBusy(false);
     }
@@ -331,17 +392,20 @@ export function EditProfileScreen({ navigation }: ProfileProps) {
         onChangeText={setDisplayName}
         placeholder={user?.displayName || 'Tu nombre'}
       />
-      <ProfileField
-        label="Email · no editable"
-        value={user?.email || 'gustavo@t2t.com'}
-        editable={false}
-      />
+      <ProfileField label="Email · no editable" value={emailValue} editable={false} />
       <ProfileField
         label="Bio"
         value={bio}
         onChangeText={setBio}
         placeholder="Contanos sobre vos..."
         multiline
+      />
+      <AppAlert
+        visible={alert !== null}
+        tone={alert?.tone ?? 'info'}
+        title={alert?.title ?? ''}
+        message={alert?.message ?? ''}
+        onConfirm={() => setAlert(null)}
       />
     </ProfileScreenShell>
   );
@@ -935,16 +999,31 @@ function formatRelative(date: Date): string {
 
 export function CoinsHistoryScreen({ navigation }: ProfileProps) {
   const user = useAuthStore((state) => state.user);
+  const refreshUserProfile = useAuthStore((state) => state.refreshUserProfile);
   const [txs, setTxs] = useState<CoinTransaction[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!user?.id) return;
-    void getGamificationRepo()
-      .getCoinTransactions(user.id)
-      .then(setTxs)
-      .finally(() => setLoading(false));
-  }, [user?.id]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!user?.id) return undefined;
+      let cancelled = false;
+      setLoading(true);
+      void (async () => {
+        try {
+          await refreshUserProfile();
+          const items = await getGamificationRepo().getCoinTransactions(user.id);
+          if (!cancelled) setTxs(items);
+        } catch {
+          if (!cancelled) setTxs([]);
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [user?.id, refreshUserProfile]),
+  );
 
   return (
     <ProfileScreenShell title="T2T Coins" navigation={navigation}>

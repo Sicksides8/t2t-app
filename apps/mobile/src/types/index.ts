@@ -35,6 +35,8 @@ export interface User {
   displayName: string;
   phone?: string;
   avatar?: string;
+  /** Bio corta del alumno (editable en perfil). */
+  bio?: string;
   role: UserRole;
   subscriptionId?: string;
   onboardingCompleted: boolean;

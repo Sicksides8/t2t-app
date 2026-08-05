@@ -5,12 +5,10 @@ import type { DiagnosticResult } from '../types';
 import { categorizeDiagnosticScores } from '../utils/diagnosticBuckets';
 import { Colors, Spacing } from '../theme';
 import { Button } from './ui';
-import {
-  DiagnosticIntro,
-  DiagnosticSectionHeader,
-  DiagnosticSkillRow,
-  DiagnosticStatTiles,
-} from './diagnostic';
+import { DiagnosticIntro } from './diagnostic/DiagnosticIntro';
+import { DiagnosticSectionHeader } from './diagnostic/DiagnosticSectionHeader';
+import { DiagnosticSkillRow } from './diagnostic/DiagnosticSkillRow';
+import { DiagnosticStatTiles } from './diagnostic/DiagnosticStatTiles';
 
 type Props = {
   diagnostic: DiagnosticResult;

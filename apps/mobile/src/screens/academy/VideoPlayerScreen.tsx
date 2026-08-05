@@ -792,9 +792,10 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
     void (async () => {
       try {
         await completeLesson(courseId, lesson.id, updated);
-        await awardLessonCompletion(courseId, lesson.id);
+        const lessonCoins = await awardLessonCompletion(courseId, lesson.id);
+        let latestCoins = lessonCoins;
         if (justFinishedCourse) {
-          await awardCourseCompletion(courseId);
+          latestCoins = await awardCourseCompletion(courseId);
           await awardCourseAchievement(courseId, courseTitle || 'Curso T2T');
           if (course?.skillImpact && !courseProgress?.skillImpactApplied) {
             const diagnostic = useAcademyStore.getState().diagnostic;
@@ -827,9 +828,13 @@ export function VideoPlayerScreen({ route, navigation }: NativeStackScreenProps<
           });
         }
         await scheduleStreakReminder();
-        if (streak.delta > 0 || streak.milestoneReached) {
-          await refreshUserProfile();
+        // Siempre sincronizar perfil: antes solo se hacía si había delta de racha
+        // y el balance de coins quedaba stale hasta reiniciar la app.
+        const authState = useAuthStore.getState();
+        if (authState.user) {
+          authState.setUser({ ...authState.user, coins: latestCoins });
         }
+        await refreshUserProfile();
       } catch {
         /* ignore network errors – local state already updated */
       }

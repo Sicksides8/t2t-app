@@ -5,4 +5,6 @@ export * from './ScreenWrapper';
 export * from './Skeleton';
 export * from './EmptyState';
 export * from './T2TCoin';
+export { AppAlert } from './AppAlert';
+export type { AppAlertTone } from './AppAlert';
 export { ProgressRing as SvgProgressRing } from './ProgressRing';

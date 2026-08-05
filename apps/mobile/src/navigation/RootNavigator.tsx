@@ -68,7 +68,13 @@ export default function RootNavigator() {
         }
 
         try {
-          setUser(await getUserProfile(firebaseUser.uid));
+          const profile = await getUserProfile(firebaseUser.uid);
+          setUser({
+            ...profile,
+            email: profile.email || firebaseUser.email || '',
+            displayName: profile.displayName || firebaseUser.displayName || 'Alumno T2T',
+            avatar: profile.avatar || firebaseUser.photoURL || undefined,
+          });
         } catch {
           setUser({
             id: firebaseUser.uid,
@@ -86,10 +92,22 @@ export default function RootNavigator() {
         }
         // Hidratar progreso desde Firestore antes de marcar inicializado
         // para que pantallas como Mis cursos arranquen con datos correctos.
-        await useAcademyStore.getState().loadUserProgress(firebaseUser.uid);
-        const remoteDiagnostic = await loadDiagnosticResult(firebaseUser.uid);
-        if (remoteDiagnostic) {
-          useAcademyStore.getState().setDiagnostic(remoteDiagnostic);
+        try {
+          await useAcademyStore.getState().loadUserProgress(firebaseUser.uid);
+        } catch (error: unknown) {
+          if (__DEV__) {
+            console.warn('[RootNavigator] loadUserProgress failed', error);
+          }
+        }
+        try {
+          const remoteDiagnostic = await loadDiagnosticResult(firebaseUser.uid);
+          if (remoteDiagnostic) {
+            useAcademyStore.getState().setDiagnostic(remoteDiagnostic);
+          }
+        } catch (error: unknown) {
+          if (__DEV__) {
+            console.warn('[RootNavigator] loadDiagnosticResult failed', error);
+          }
         }
         setInitialized();
       });

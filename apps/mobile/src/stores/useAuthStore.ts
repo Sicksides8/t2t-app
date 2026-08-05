@@ -184,9 +184,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setOnboardingCompleted: async (value) => {
     const current = get().user;
-    if (current) {
+    if (!current) return;
+    try {
       await authService.updateUserFields(current.id, { onboardingCompleted: value });
       set({ user: { ...current, onboardingCompleted: value } });
+    } catch (error: unknown) {
+      if (__DEV__) {
+        console.warn('[Auth] setOnboardingCompleted failed', error);
+      }
+      throw error;
     }
   },
 
@@ -198,8 +204,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   refreshUserProfile: async () => {
     const current = get().user;
     if (!current) return;
-    const profile = await authService.getUserProfile(current.id);
-    set({ user: profile, isAuthenticated: true });
+    try {
+      const profile = await authService.getUserProfile(current.id);
+      set({ user: profile, isAuthenticated: true });
+    } catch (error: unknown) {
+      if (__DEV__) {
+        console.warn('[Auth] refreshUserProfile failed', error);
+      }
+      return;
+    }
     try {
       await get().checkSubscriptionExpiry();
     } catch {

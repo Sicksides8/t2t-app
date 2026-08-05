@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform, StyleSheet, Text, View } from 'react-native';
 import { PenpotFlowShell, PenpotTopBar } from '../../components/penpot';
 import { Button } from '../../components/ui';
@@ -94,6 +94,8 @@ export function HooksFlowScreen() {
    */
   const [remoteWelcomeUrl, setRemoteWelcomeUrl] = useState<string | null>(null);
   const [remoteWelcomeSubtitles, setRemoteWelcomeSubtitles] = useState<SubtitleTrack[]>([]);
+  const [finishing, setFinishing] = useState(false);
+  const finishingRef = useRef(false);
   const user = useAuthStore((state) => state.user);
   const setOnboardingCompleted = useAuthStore((state) => state.setOnboardingCompleted);
   const refreshUserProfile = useAuthStore((state) => state.refreshUserProfile);
@@ -295,7 +297,18 @@ export function HooksFlowScreen() {
   }, []);
 
   const finishHooks = useCallback(async () => {
-    await setOnboardingCompleted(true);
+    if (finishingRef.current) return;
+    finishingRef.current = true;
+    setFinishing(true);
+    try {
+      await setOnboardingCompleted(true);
+    } catch (error: unknown) {
+      if (__DEV__) {
+        console.warn('[HooksFlow] finishHooks failed', error);
+      }
+      finishingRef.current = false;
+      setFinishing(false);
+    }
   }, [setOnboardingCompleted]);
 
   /**
@@ -534,7 +547,14 @@ export function HooksFlowScreen() {
       case 'personalizedPlan':
         return <Button title={current.ctaLabel} onPress={() => void persistAndAdvance(true)} />;
       case 'welcomeVideo':
-        return <Button title={current.ctaLabel} onPress={() => void persistAndAdvance(true)} />;
+        return (
+          <Button
+            title={current.ctaLabel}
+            loading={finishing}
+            disabled={finishing}
+            onPress={() => void persistAndAdvance(true)}
+          />
+        );
       case 'confirmPlan':
         return (
           <HookConfirmPlanFooter

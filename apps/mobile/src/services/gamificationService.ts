@@ -95,27 +95,36 @@ async function firestoreAddCoins(
   const userRef = doc(db, FS_COL.users, userId);
   const txRef = doc(db, FS_COL.coinsTransactions, `${userId}_${dedupeKey}`);
 
-  return runTransaction(db, async (tx) => {
-    const txSnap = await tx.get(txRef);
-    const userSnap = await tx.get(userRef);
-    const current = Number(userSnap.data()?.coins ?? 0);
+  try {
+    return await runTransaction(db, async (tx) => {
+      const txSnap = await tx.get(txRef);
+      const userSnap = await tx.get(userRef);
+      const current = Number(userSnap.data()?.coins ?? 0);
 
-    if (txSnap.exists()) {
-      return current;
-    }
+      if (txSnap.exists()) {
+        return current;
+      }
 
-    tx.set(userRef, { coins: increment(amount), updatedAt: serverTimestamp() }, { merge: true });
-    tx.set(txRef, {
-      userId,
-      amount,
-      type: 'earned',
-      reason,
-      dedupeKey,
-      createdAt: serverTimestamp(),
+      tx.set(userRef, { coins: increment(amount), updatedAt: serverTimestamp() }, { merge: true });
+      tx.set(txRef, {
+        userId,
+        amount,
+        type: 'earned',
+        reason,
+        dedupeKey,
+        createdAt: serverTimestamp(),
+      });
+
+      return current + amount;
     });
-
-    return current + amount;
-  });
+  } catch (error: unknown) {
+      // t2t_coins_transactions: create owner + get de doc inexistente (ver Console).
+      // Si rules deniegan, degradamos sin romper el flujo de la app.
+    if (__DEV__) {
+      console.warn('[gamification] award coins skipped', error);
+    }
+    return firestoreCoins(userId).catch(() => 0);
+  }
 }
 
 export const firestoreGamificationRepo: IGamificationRepository = {
@@ -266,38 +275,54 @@ export const firestoreGamificationRepo: IGamificationRepository = {
     // ID determinista para garantizar idempotencia (un certificado por usuario+curso).
     const achievementId = `${userId}_${courseId}`;
     const ref = doc(db, FS_COL.achievements, achievementId);
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-      const data = snap.data();
+    try {
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        const data = snap.data();
+        return {
+          id: snap.id,
+          userId: data.userId,
+          type: data.type || 'course_completed',
+          title: data.title,
+          description: data.description,
+          courseId: data.courseId,
+          earnedAt: data.earnedAt?.toDate?.() || new Date(),
+        } as Achievement;
+      }
+
+      await setDoc(ref, {
+        userId,
+        type: 'course_completed',
+        title: courseTitle,
+        description: `Certificado por completar el curso ${courseTitle}`,
+        courseId,
+        earnedAt: serverTimestamp(),
+      });
+
       return {
-        id: snap.id,
-        userId: data.userId,
-        type: data.type || 'course_completed',
-        title: data.title,
-        description: data.description,
-        courseId: data.courseId,
-        earnedAt: data.earnedAt?.toDate?.() || new Date(),
-      } as Achievement;
+        id: achievementId,
+        userId,
+        type: 'course_completed',
+        title: courseTitle,
+        description: `Certificado por completar el curso ${courseTitle}`,
+        courseId,
+        earnedAt: new Date(),
+      };
+    } catch (error: unknown) {
+      // t2t_achievements write:false en rules — devolver achievement local sin persistir.
+      if (__DEV__) {
+        console.warn('[gamification] award achievement skipped', error);
+      }
+      return {
+        id: achievementId,
+        userId,
+        type: 'course_completed' as const,
+        title: courseTitle,
+        description: `Certificado por completar el curso ${courseTitle}`,
+        courseId,
+        earnedAt: new Date(),
+      };
     }
-
-    await setDoc(ref, {
-      userId,
-      type: 'course_completed',
-      title: courseTitle,
-      description: `Certificado por completar el curso ${courseTitle}`,
-      courseId,
-      earnedAt: serverTimestamp(),
-    });
-
-    return {
-      id: achievementId,
-      userId,
-      type: 'course_completed',
-      title: courseTitle,
-      description: `Certificado por completar el curso ${courseTitle}`,
-      courseId,
-      earnedAt: new Date(),
-    };
   },
 };
 

@@ -33,13 +33,20 @@ export async function registerForPushNotifications(userId: string): Promise<stri
   if (finalStatus !== 'granted') return null;
 
   const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-  await setDoc(
-    doc(db, FS_COL.users, userId),
-    {
-      notificationTokens: arrayUnion(token),
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true },
-  );
+  try {
+    await setDoc(
+      doc(db, FS_COL.users, userId),
+      {
+        notificationTokens: arrayUnion(token),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+  } catch (error: unknown) {
+    if (__DEV__) {
+      console.warn('[notificationService] push token write failed', error);
+    }
+    return null;
+  }
   return token;
 }

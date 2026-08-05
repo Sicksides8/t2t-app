@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius, Spacing, Typography } from '../../theme';
+import { useAuthScroll } from './AuthFormShell';
 
 type Props = {
   label: string;
@@ -35,11 +36,24 @@ export function AuthField({
   autoComplete,
   textContentType,
 }: Props) {
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = React.useState(false);
   const isHidden = secure && !visible;
+  const fieldKey = useId();
+  const wrapRef = useRef<View>(null);
+  const authScroll = useAuthScroll();
+
+  useEffect(() => {
+    authScroll?.registerField(fieldKey, wrapRef.current);
+    return () => authScroll?.registerField(fieldKey, null);
+  }, [authScroll, fieldKey]);
 
   return (
-    <View style={styles.wrap}>
+    <View
+      ref={wrapRef}
+      style={styles.wrap}
+      collapsable={false}
+      onLayout={() => authScroll?.registerField(fieldKey, wrapRef.current)}
+    >
       <Text style={styles.label}>{label}</Text>
       <View style={styles.inputWrap}>
         <TextInput
@@ -54,6 +68,12 @@ export function AuthField({
           textContentType={textContentType}
           selectionColor={Colors.accentPrimary}
           style={[styles.input, secure && styles.inputWithEye]}
+          onFocus={() => {
+            // Delay para esperar al KeyboardAvoidingView antes de scrollear.
+            requestAnimationFrame(() => {
+              setTimeout(() => authScroll?.scrollToField(fieldKey), 80);
+            });
+          }}
         />
         {secure ? (
           <Pressable

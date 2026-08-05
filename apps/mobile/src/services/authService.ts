@@ -208,6 +208,7 @@ function fromFirestore(id: string, data: any): User {
     displayName: data.displayName || 'Alumno T2T',
     phone: data.phone,
     avatar: data.avatar,
+    bio: typeof data.bio === 'string' ? data.bio : undefined,
     role: data.role || 'student',
     subscriptionId: data.subscriptionId,
     onboardingCompleted: Boolean(data.onboardingCompleted),
@@ -260,6 +261,7 @@ export async function updateUserFields(
       | 'displayName'
       | 'phone'
       | 'avatar'
+      | 'bio'
       | 'onboardingCompleted'
       | 'diagnosticCompleted'
       | 'subscriptionId'
