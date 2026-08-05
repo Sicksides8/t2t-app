@@ -99,13 +99,22 @@ service cloud.firestore {
     }
 
     match /t2t_coins_transactions/{id} {
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow write: if false;
+      // get de doc inexistente (idempotencia client) requiere resource == null.
+      allow get: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasAll(['userId', 'amount', 'type', 'reason', 'dedupeKey', 'createdAt']);
+      allow update, delete: if false;
     }
 
     match /t2t_achievements/{id} {
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow write: if false;
+      allow get: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasAll(['userId', 'type', 'title', 'description', 'earnedAt']);
+      allow update, delete: if false;
     }
 
     match /t2t_weekly_challenges/{id} {

@@ -17,6 +17,8 @@ Resources/
 !.env.example
 !.env.local.example
 
+.vercel/
+
 android/
 ios/
 

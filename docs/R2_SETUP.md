@@ -23,7 +23,8 @@ R2 → bucket `t2t-courses` → Settings → CORS Policy → Edit. Pegar:
   {
     "AllowedOrigins": [
       "http://localhost:3000",
-      "https://crm.t2t-academy.com"
+      "https://crm.t2t-academy.com",
+      "https://TU-PROYECTO.vercel.app"
     ],
     "AllowedMethods": ["GET", "PUT", "HEAD"],
     "AllowedHeaders": ["*"],
@@ -60,6 +61,18 @@ videos/
   <courseId|new>/<timestamp>-<rand>-<filename>.mp4
 thumbnails/
   <courseId|new>/<timestamp>-<rand>-<filename>.jpg
+avatars/
+  <userId>/<timestamp>-<rand>-avatar.jpg   # app mobile (presign /api/uploads/avatar-presign)
 ```
 
 Si el usuario reemplaza un archivo o cancela el form con cambios pendientes, el endpoint `/api/admin/uploads/cleanup` borra los huérfanos en best-effort.
+
+## Avatar mobile (sin Firebase Storage)
+
+Firebase Storage está bloqueado en plan Spark. La app firma un PUT a R2 con el endpoint autenticado:
+
+`POST /api/uploads/avatar-presign` → `{ uploadUrl, publicUrl, key }`
+
+Requisitos:
+- CRM corriendo con R2 configurado en `apps/web-crm/.env`
+- Mobile con `EXPO_PUBLIC_API_BASE_URL` apuntando al CRM (ej. `http://<LAN-IP>:3000` en device físico; no uses `localhost` desde el teléfono)
