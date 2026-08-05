@@ -8,6 +8,7 @@
     "apps/waitlist-web"
   ],
   "scripts": {
+    "postinstall": "patch-package",
     "mobile": "npm --workspace apps/mobile run start",
     "mobile:android": "npm --workspace apps/mobile run android",
     "mobile:bundle": "npm --workspace apps/mobile run bundle:android",
@@ -20,6 +21,7 @@
     "audit:lesson-videos": "node firebase/scripts/audit-lesson-videos.mjs"
   },
   "devDependencies": {
-    "firebase-admin": "^13.7.0"
+    "firebase-admin": "^13.7.0",
+    "patch-package": "^8.0.1"
   }
 }

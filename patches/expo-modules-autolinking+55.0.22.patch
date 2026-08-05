@@ -1,0 +1,15 @@
+diff --git a/node_modules/expo-modules-autolinking/android/expo-gradle-plugin/expo-autolinking-plugin/src/main/kotlin/expo/modules/plugin/GeneratePackagesListTask.kt b/node_modules/expo-modules-autolinking/android/expo-gradle-plugin/expo-autolinking-plugin/src/main/kotlin/expo/modules/plugin/GeneratePackagesListTask.kt
+index 1111111..2222222 100644
+--- a/node_modules/expo-modules-autolinking/android/expo-gradle-plugin/expo-autolinking-plugin/src/main/kotlin/expo/modules/plugin/GeneratePackagesListTask.kt
++++ b/node_modules/expo-modules-autolinking/android/expo-gradle-plugin/expo-autolinking-plugin/src/main/kotlin/expo/modules/plugin/GeneratePackagesListTask.kt
+@@ -52,7 +52,9 @@ abstract class GeneratePackagesListTask : DefaultTask() {
+   }
+ 
+   private fun generatePackageListFileContent(): String {
+-    return """package ${namespace.get()};
++    return """@file:OptIn(com.facebook.react.common.annotations.UnstableReactNativeAPI::class)
++
++package ${namespace.get()};
+ 
+ import expo.modules.core.interfaces.Package;
+ import expo.modules.kotlin.modules.Module;
